@@ -5,6 +5,9 @@ on:
     types: [published]
   workflow_dispatch:  # Allow manual trigger for testing
 
+env:
+  GIT_LFS_SKIP_SMUDGE: 1  # Skip LFS to avoid bandwidth quota issues
+
 jobs:
   build_wheels:
     name: Build wheels on ${{ matrix.os }}

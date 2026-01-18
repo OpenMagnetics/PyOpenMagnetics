@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main, master, develop]
 
+env:
+  GIT_LFS_SKIP_SMUDGE: 1  # Skip LFS to avoid bandwidth quota issues
+
 jobs:
   test:
     name: Test on ${{ matrix.os }} / Python ${{ matrix.python-version }}

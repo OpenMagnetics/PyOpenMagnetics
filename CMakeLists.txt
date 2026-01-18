@@ -112,6 +112,8 @@ FetchContent_Declare(MKF
         GIT_TAG main)
 
 message(STATUS "Fetching mas")
+# Skip Git LFS to avoid bandwidth quota issues - data files are optional for build
+set(ENV{GIT_LFS_SKIP_SMUDGE} "1")
 FetchContent_Declare(
        mas
        GIT_REPOSITORY https://github.com/OpenMagnetics/MAS.git
