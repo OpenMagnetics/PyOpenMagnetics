@@ -25,6 +25,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          
+      - name: Install quicktype
+        run: npm install -g quicktype
 
       - name: Install build dependencies
         run: |
@@ -68,3 +71,4 @@ jobs:
           ls -la dist/
           echo "--- Wheel contents ---"
           python -m zipfile -l dist/*.whl | head -50
+
