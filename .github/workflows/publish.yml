@@ -24,6 +24,14 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install quicktype
+        run: npm install -g quicktype
+
       - name: Install cibuildwheel
         run: python -m pip install cibuildwheel==2.21.3
 
@@ -36,6 +44,11 @@ jobs:
           CIBW_SKIP: "*-win32 *-manylinux_i686 *musllinux* pp*"
           # Use manylinux2014 for broader compatibility
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+          # Install Node.js and quicktype in the build container (Linux)
+          CIBW_BEFORE_ALL_LINUX: |
+            curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - && yum install -y nodejs && npm install -g quicktype
+          CIBW_BEFORE_ALL_MACOS: npm install -g quicktype
+          CIBW_BEFORE_ALL_WINDOWS: npm install -g quicktype
           # Install build dependencies
           CIBW_BEFORE_BUILD: pip install scikit-build-core cmake ninja pybind11
           # Test the wheel
@@ -58,6 +71,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install quicktype
+        run: npm install -g quicktype
 
       - name: Install build
         run: python -m pip install build
