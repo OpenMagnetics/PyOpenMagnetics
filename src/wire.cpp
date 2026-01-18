@@ -438,48 +438,418 @@ std::vector<std::string> get_available_wire_standards() {
 
 void register_wire_bindings(py::module& m) {
     // Wires and materials
-    m.def("get_wires", &get_wires, "Retrieve all available wires as JSON objects");
-    m.def("get_wire_materials", &get_wire_materials, "Retrieve all available wire materials");
-    m.def("get_wire_names", &get_wire_names, "Retrieve list of all wire names");
-    m.def("get_wire_material_names", &get_wire_material_names, "Retrieve list of all wire material names");
+    m.def("get_wires", &get_wires,
+        R"pbdoc(
+        Retrieve all available wires from the database.
+        
+        Returns complete wire specifications including:
+        - Type (round, litz, rectangular, foil)
+        - Conductor dimensions
+        - Coating/insulation properties
+        - Standard designation
+        
+        Returns:
+            JSON array of Wire objects.
+        )pbdoc");
+    
+    m.def("get_wire_materials", &get_wire_materials,
+        R"pbdoc(
+        Retrieve all available wire conductor materials.
+        
+        Returns material properties including:
+        - Resistivity vs temperature
+        - Density
+        - Standard designations
+        
+        Returns:
+            JSON array of WireMaterial objects (copper, aluminum, etc.).
+        )pbdoc");
+    
+    m.def("get_wire_names", &get_wire_names,
+        R"pbdoc(
+        Retrieve list of all wire names in database.
+        
+        Returns:
+            JSON array of wire name strings.
+        )pbdoc");
+    
+    m.def("get_wire_material_names", &get_wire_material_names,
+        R"pbdoc(
+        Retrieve list of all wire material names.
+        
+        Returns:
+            JSON array of material name strings.
+        )pbdoc");
 
     // Lookup functions
-    m.def("find_wire_by_name", &find_wire_by_name, "Find wire data by name");
-    m.def("find_wire_material_by_name", &find_wire_material_by_name, "Find wire material data by name");
-    m.def("find_wire_by_dimension", &find_wire_by_dimension, "Find wire by dimension, type, and standard");
+    m.def("find_wire_by_name", &find_wire_by_name,
+        R"pbdoc(
+        Find complete wire data by name.
+        
+        Args:
+            name: Wire name (e.g., "Round 0.5 - Grade 1").
+        
+        Returns:
+            JSON Wire object with full specification.
+        )pbdoc",
+        py::arg("name"));
+    
+    m.def("find_wire_material_by_name", &find_wire_material_by_name,
+        R"pbdoc(
+        Find wire conductor material data by name.
+        
+        Args:
+            name: Material name (e.g., "copper", "aluminum").
+        
+        Returns:
+            JSON WireMaterial object.
+        )pbdoc",
+        py::arg("name"));
+    
+    m.def("find_wire_by_dimension", &find_wire_by_dimension,
+        R"pbdoc(
+        Find wire by dimension, type, and standard.
+        
+        Searches for the closest matching wire in the database.
+        
+        Args:
+            dimension: Target dimension in meters (diameter for round wire).
+            wire_type_json: Wire type ("round", "litz", "rectangular", "foil").
+            wire_standard_json: Standard ("IEC 60317", "NEMA MW 1000", etc.).
+        
+        Returns:
+            JSON Wire object matching criteria.
+        )pbdoc",
+        py::arg("dimension"), py::arg("wire_type_json"), py::arg("wire_standard_json"));
 
     // Wire data functions
-    m.def("get_wire_data", &get_wire_data, "Get complete wire data from specification");
-    m.def("get_wire_data_by_name", &get_wire_data_by_name, "Get wire data by name");
-    m.def("get_wire_data_by_standard_name", &get_wire_data_by_standard_name, "Get wire data by standard designation");
-    m.def("get_strand_by_standard_name", &get_strand_by_standard_name, "Get strand data by standard designation");
-    m.def("get_wire_conducting_diameter_by_standard_name", &get_wire_conducting_diameter_by_standard_name, "Get conducting diameter by standard name");
+    m.def("get_wire_data", &get_wire_data,
+        R"pbdoc(
+        Get complete wire data from winding specification.
+        
+        Resolves wire reference to full wire data.
+        
+        Args:
+            winding_data_json: JSON Winding object with wire field.
+        
+        Returns:
+            JSON Wire object with complete specification.
+        )pbdoc",
+        py::arg("winding_data_json"));
+    
+    m.def("get_wire_data_by_name", &get_wire_data_by_name,
+        R"pbdoc(
+        Get wire data by name.
+        
+        Args:
+            name: Wire name string.
+        
+        Returns:
+            JSON Wire object.
+        )pbdoc",
+        py::arg("name"));
+    
+    m.def("get_wire_data_by_standard_name", &get_wire_data_by_standard_name,
+        R"pbdoc(
+        Get wire data by standard designation (e.g., AWG or IEC size).
+        
+        Args:
+            standard_name: Standard wire size (e.g., "AWG 24", "0.50 mm").
+        
+        Returns:
+            JSON Wire object.
+        )pbdoc",
+        py::arg("standard_name"));
+    
+    m.def("get_strand_by_standard_name", &get_strand_by_standard_name,
+        R"pbdoc(
+        Get strand wire data by standard name (for litz wire strands).
+        
+        Args:
+            standard_name: Strand size designation.
+        
+        Returns:
+            JSON Wire object for individual strand.
+        )pbdoc",
+        py::arg("standard_name"));
+    
+    m.def("get_wire_conducting_diameter_by_standard_name", &get_wire_conducting_diameter_by_standard_name,
+        R"pbdoc(
+        Get bare conductor diameter by standard name.
+        
+        Args:
+            standard_name: Wire size designation.
+        
+        Returns:
+            Conducting diameter in meters.
+        )pbdoc",
+        py::arg("standard_name"));
 
     // Wire dimensions
-    m.def("get_wire_outer_width_rectangular", &get_wire_outer_width_rectangular, "Get outer width of rectangular wire");
-    m.def("get_wire_outer_height_rectangular", &get_wire_outer_height_rectangular, "Get outer height of rectangular wire");
-    m.def("get_wire_outer_diameter_bare_litz", &get_wire_outer_diameter_bare_litz, "Get outer diameter of bare litz wire");
-    m.def("get_wire_outer_diameter_served_litz", &get_wire_outer_diameter_served_litz, "Get outer diameter of served litz wire");
-    m.def("get_wire_outer_diameter_insulated_litz", &get_wire_outer_diameter_insulated_litz, "Get outer diameter of insulated litz wire");
-    m.def("get_wire_outer_diameter_enamelled_round", &get_wire_outer_diameter_enamelled_round, "Get outer diameter of enamelled round wire");
-    m.def("get_wire_outer_diameter_insulated_round", &get_wire_outer_diameter_insulated_round, "Get outer diameter of insulated round wire");
-    m.def("get_outer_dimensions", &get_outer_dimensions, "Get outer dimensions of a wire");
+    m.def("get_wire_outer_width_rectangular", &get_wire_outer_width_rectangular,
+        R"pbdoc(
+        Get total outer width of rectangular wire including insulation.
+        
+        Args:
+            conducting_width: Conductor width in meters.
+            grade: Insulation grade (1, 2, 3).
+            wire_standard_json: Wire standard (e.g., "IEC 60317").
+        
+        Returns:
+            Outer width in meters.
+        )pbdoc",
+        py::arg("conducting_width"), py::arg("grade"), py::arg("wire_standard_json"));
+    
+    m.def("get_wire_outer_height_rectangular", &get_wire_outer_height_rectangular,
+        R"pbdoc(
+        Get total outer height of rectangular wire including insulation.
+        
+        Args:
+            conducting_height: Conductor height in meters.
+            grade: Insulation grade (1, 2, 3).
+            wire_standard_json: Wire standard (e.g., "IEC 60317").
+        
+        Returns:
+            Outer height in meters.
+        )pbdoc",
+        py::arg("conducting_height"), py::arg("grade"), py::arg("wire_standard_json"));
+    
+    m.def("get_wire_outer_diameter_bare_litz", &get_wire_outer_diameter_bare_litz,
+        R"pbdoc(
+        Get outer diameter of bare litz bundle (no serving).
+        
+        Args:
+            conducting_diameter: Strand conductor diameter in meters.
+            number_conductors: Number of strands in bundle.
+            grade: Strand insulation grade (1, 2, 3).
+            wire_standard_json: Wire standard (e.g., "IEC 60317").
+        
+        Returns:
+            Bundle diameter in meters.
+        )pbdoc",
+        py::arg("conducting_diameter"), py::arg("number_conductors"), py::arg("grade"), py::arg("wire_standard_json"));
+    
+    m.def("get_wire_outer_diameter_served_litz", &get_wire_outer_diameter_served_litz,
+        R"pbdoc(
+        Get outer diameter of litz wire with serving.
+        
+        Args:
+            conducting_diameter: Strand conductor diameter in meters.
+            number_conductors: Number of strands in bundle.
+            grade: Strand insulation grade (1, 2, 3).
+            number_layers: Number of serving layers.
+            wire_standard_json: Wire standard (e.g., "IEC 60317").
+        
+        Returns:
+            Served diameter in meters.
+        )pbdoc",
+        py::arg("conducting_diameter"), py::arg("number_conductors"), py::arg("grade"), py::arg("number_layers"), py::arg("wire_standard_json"));
+    
+    m.def("get_wire_outer_diameter_insulated_litz", &get_wire_outer_diameter_insulated_litz,
+        R"pbdoc(
+        Get outer diameter of fully insulated litz wire.
+        
+        Args:
+            conducting_diameter: Strand conductor diameter in meters.
+            number_conductors: Number of strands in bundle.
+            number_layers: Number of insulation layers.
+            thickness_layers: Thickness per insulation layer in meters.
+            grade: Strand insulation grade (1, 2, 3).
+            wire_standard_json: Wire standard (e.g., "IEC 60317").
+        
+        Returns:
+            Insulated diameter in meters.
+        )pbdoc",
+        py::arg("conducting_diameter"), py::arg("number_conductors"), py::arg("number_layers"), py::arg("thickness_layers"), py::arg("grade"), py::arg("wire_standard_json"));
+    
+    m.def("get_wire_outer_diameter_enamelled_round", &get_wire_outer_diameter_enamelled_round,
+        R"pbdoc(
+        Get outer diameter of enamelled round wire.
+        
+        Includes conductor plus enamel coating.
+        
+        Args:
+            conducting_diameter: Conductor diameter in meters.
+            grade: Insulation grade (1, 2, 3).
+            wire_standard_json: Wire standard (e.g., "IEC 60317").
+        
+        Returns:
+            Outer diameter in meters.
+        )pbdoc",
+        py::arg("conducting_diameter"), py::arg("grade"), py::arg("wire_standard_json"));
+    
+    m.def("get_wire_outer_diameter_insulated_round", &get_wire_outer_diameter_insulated_round,
+        R"pbdoc(
+        Get outer diameter of insulated round wire.
+        
+        Includes all insulation layers.
+        
+        Args:
+            conducting_diameter: Conductor diameter in meters.
+            number_layers: Number of insulation layers.
+            thickness_layers: Thickness per insulation layer in meters.
+            wire_standard_json: Wire standard (e.g., "IEC 60317").
+        
+        Returns:
+            Outer diameter in meters.
+        )pbdoc",
+        py::arg("conducting_diameter"), py::arg("number_layers"), py::arg("thickness_layers"), py::arg("wire_standard_json"));
+    
+    m.def("get_outer_dimensions", &get_outer_dimensions,
+        R"pbdoc(
+        Get outer dimensions of any wire type.
+        
+        Universal function that handles all wire types.
+        
+        Args:
+            wire_json: JSON Wire object.
+        
+        Returns:
+            JSON array of dimensions [width, height] or [diameter] in meters.
+        )pbdoc",
+        py::arg("wire_json"));
 
     // Wire utilities
-    m.def("get_equivalent_wire", &get_equivalent_wire, "Get equivalent wire for comparison");
-    m.def("get_coating", &get_coating, "Get coating data for a wire");
-    m.def("get_coating_label", &get_coating_label, "Get coating label for a wire");
-    m.def("get_wire_coating_by_label", &get_wire_coating_by_label, "Get wire coating data by label");
-    m.def("get_coating_labels_by_type", &get_coating_labels_by_type, "Get available coating labels by type");
-    m.def("get_coating_thickness", &get_coating_thickness, "Get thickness of wire coating");
-    m.def("get_coating_relative_permittivity", &get_coating_relative_permittivity, "Get relative permittivity of coating");
-    m.def("get_coating_insulation_material", &get_coating_insulation_material, "Get insulation material of coating");
+    m.def("get_equivalent_wire", &get_equivalent_wire,
+        R"pbdoc(
+        Get equivalent wire for comparison or substitution.
+        
+        Finds a wire with similar electrical characteristics.
+        
+        Args:
+            old_wire_json: JSON Wire object to find equivalent for.
+            new_wire_type_json: Target wire type ("round", "litz", etc.).
+            effective_frequency: Operating frequency in Hz.
+        
+        Returns:
+            JSON Wire object representing equivalent.
+        )pbdoc",
+        py::arg("old_wire_json"), py::arg("new_wire_type_json"), py::arg("effective_frequency"));
+    
+    m.def("get_coating", &get_coating,
+        R"pbdoc(
+        Get coating/insulation data for a wire.
+        
+        Args:
+            wire_json: JSON Wire object.
+        
+        Returns:
+            JSON WireCoating object.
+        )pbdoc",
+        py::arg("wire_json"));
+    
+    m.def("get_coating_label", &get_coating_label,
+        R"pbdoc(
+        Get human-readable coating label for a wire.
+        
+        Args:
+            wire_json: JSON Wire object.
+        
+        Returns:
+            Coating label string (e.g., "Grade 1", "Triple Insulated").
+        )pbdoc",
+        py::arg("wire_json"));
+    
+    m.def("get_wire_coating_by_label", &get_wire_coating_by_label,
+        R"pbdoc(
+        Get wire coating specification by label.
+        
+        Args:
+            label: Coating label string.
+        
+        Returns:
+            JSON WireCoating object.
+        )pbdoc",
+        py::arg("label"));
+    
+    m.def("get_coating_labels_by_type", &get_coating_labels_by_type,
+        R"pbdoc(
+        Get available coating labels for a wire type.
+        
+        Args:
+            wire_type_json: Wire type.
+        
+        Returns:
+            List of available coating label strings.
+        )pbdoc",
+        py::arg("wire_type_json"));
+    
+    m.def("get_coating_thickness", &get_coating_thickness,
+        R"pbdoc(
+        Get thickness of wire coating/insulation.
+        
+        Args:
+            wire_json: JSON Wire object.
+        
+        Returns:
+            Coating thickness in meters.
+        )pbdoc",
+        py::arg("wire_json"));
+    
+    m.def("get_coating_relative_permittivity", &get_coating_relative_permittivity,
+        R"pbdoc(
+        Get relative permittivity (dielectric constant) of coating.
+        
+        Used for stray capacitance calculations.
+        
+        Args:
+            wire_json: JSON Wire object.
+        
+        Returns:
+            Relative permittivity (dimensionless).
+        )pbdoc",
+        py::arg("wire_json"));
+    
+    m.def("get_coating_insulation_material", &get_coating_insulation_material,
+        R"pbdoc(
+        Get insulation material of wire coating.
+        
+        Args:
+            wire_json: JSON Wire object.
+        
+        Returns:
+            JSON InsulationMaterial object.
+        )pbdoc",
+        py::arg("wire_json"));
 
     // Availability queries
-    m.def("get_available_wires", &get_available_wires, "Get list of all available wires");
-    m.def("get_unique_wire_diameters", &get_unique_wire_diameters, "Get list of unique wire diameters");
-    m.def("get_available_wire_types", &get_available_wire_types, "Get list of available wire types");
-    m.def("get_available_wire_standards", &get_available_wire_standards, "Get list of available wire standards");
+    m.def("get_available_wires", &get_available_wires,
+        R"pbdoc(
+        Get list of all available wire names.
+        
+        Returns:
+            List of wire name strings.
+        )pbdoc");
+    
+    m.def("get_unique_wire_diameters", &get_unique_wire_diameters,
+        R"pbdoc(
+        Get list of unique wire diameters for a standard.
+        
+        Useful for wire selection UI.
+        
+        Args:
+            wire_standard_json: Wire standard to query.
+        
+        Returns:
+            List of standard size designation strings.
+        )pbdoc",
+        py::arg("wire_standard_json"));
+    
+    m.def("get_available_wire_types", &get_available_wire_types,
+        R"pbdoc(
+        Get list of available wire types.
+        
+        Returns:
+            List of type strings: "round", "litz", "rectangular", "foil".
+        )pbdoc");
+    
+    m.def("get_available_wire_standards", &get_available_wire_standards,
+        R"pbdoc(
+        Get list of available wire standards.
+        
+        Returns:
+            List of standard strings: "IEC 60317", "NEMA MW 1000", etc.
+        )pbdoc");
 }
 
 } // namespace PyMKF

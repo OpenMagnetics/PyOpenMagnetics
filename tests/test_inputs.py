@@ -1,12 +1,12 @@
 """
-Tests for PyMKF Inputs processing.
+Tests for PyOpenMagnetics Inputs processing.
 
 These tests mirror TestInputs.cpp from the MKF test suite, verifying that
 input processing, waveform analysis, and harmonic calculation work correctly.
 """
 import pytest
 import math
-import PyMKF
+import PyOpenMagnetics
 
 
 class TestInputsProcessing:
@@ -25,7 +25,7 @@ class TestInputsProcessing:
             "operatingPoints": [triangular_operating_point]
         }
         
-        result = PyMKF.process_inputs(inputs)
+        result = PyOpenMagnetics.process_inputs(inputs)
         assert "operatingPoints" in result
         
         excitation = result["operatingPoints"][0]["excitationsPerWinding"][0]
@@ -56,7 +56,7 @@ class TestInputsProcessing:
             "operatingPoints": [sinusoidal_operating_point]
         }
         
-        result = PyMKF.process_inputs(inputs)
+        result = PyOpenMagnetics.process_inputs(inputs)
         excitation = result["operatingPoints"][0]["excitationsPerWinding"][0]
         current = excitation["current"]
         
@@ -81,7 +81,7 @@ class TestInputsProcessing:
             "operatingPoints": [rectangular_voltage_operating_point]
         }
         
-        result = PyMKF.process_inputs(inputs)
+        result = PyOpenMagnetics.process_inputs(inputs)
         excitation = result["operatingPoints"][0]["excitationsPerWinding"][0]
         voltage = excitation["voltage"]
         
@@ -99,7 +99,7 @@ class TestInputsProcessing:
     @pytest.mark.xfail(reason="C++ library issue with transformer inputs")
     def test_transformer_inputs_with_turns_ratio(self, transformer_inputs):
         """Test processing of transformer inputs with turns ratio."""
-        result = PyMKF.process_inputs(transformer_inputs)
+        result = PyOpenMagnetics.process_inputs(transformer_inputs)
         
         # Should have design requirements preserved
         assert "designRequirements" in result
@@ -108,7 +108,7 @@ class TestInputsProcessing:
 
     def test_high_frequency_inputs(self, high_frequency_inputs):
         """Test processing of high frequency inputs (~500kHz)."""
-        result = PyMKF.process_inputs(high_frequency_inputs)
+        result = PyOpenMagnetics.process_inputs(high_frequency_inputs)
         
         excitation = result["operatingPoints"][0]["excitationsPerWinding"][0]
         assert excitation["frequency"] == 500000
@@ -119,7 +119,7 @@ class TestOperatingPointConditions:
 
     def test_ambient_temperature_preserved(self, inductor_inputs):
         """Verify ambient temperature is preserved in processing."""
-        result = PyMKF.process_inputs(inductor_inputs)
+        result = PyOpenMagnetics.process_inputs(inductor_inputs)
         conditions = result["operatingPoints"][0]["conditions"]
         assert "ambientTemperature" in conditions
         assert conditions["ambientTemperature"] == 25
@@ -169,7 +169,7 @@ class TestOperatingPointConditions:
             ]
         }
         
-        result = PyMKF.process_inputs(inputs)
+        result = PyOpenMagnetics.process_inputs(inputs)
         assert len(result["operatingPoints"]) == 2
         assert result["operatingPoints"][0]["name"] == "Low Power"
         assert result["operatingPoints"][1]["name"] == "High Power"
@@ -180,20 +180,20 @@ class TestDesignRequirements:
 
     def test_magnetizing_inductance_nominal(self, inductor_inputs):
         """Test magnetizing inductance is preserved."""
-        result = PyMKF.process_inputs(inductor_inputs)
+        result = PyOpenMagnetics.process_inputs(inductor_inputs)
         mag_ind = result["designRequirements"]["magnetizingInductance"]
         assert "nominal" in mag_ind
         assert abs(mag_ind["nominal"] - 100e-6) < 1e-9
 
     def test_turns_ratios_empty_for_inductor(self, inductor_inputs):
         """Inductor should have empty turns ratios."""
-        result = PyMKF.process_inputs(inductor_inputs)
+        result = PyOpenMagnetics.process_inputs(inductor_inputs)
         assert result["designRequirements"]["turnsRatios"] == []
 
     @pytest.mark.xfail(reason="C++ library issue with transformer inputs")
     def test_turns_ratios_for_transformer(self, transformer_inputs):
         """Transformer should have non-empty turns ratios."""
-        result = PyMKF.process_inputs(transformer_inputs)
+        result = PyOpenMagnetics.process_inputs(transformer_inputs)
         ratios = result["designRequirements"]["turnsRatios"]
         assert len(ratios) == 1
         assert abs(ratios[0]["nominal"] - 0.307692) < 0.001

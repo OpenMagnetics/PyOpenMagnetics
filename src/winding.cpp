@@ -142,7 +142,7 @@ json wind(json coilJson, size_t repetitions, json proportionPerWindingJson, json
 
 json wind_planar(json coilJson, json stackUpJson, double borderToWireDistance, json wireToWireDistanceJson, json insulationThicknessJson, double coreToLayerDistance) {
     try {
-        OpenMagnetics::settings->set_coil_wind_even_if_not_fit(true);
+        OpenMagnetics::settings.set_coil_wind_even_if_not_fit(true);
         auto coil = OpenMagnetics::Coil(coilJson, false);
         std::vector<size_t> stackUp = stackUpJson;
         std::map<std::pair<size_t, size_t>, double> insulationThickness = insulationThicknessJson.get<std::map<std::pair<size_t, size_t>, double>>();
@@ -594,34 +594,314 @@ json get_isolation_side_from_index(size_t index) {
 
 void register_winding_bindings(py::module& m) {
     // Winding functions
-    m.def("wind", &wind, "Wind coils on a magnetic core according to specifications");
-    m.def("wind_planar", &wind_planar, "Wind planar coils");
-    m.def("wind_by_sections", &wind_by_sections, "Wind coil organized by sections");
-    m.def("wind_by_layers", &wind_by_layers, "Wind coil organized by layers");
-    m.def("wind_by_turns", &wind_by_turns, "Wind coil turn by turn");
-    m.def("delimit_and_compact", &delimit_and_compact, "Delimit and compact winding layout");
+    m.def("wind", &wind,
+        R"pbdoc(
+        Wind coils on a magnetic core according to specifications.
+        
+        The main winding function that places turns in the winding window,
+        organizing them into sections, layers, and individual turns. Supports
+        various winding patterns including interleaved and sectored windings.
+        
+        Args:
+            coil_json: JSON object containing:
+                - bobbin: Bobbin specification or name
+                - functionalDescription: Array of Winding objects with:
+                    - name: Winding identifier (e.g., "Primary", "Secondary")
+                    - numberTurns: Number of turns for this winding
+                    - numberParallels: Number of parallel conductors
+                    - wire: Wire specification or name
+                - layersOrientation: Optional layer stacking direction
+                - turnsAlignment: Optional turn alignment within layers
+            repetitions: Number of times to repeat the winding pattern.
+            proportion_per_winding_json: Proportion of window for each winding.
+            pattern_json: Winding order pattern (e.g., [0, 1] for P-S-P-S).
+            margin_pairs_json: Margin tape pairs [[left, right], ...].
+        
+        Returns:
+            JSON Coil object with complete descriptions:
+                - functionalDescription: Input winding specs
+                - sectionsDescription: Section-level organization
+                - layersDescription: Layer-level arrangement
+                - turnsDescription: Individual turn positions
+        
+        Example:
+            >>> coil = {
+            ...     "bobbin": bobbin_data,
+            ...     "functionalDescription": [
+            ...         {"name": "Primary", "numberTurns": 20, "numberParallels": 1, "wire": "Round 0.5 - Grade 1"},
+            ...         {"name": "Secondary", "numberTurns": 5, "numberParallels": 2, "wire": "Round 1.0 - Grade 1"}
+            ...     ]
+            ... }
+            >>> result = PyMKF.wind(coil, 2, [0.5, 0.5], [0, 1], [[0.001, 0.001]])
+        )pbdoc",
+        py::arg("coil_json"), py::arg("repetitions"), py::arg("proportion_per_winding_json"),
+        py::arg("pattern_json"), py::arg("margin_pairs_json"));
+    
+    m.def("wind_planar", &wind_planar,
+        R"pbdoc(
+        Wind planar (PCB) coils with layer stack-up specification.
+        
+        For PCB-integrated magnetics with traces on multiple layers.
+        
+        Args:
+            coil_json: JSON Coil specification.
+            stack_up_json: Layer stack-up array [winding_index per layer].
+            border_to_wire_distance: Clearance from board edge in meters.
+            wire_to_wire_distance_json: Spacing between traces per layer.
+            insulation_thickness_json: Insulation between layer pairs.
+            core_to_layer_distance: Gap between core and first layer.
+        
+        Returns:
+            JSON Coil object with planar winding arrangement.
+        )pbdoc",
+        py::arg("coil_json"), py::arg("stack_up_json"), py::arg("border_to_wire_distance"),
+        py::arg("wire_to_wire_distance_json"), py::arg("insulation_thickness_json"), py::arg("core_to_layer_distance"));
+    
+    m.def("wind_by_sections", &wind_by_sections,
+        R"pbdoc(
+        Wind coil organized by sections only (no layer/turn details).
+        
+        Creates section-level description for initial design exploration.
+        
+        Args:
+            coil_json: JSON Coil specification.
+            repetitions: Pattern repetition count.
+            proportion_per_winding_json: Window proportion per winding.
+            pattern_json: Winding order pattern.
+            insulation_thickness: Inter-section insulation in meters.
+        
+        Returns:
+            JSON Coil with sectionsDescription populated.
+        )pbdoc",
+        py::arg("coil_json"), py::arg("repetitions"), py::arg("proportion_per_winding_json"),
+        py::arg("pattern_json"), py::arg("insulation_thickness"));
+    
+    m.def("wind_by_layers", &wind_by_layers,
+        R"pbdoc(
+        Wind coil with layer-level detail from section description.
+        
+        Takes a coil with sections and generates layer arrangement.
+        
+        Args:
+            coil_json: JSON Coil with sectionsDescription.
+            insulation_layers_json: Insulation layer specs between windings.
+            insulation_thickness: Default insulation thickness in meters.
+        
+        Returns:
+            JSON Coil with layersDescription populated.
+        )pbdoc",
+        py::arg("coil_json"), py::arg("insulation_layers_json"), py::arg("insulation_thickness"));
+    
+    m.def("wind_by_turns", &wind_by_turns,
+        R"pbdoc(
+        Wind coil with turn-level detail from layer description.
+        
+        Places individual turns within defined layers.
+        
+        Args:
+            coil_json: JSON Coil with layersDescription.
+        
+        Returns:
+            JSON Coil with turnsDescription populated.
+        )pbdoc",
+        py::arg("coil_json"));
+    
+    m.def("delimit_and_compact", &delimit_and_compact,
+        R"pbdoc(
+        Delimit and compact winding layout to minimize window usage.
+        
+        Optimizes turn positions within the winding window.
+        
+        Args:
+            coil_json: JSON Coil with complete winding description.
+        
+        Returns:
+            JSON Coil with optimized turn positions.
+        )pbdoc",
+        py::arg("coil_json"));
 
     // Layer and section functions
-    m.def("get_layers_by_winding_index", &get_layers_by_winding_index, "Get layers for a specific winding index");
-    m.def("get_layers_by_section", &get_layers_by_section, "Get layers within a section");
-    m.def("get_sections_description_conduction", &get_sections_description_conduction, "Get conduction description for sections");
-    m.def("are_sections_and_layers_fitting", &are_sections_and_layers_fitting, "Check if sections and layers fit in window");
-    m.def("add_margin_to_section_by_index", &add_margin_to_section_by_index, "Add margin to a section by index");
+    m.def("get_layers_by_winding_index", &get_layers_by_winding_index,
+        R"pbdoc(
+        Get all layers belonging to a specific winding.
+        
+        Args:
+            coil_json: JSON Coil with layersDescription.
+            winding_index: Zero-based winding index.
+        
+        Returns:
+            JSON array of Layer objects for that winding.
+        )pbdoc",
+        py::arg("coil_json"), py::arg("winding_index"));
+    
+    m.def("get_layers_by_section", &get_layers_by_section,
+        R"pbdoc(
+        Get all layers within a named section.
+        
+        Args:
+            coil_json: JSON Coil with layersDescription.
+            section_name: Name of the section.
+        
+        Returns:
+            JSON array of Layer objects in that section.
+        )pbdoc",
+        py::arg("coil_json"), py::arg("section_name"));
+    
+    m.def("get_sections_description_conduction", &get_sections_description_conduction,
+        R"pbdoc(
+        Get only conduction sections (excluding insulation sections).
+        
+        Args:
+            coil_json: JSON Coil with sectionsDescription.
+        
+        Returns:
+            JSON array of Section objects with type "conduction".
+        )pbdoc",
+        py::arg("coil_json"));
+    
+    m.def("are_sections_and_layers_fitting", &are_sections_and_layers_fitting,
+        R"pbdoc(
+        Check if all sections and layers fit within the winding window.
+        
+        Args:
+            coil_json: JSON Coil with winding description.
+        
+        Returns:
+            True if everything fits, False otherwise.
+        )pbdoc",
+        py::arg("coil_json"));
+    
+    m.def("add_margin_to_section_by_index", &add_margin_to_section_by_index,
+        R"pbdoc(
+        Add margin tape to a section.
+        
+        Args:
+            coil_json: JSON Coil specification.
+            section_index: Zero-based section index.
+            top_or_left_margin: Top/left margin in meters.
+            bottom_or_right_margin: Bottom/right margin in meters.
+        
+        Returns:
+            Updated JSON Coil with margin added.
+        )pbdoc",
+        py::arg("coil_json"), py::arg("section_index"), 
+        py::arg("top_or_left_margin"), py::arg("bottom_or_right_margin"));
 
     // Winding orientation and alignment
-    m.def("get_available_winding_orientations", &get_available_winding_orientations, "Get list of available winding orientations");
-    m.def("get_available_coil_alignments", &get_available_coil_alignments, "Get list of available coil alignments");
+    m.def("get_available_winding_orientations", &get_available_winding_orientations,
+        R"pbdoc(
+        Get list of available winding orientation options.
+        
+        Returns:
+            List of orientation strings: "contiguous", "overlapping".
+        )pbdoc");
+    
+    m.def("get_available_coil_alignments", &get_available_coil_alignments,
+        R"pbdoc(
+        Get list of available coil alignment options.
+        
+        Returns:
+            List of alignment strings: "inner or top", "outer or bottom", "spread", "centered".
+        )pbdoc");
 
     // Number of turns
-    m.def("calculate_number_turns", &calculate_number_turns, "Calculate optimal number of turns");
+    m.def("calculate_number_turns", &calculate_number_turns,
+        R"pbdoc(
+        Calculate optimal number of turns for all windings.
+        
+        Given primary turns and design requirements (turns ratios),
+        calculates the turns for all windings.
+        
+        Args:
+            number_turns_primary: Number of primary turns.
+            design_requirements_json: JSON DesignRequirements with turnsRatios.
+        
+        Returns:
+            List of integer turns for each winding [primary, secondary, ...].
+        )pbdoc",
+        py::arg("number_turns_primary"), py::arg("design_requirements_json"));
 
     // Insulation
-    m.def("get_insulation_materials", &get_insulation_materials, "Retrieve all available insulation materials");
-    m.def("get_insulation_material_names", &get_insulation_material_names, "Retrieve list of all insulation material names");
-    m.def("find_insulation_material_by_name", &find_insulation_material_by_name, "Find insulation material data by name");
-    m.def("calculate_insulation", &calculate_insulation, "Calculate insulation requirements");
-    m.def("get_insulation_layer_insulation_material", &get_insulation_layer_insulation_material, "Get insulation material for layer insulation");
-    m.def("get_isolation_side_from_index", &get_isolation_side_from_index, "Get isolation side from winding index");
+    m.def("get_insulation_materials", &get_insulation_materials,
+        R"pbdoc(
+        Retrieve all available insulation materials from database.
+        
+        Returns:
+            JSON array of InsulationMaterial objects with dielectric
+            properties, thickness, and temperature ratings.
+        )pbdoc");
+    
+    m.def("get_insulation_material_names", &get_insulation_material_names,
+        R"pbdoc(
+        Retrieve list of all insulation material names.
+        
+        Returns:
+            JSON array of material name strings.
+        )pbdoc");
+    
+    m.def("find_insulation_material_by_name", &find_insulation_material_by_name,
+        R"pbdoc(
+        Find insulation material data by name.
+        
+        Args:
+            name: Insulation material name.
+        
+        Returns:
+            JSON InsulationMaterial object.
+        )pbdoc",
+        py::arg("name"));
+    
+    m.def("calculate_insulation", &calculate_insulation,
+        R"pbdoc(
+        Calculate insulation requirements per safety standards.
+        
+        Computes creepage, clearance, and dielectric requirements based on
+        IEC 60664-1, IEC 61558-1, IEC 62368-1, or IEC 60335-1 standards.
+        
+        Args:
+            inputs_json: JSON Inputs with insulation requirements:
+                - insulationType: "Functional", "Basic", "Reinforced", etc.
+                - pollutionDegree: "P1", "P2", "P3"
+                - overvoltageCategory: "OVC-I" to "OVC-IV"
+                - altitude: Operating altitude
+                - standards: Array of applicable standards
+        
+        Returns:
+            JSON object with:
+                - creepageDistance: Required creepage in meters
+                - clearance: Required clearance in meters
+                - withstandVoltage: Test voltage in Volts
+                - distanceThroughInsulation: Solid insulation in meters
+                - errorMessage: Empty if successful, error description otherwise
+        )pbdoc",
+        py::arg("inputs_json"));
+    
+    m.def("get_insulation_layer_insulation_material", &get_insulation_layer_insulation_material,
+        R"pbdoc(
+        Get the insulation material used in a specific insulation layer.
+        
+        Args:
+            coil_json: JSON Coil specification.
+            layer_name: Name of the insulation layer.
+        
+        Returns:
+            JSON InsulationMaterial object.
+        )pbdoc",
+        py::arg("coil_json"), py::arg("layer_name"));
+    
+    m.def("get_isolation_side_from_index", &get_isolation_side_from_index,
+        R"pbdoc(
+        Get isolation side designation from winding index.
+        
+        Used for insulation coordination between primary and secondary sides.
+        
+        Args:
+            index: Winding index (0 = primary, 1+ = secondaries).
+        
+        Returns:
+            JSON IsolationSide string ("Primary", "Secondary", etc.).
+        )pbdoc",
+        py::arg("index"));
 }
 
 } // namespace PyMKF

@@ -1,0 +1,771 @@
+# PyOpenMagnetics
+
+> Python library for magnetic component design and analysis - transformers, inductors, chokes
+
+PyOpenMagnetics is a Python wrapper for the OpenMagnetics MKF (Magnetics Knowledge Foundation) C++ engine. It provides comprehensive tools for designing, simulating, and optimizing magnetic components following the MAS (Magnetic Agnostic Structure) JSON schema.
+
+## Installation
+
+```bash
+pip install PyOpenMagnetics
+```
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      User Application                        │
+├─────────────────────────────────────────────────────────────┤
+│                     PyOpenMagnetics                          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐   │
+│  │ Database │ │   Core   │ │ Winding  │ │   Adviser    │   │
+│  │ Access   │ │ Calcs    │ │ Engine   │ │   System     │   │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────┘   │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐   │
+│  │  Losses  │ │Simulation│ │ Plotting │ │   Settings   │   │
+│  │  Models  │ │  Engine  │ │   SVG    │ │   Config     │   │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────┘   │
+├─────────────────────────────────────────────────────────────┤
+│              MKF C++ Engine (via pybind11)                   │
+├─────────────────────────────────────────────────────────────┤
+│                    MAS JSON Schema                           │
+│         (Core, Coil, Inputs, Outputs definitions)            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Core Concepts
+
+### MAS (Magnetic Agnostic Structure)
+The MAS schema defines standardized JSON structures for magnetic components:
+
+- **Inputs**: Design requirements + operating points
+- **Magnetic**: Core + Coil assembly
+- **Outputs**: Simulation results (losses, temperature, inductance)
+- **Mas**: Complete specification (Inputs + Magnetic + Outputs)
+
+### Key Data Structures
+
+#### Core Specification
+```python
+core = {
+    "functionalDescription": {
+        "type": "two-piece set",          # or "toroidal", "closed shape"
+        "shape": "E 42/21/15",            # Shape name or full CoreShape object
+        "material": "3C95",               # Material name or full CoreMaterial object
+        "gapping": [                      # Array of gaps
+            {"type": "subtractive", "length": 0.001}  # 1mm gap
+        ],
+        "numberStacks": 1                 # Stacked cores
+    }
+}
+```
+
+#### Coil Specification
+```python
+coil = {
+    "bobbin": bobbin_data,                # Bobbin specification
+    "functionalDescription": [            # Array of windings
+        {
+            "name": "Primary",
+            "numberTurns": 20,
+            "numberParallels": 1,
+            "wire": "Round 0.5 - Grade 1", # Wire name or full Wire object
+            "isolationSide": "primary"
+        },
+        {
+            "name": "Secondary", 
+            "numberTurns": 5,
+            "numberParallels": 2,
+            "wire": "Round 1.0 - Grade 1",
+            "isolationSide": "secondary"
+        }
+    ]
+}
+```
+
+#### Operating Point
+```python
+operating_point = {
+    "name": "Nominal",
+    "conditions": {
+        "ambientTemperature": 25          # Celsius
+    },
+    "excitationsPerWinding": [{
+        "name": "Primary",
+        "frequency": 100000,               # Hz
+        "voltage": {
+            "waveform": {
+                "data": [400, 400, -400, -400],
+                "time": [0, 5e-6, 5e-6, 10e-6]
+            }
+        },
+        "current": {
+            "waveform": {
+                "data": [0.5, 1.5, 1.5, 0.5],
+                "time": [0, 5e-6, 5e-6, 10e-6]
+            }
+        }
+    }]
+}
+```
+
+#### Design Requirements
+```python
+design_requirements = {
+    "magnetizingInductance": {
+        "nominal": 100e-6,                 # 100 µH
+        "minimum": 90e-6,
+        "maximum": 110e-6
+    },
+    "turnsRatios": [{"nominal": 4.0}],    # N_pri / N_sec
+    "leakageInductance": [{"maximum": 5e-6}],  # Optional
+    "insulation": {
+        "insulationType": "Reinforced",
+        "pollutionDegree": "P2",
+        "overvoltageCategory": "OVC-III",
+        "standards": ["IEC 61558-1"]
+    }
+}
+```
+
+## Complete API Reference
+
+### Database Access
+
+#### Core Materials
+```python
+# Get all materials
+materials = PyOpenMagnetics.get_core_materials()
+
+# Get material names (faster than loading full data)
+names = PyOpenMagnetics.get_core_material_names()
+names_ferroxcube = PyOpenMagnetics.get_core_material_names_by_manufacturer("Ferroxcube")
+
+# Find specific material
+material = PyOpenMagnetics.find_core_material_by_name("3C95")
+
+# Get material properties at operating conditions
+mu_i = PyOpenMagnetics.get_material_permeability("3C95", 25, 0, 100000)
+rho = PyOpenMagnetics.get_material_resistivity("3C95", 25)
+steinmetz = PyOpenMagnetics.get_core_material_steinmetz_coefficients("3C95", 100000)
+# Returns: {k, alpha, beta, minimumFrequency, maximumFrequency, ct0, ct1, ct2}
+```
+
+#### Core Shapes
+```python
+# Get all shapes
+shapes = PyOpenMagnetics.get_core_shapes()
+
+# Get shape families (E, ETD, PQ, RM, T, etc.)
+families = PyOpenMagnetics.get_core_shape_families()
+
+# Get shape names
+names = PyOpenMagnetics.get_core_shape_names(include_toroidal=True)
+
+# Find specific shape
+shape = PyOpenMagnetics.find_core_shape_by_name("E 42/21/15")
+```
+
+#### Wires
+```python
+# Get all wires
+wires = PyOpenMagnetics.get_wires()
+wire_names = PyOpenMagnetics.get_wire_names()
+
+# Find wire by name
+wire = PyOpenMagnetics.find_wire_by_name("Round 0.5 - Grade 1")
+
+# Find wire by dimension
+wire = PyOpenMagnetics.find_wire_by_dimension(0.0005, "round", "IEC 60317")
+
+# Wire dimensions
+outer_d = PyOpenMagnetics.get_wire_outer_diameter_enamelled_round(wire)
+outer_dims = PyOpenMagnetics.get_outer_dimensions(wire)  # Works for any type
+
+# Wire types: "round", "litz", "rectangular", "foil"
+wire_types = PyOpenMagnetics.get_available_wire_types()
+
+# Wire standards: "IEC 60317", "NEMA MW 1000", etc.
+standards = PyOpenMagnetics.get_available_wire_standards()
+```
+
+#### Bobbins
+```python
+bobbins = PyOpenMagnetics.get_bobbins()
+bobbin = PyOpenMagnetics.find_bobbin_by_name("E 42/21/15 Bobbin")
+```
+
+### Core Calculations
+
+```python
+# Calculate complete core data (adds processedDescription, geometricalDescription)
+core = PyOpenMagnetics.calculate_core_data(core_functional, include_material_data=False)
+
+# Get effective parameters
+Ae = core["processedDescription"]["effectiveParameters"]["effectiveArea"]    # m²
+le = core["processedDescription"]["effectiveParameters"]["effectiveLength"]  # m
+Ve = core["processedDescription"]["effectiveParameters"]["effectiveVolume"]  # m³
+
+# Temperature-dependent parameters
+params = PyOpenMagnetics.get_core_temperature_dependant_parameters(core, temperature=80)
+# Returns: {magneticFluxDensitySaturation, initialPermeability, effectivePermeability,
+#           reluctance, permeance, resistivity}
+
+# Maximum magnetic energy
+E_max = PyOpenMagnetics.calculate_core_maximum_magnetic_energy(core, operating_point)
+
+# Saturation current (requires complete magnetic)
+I_sat = PyOpenMagnetics.calculate_saturation_current(magnetic, temperature=25)
+```
+
+### Inductance Calculations
+
+```python
+# Models available: "ZHANG", "MUEHLETHALER", "PARTRIDGE", "EFFECTIVE_AREA", 
+#                   "EFFECTIVE_LENGTH", "STENGLEIN", "BALAKRISHNAN", "CLASSIC"
+models = {"reluctance": "ZHANG"}
+
+# Calculate inductance from turns and gap
+L = PyOpenMagnetics.calculate_inductance_from_number_turns_and_gapping(
+    core, coil, operating_point, models
+)
+
+# Calculate turns from inductance and gap
+N = PyOpenMagnetics.calculate_number_turns_from_gapping_and_inductance(
+    core, inputs, models
+)
+
+# Calculate gap from turns and inductance
+core_with_gap = PyOpenMagnetics.calculate_gapping_from_number_turns_and_inductance(
+    core, coil, inputs,
+    gapping_type="SUBTRACTIVE",  # or "ADDITIVE", "DISTRIBUTED"
+    decimals=4,                   # Gap length precision
+    models=models
+)
+
+# Gap reluctance calculation
+gap_result = PyOpenMagnetics.calculate_gap_reluctance(gap_data, "ZHANG")
+# Returns: {reluctance, fringingFactor}
+```
+
+### Loss Calculations
+
+#### Core Losses
+```python
+# Models: "STEINMETZ", "IGSE", "MSE", "BARG", "ROSHEN", "ALBACH", "PROPRIETARY"
+models = {"coreLosses": "IGSE", "reluctance": "ZHANG", "coreTemperature": "MANIKTALA"}
+
+losses = PyOpenMagnetics.calculate_core_losses(core, coil, inputs, models)
+# Returns:
+# {
+#   coreLosses: float (Watts),
+#   magneticFluxDensityPeak: float (Tesla),
+#   magneticFluxDensityAcPeak: float (Tesla),
+#   voltageRms: float (Volts),
+#   currentRms: float (Amperes),
+#   apparentPower: float (VA),
+#   maximumCoreTemperature: float (Celsius),
+#   maximumCoreTemperatureRise: float (Kelvin)
+# }
+
+# Get model documentation
+model_info = PyOpenMagnetics.get_core_losses_model_information(material)
+```
+
+#### Winding Losses
+```python
+# Complete winding losses (DC + skin + proximity)
+winding_losses = PyOpenMagnetics.calculate_winding_losses(magnetic, operating_point, temperature=25)
+# Returns:
+# {
+#   windingLosses: float (total Watts),
+#   windingLossesPerWinding: [float, ...],
+#   ohmicLosses: {...},
+#   skinEffectLosses: {...},
+#   proximityEffectLosses: {...}
+# }
+
+# Individual loss components
+ohmic = PyOpenMagnetics.calculate_ohmic_losses(coil, operating_point, temperature)
+
+# For proximity losses, first calculate field
+field = PyOpenMagnetics.calculate_magnetic_field_strength_field(operating_point, magnetic)
+prox = PyOpenMagnetics.calculate_proximity_effect_losses(coil, temperature, winding_losses, field)
+skin = PyOpenMagnetics.calculate_skin_effect_losses(coil, winding_losses, temperature)
+```
+
+#### Wire-Level Losses
+```python
+# Per-meter calculations (for wire selection)
+R_dc = PyOpenMagnetics.calculate_dc_resistance_per_meter(wire, temperature)
+P_dc = PyOpenMagnetics.calculate_dc_losses_per_meter(wire, current, temperature)
+P_skin = PyOpenMagnetics.calculate_skin_ac_losses_per_meter(wire, current, temperature)
+R_ac = PyOpenMagnetics.calculate_skin_ac_resistance_per_meter(wire, current, temperature)
+
+# AC factor (Rac/Rdc)
+Fr = PyOpenMagnetics.calculate_skin_ac_factor(wire, current, temperature)
+
+# Effective current density
+J_eff = PyOpenMagnetics.calculate_effective_current_density(wire, current, temperature)
+
+# Skin depth
+delta = PyOpenMagnetics.calculate_effective_skin_depth("copper", current, temperature)
+```
+
+### Winding Engine
+
+```python
+# Main winding function - places turns in winding window
+coil_wound = PyOpenMagnetics.wind(
+    coil,                        # Coil with functional description
+    repetitions=2,               # Pattern repetitions
+    proportion_per_winding=[0.5, 0.5],  # Window share per winding
+    pattern=[0, 1],              # Interleaving: P-S-P-S
+    margin_pairs=[[0.001, 0.001]]  # Margin tape [left, right] per winding
+)
+
+# Result contains:
+# - functionalDescription (input)
+# - sectionsDescription (coarse level)
+# - layersDescription (layer level)
+# - turnsDescription (individual turns with coordinates)
+
+# Alternative winding approaches
+coil_sections = PyOpenMagnetics.wind_by_sections(coil, repetitions, proportions, pattern, insulation_thickness)
+coil_layers = PyOpenMagnetics.wind_by_layers(coil, insulation_layers, insulation_thickness)
+coil_turns = PyOpenMagnetics.wind_by_turns(coil)
+
+# Planar (PCB) winding
+coil_planar = PyOpenMagnetics.wind_planar(
+    coil, stack_up, border_distance, wire_spacing, insulation, core_distance
+)
+
+# Check if winding fits
+fits = PyOpenMagnetics.are_sections_and_layers_fitting(coil)
+
+# Get layers by winding
+primary_layers = PyOpenMagnetics.get_layers_by_winding_index(coil, 0)
+secondary_layers = PyOpenMagnetics.get_layers_by_winding_index(coil, 1)
+```
+
+### Design Adviser
+
+```python
+# Process inputs (REQUIRED before adviser functions - adds harmonics)
+inputs = {
+    "designRequirements": design_requirements,
+    "operatingPoints": [operating_point]
+}
+processed = PyOpenMagnetics.process_inputs(inputs)
+
+# Get recommended cores
+weights = {"COST": 1.0, "EFFICIENCY": 1.0, "DIMENSIONS": 0.5}
+cores = PyOpenMagnetics.calculate_advised_cores(
+    processed,
+    weights,
+    max_results=10,
+    core_mode="STANDARD_CORES"  # or "AVAILABLE_CORES" for stock only
+)
+
+# Get complete magnetic designs
+magnetics = PyOpenMagnetics.calculate_advised_magnetics(
+    processed,
+    max_results=5,
+    core_mode="STANDARD_CORES"
+)
+
+# Each result contains complete Mas object:
+for mag in magnetics:
+    core_name = mag["magnetic"]["core"]["functionalDescription"]["shape"]["name"]
+    material = mag["magnetic"]["core"]["functionalDescription"]["material"]["name"]
+    
+# From custom catalog
+catalog_results = PyOpenMagnetics.calculate_advised_magnetics_from_catalog(
+    processed, catalog_magnetics, max_results=5
+)
+```
+
+### Simulation
+
+```python
+# Full simulation
+models = {"coreLosses": "IGSE", "reluctance": "ZHANG"}
+mas = PyOpenMagnetics.simulate(inputs, magnetic, models)
+# Returns Mas with outputs populated
+
+# Autocomplete partial structures
+magnetic = PyOpenMagnetics.magnetic_autocomplete(partial_magnetic, config)
+mas = PyOpenMagnetics.mas_autocomplete(partial_mas, config)
+
+# Extract operating point from SPICE simulation
+op = PyOpenMagnetics.extract_operating_point(
+    spice_file, num_windings=2, frequency=100000, 
+    target_inductance=100e-6, column_mapping
+)
+
+# Export to SPICE
+subcircuit = PyOpenMagnetics.export_magnetic_as_subcircuit(magnetic)
+```
+
+### Insulation Coordination
+
+```python
+# Calculate safety distances per IEC standards
+insulation = PyOpenMagnetics.calculate_insulation(inputs)
+# Returns:
+# {
+#   creepageDistance: float (meters),
+#   clearance: float (meters),
+#   withstandVoltage: float (Volts),
+#   distanceThroughInsulation: float (meters),
+#   errorMessage: "" if successful
+# }
+
+# Get insulation materials
+materials = PyOpenMagnetics.get_insulation_materials()
+material = PyOpenMagnetics.find_insulation_material_by_name("Kapton")
+```
+
+### Visualization
+
+```python
+# Core views
+svg_core = PyOpenMagnetics.plot_core(core, use_colors=True)
+svg_core_2d = PyOpenMagnetics.plot_core_2d(core, axis=1, winding_windows=None, use_colors=True)
+
+# Coil views
+svg_coil = PyOpenMagnetics.plot_coil_2d(coil, axis=1, mirrored=True, use_colors=True)
+
+# Field visualization
+svg_field = PyOpenMagnetics.plot_field_2d(magnetic, operating_point, axis=1, use_colors=True)
+svg_field_map = PyOpenMagnetics.plot_field_map(magnetic, operating_point, axis=1)
+
+# Individual components
+svg_wire = PyOpenMagnetics.plot_wire(wire, use_colors=True)
+svg_bobbin = PyOpenMagnetics.plot_bobbin(bobbin, use_colors=True)
+```
+
+### Settings and Configuration
+
+```python
+# Get current settings
+settings = PyOpenMagnetics.get_settings()
+
+# Modify settings
+settings["coilAllowMarginTape"] = True
+settings["coilWindEvenIfNotFit"] = False
+settings["useOnlyCoresInStock"] = True
+settings["painterNumberPointsX"] = 100
+settings["painterNumberPointsY"] = 100
+PyOpenMagnetics.set_settings(settings)
+
+# Reset to defaults
+PyOpenMagnetics.reset_settings()
+
+# Get physical constants
+constants = PyOpenMagnetics.get_constants()
+mu_0 = constants["vacuumPermeability"]
+
+# Get default models
+defaults = PyOpenMagnetics.get_default_models()
+```
+
+## Supported Components
+
+### Core Materials by Manufacturer
+| Manufacturer | Materials |
+|--------------|-----------|
+| TDK/EPCOS | N27, N49, N87, N95, N97, PC40, PC95 |
+| Ferroxcube | 3C90, 3C94, 3C95, 3C96, 3F3, 3F4, 3F35 |
+| Fair-Rite | 67, 77, 78 materials |
+| Magnetics Inc | MPP, High Flux, Kool Mu, XFlux |
+| Micrometals | Iron powder: -2, -8, -18, -26, -52 |
+
+### Core Shape Families
+| Family | Description |
+|--------|-------------|
+| E, EI, EFD, EQ, ER | Standard E-cores |
+| ETD, EC | Round center leg |
+| PQ, PM | Optimized power |
+| RM | Rectangular module |
+| T | Toroidal |
+| P, PT | Pot cores |
+| U, UI | U-cores |
+| LP (E-LP, EQ-LP) | Planar cores |
+
+### Wire Types
+| Type | Description |
+|------|-------------|
+| Round | Standard enamelled magnet wire (AWG, IEC) |
+| Litz | Multi-strand for reduced AC losses |
+| Rectangular | High-current, better fill factor |
+| Foil | Very high current, transformers |
+
+## Error Handling
+
+Most functions return JSON objects. Check for errors:
+```python
+result = PyOpenMagnetics.calculate_core_data(bad_data, False)
+if isinstance(result, str) and result.startswith("Exception:"):
+    print(f"Error: {result}")
+elif "data" in result and "Exception" in str(result.get("data", "")):
+    print(f"Error: {result['data']}")
+```
+
+## Converter Topology Workflows
+
+PyOpenMagnetics includes built-in support for common power converter topologies. Each topology class automatically generates proper operating points and design requirements from high-level specifications.
+
+### Flyback Converter (Isolated, Energy-Storing)
+```python
+import PyOpenMagnetics
+
+# Flyback converter with multiple outputs
+flyback = {
+    "inputVoltage": {"minimum": 85, "nominal": 120, "maximum": 265},  # Universal AC input
+    "diodeVoltageDrop": 0.7,
+    "efficiency": 0.85,
+    "maximumDrainSourceVoltage": 600,
+    "maximumDutyCycle": 0.5,
+    "operatingPoints": [{
+        "outputVoltages": [12, 5],           # Multiple outputs (V)
+        "outputCurrents": [2.0, 0.5],        # Per output (A)
+        "switchingFrequency": 100000,        # Hz
+        "ambientTemperature": 40,
+        "mode": "CCM"                        # or "DCM", "BCM"
+    }],
+    "desiredInductance": 150e-6,             # Magnetizing inductance (H)
+    "desiredTurnsRatios": [8.0, 19.2]        # N_pri/N_sec for each output
+}
+inputs = PyOpenMagnetics.process_flyback(flyback)
+magnetics = PyOpenMagnetics.calculate_advised_magnetics(inputs, 5, "STANDARD_CORES")
+```
+
+### Buck Converter (Non-Isolated Step-Down)
+```python
+# Synchronous buck converter
+buck = {
+    "inputVoltage": {"minimum": 8, "nominal": 12, "maximum": 14},
+    "diodeVoltageDrop": 0.0,                 # Synchronous (MOSFET)
+    "efficiency": 0.95,
+    "currentRippleRatio": 0.3,               # ΔI / I_out
+    "operatingPoints": [{
+        "outputVoltage": 3.3,
+        "outputCurrent": 5.0,
+        "switchingFrequency": 500000,
+        "ambientTemperature": 25
+    }],
+    "desiredInductance": 4.7e-6              # Output inductor (H)
+}
+inputs = PyOpenMagnetics.process_buck(buck)
+```
+
+### Boost Converter (Non-Isolated Step-Up)
+```python
+# PFC boost pre-regulator
+boost = {
+    "inputVoltage": {"minimum": 85, "nominal": 120, "maximum": 265},
+    "diodeVoltageDrop": 1.0,                 # SiC diode
+    "efficiency": 0.98,
+    "currentRippleRatio": 0.2,
+    "operatingPoints": [{
+        "outputVoltage": 400,
+        "outputCurrent": 2.5,
+        "switchingFrequency": 65000,
+        "ambientTemperature": 40
+    }],
+    "desiredInductance": 250e-6
+}
+inputs = PyOpenMagnetics.process_boost(boost)
+```
+
+### Single-Switch Forward Converter
+```python
+# Forward converter with reset winding
+single_switch_forward = {
+    "inputVoltage": {"minimum": 36, "nominal": 48, "maximum": 72},
+    "diodeVoltageDrop": 0.5,
+    "efficiency": 0.90,
+    "currentRippleRatio": 0.3,
+    "operatingPoints": [{
+        "outputVoltages": [5],
+        "outputCurrents": [10],
+        "switchingFrequency": 250000,
+        "ambientTemperature": 50
+    }],
+    "desiredInductance": 50e-6,              # Magnetizing inductance
+    "desiredTurnsRatios": [9.6],             # N_pri/N_sec
+    "desiredOutputInductances": [10e-6]      # Output filter inductor
+}
+inputs = PyOpenMagnetics.process_single_switch_forward(single_switch_forward)
+```
+
+### Two-Switch Forward Converter
+```python
+# Two-switch forward (no reset winding needed)
+two_switch_forward = {
+    "inputVoltage": {"minimum": 300, "nominal": 400, "maximum": 420},
+    "diodeVoltageDrop": 0.7,
+    "efficiency": 0.92,
+    "dutyCycle": 0.45,                       # Maximum duty cycle < 0.5
+    "currentRippleRatio": 0.25,
+    "operatingPoints": [{
+        "outputVoltages": [24],
+        "outputCurrents": [20],
+        "switchingFrequency": 100000,
+        "ambientTemperature": 55
+    }],
+    "desiredInductance": 200e-6,
+    "desiredTurnsRatios": [16.7],
+    "desiredOutputInductances": [25e-6]
+}
+inputs = PyOpenMagnetics.process_two_switch_forward(two_switch_forward)
+```
+
+### Active Clamp Forward Converter
+```python
+# Active clamp forward (ZVS capable)
+active_clamp_forward = {
+    "inputVoltage": {"minimum": 36, "nominal": 48, "maximum": 60},
+    "diodeVoltageDrop": 0.5,
+    "efficiency": 0.93,
+    "currentRippleRatio": 0.2,
+    "operatingPoints": [{
+        "outputVoltages": [12],
+        "outputCurrents": [8],
+        "switchingFrequency": 350000,
+        "ambientTemperature": 45
+    }],
+    "desiredInductance": 30e-6,
+    "desiredTurnsRatios": [4.0],
+    "desiredOutputInductances": [5e-6]
+}
+inputs = PyOpenMagnetics.process_active_clamp_forward(active_clamp_forward)
+```
+
+### Push-Pull Converter
+```python
+# Push-pull with center-tapped transformer
+push_pull = {
+    "inputVoltage": {"minimum": 22, "nominal": 24, "maximum": 28},
+    "diodeVoltageDrop": 0.7,
+    "efficiency": 0.90,
+    "dutyCycle": 0.45,                       # Per switch, max 0.5
+    "currentRippleRatio": 0.3,
+    "maximumDrainSourceVoltage": 100,        # 2x Vin stress
+    "operatingPoints": [{
+        "outputVoltage": 48,
+        "outputCurrent": 5,
+        "switchingFrequency": 100000,
+        "ambientTemperature": 40
+    }],
+    "desiredInductance": 100e-6,
+    "desiredTurnsRatios": [1.0],             # 1:1:N (center-tapped primary)
+    "desiredOutputInductance": 50e-6
+}
+inputs = PyOpenMagnetics.process_push_pull(push_pull)
+```
+
+### Isolated Buck Converter
+```python
+# Isolated buck (non-inverting)
+isolated_buck = {
+    "inputVoltage": {"minimum": 280, "nominal": 310, "maximum": 375},
+    "diodeVoltageDrop": 0.7,
+    "efficiency": 0.91,
+    "currentRippleRatio": 0.25,
+    "operatingPoints": [{
+        "outputVoltages": [15],
+        "outputCurrents": [3],
+        "switchingFrequency": 200000,
+        "ambientTemperature": 35
+    }],
+    "desiredInductance": 80e-6,
+    "desiredTurnsRatios": [20.0]
+}
+inputs = PyOpenMagnetics.process_isolated_buck(isolated_buck)
+```
+
+### Isolated Buck-Boost Converter
+```python
+# Isolated buck-boost (inverting output)
+isolated_buck_boost = {
+    "inputVoltage": {"minimum": 18, "nominal": 24, "maximum": 36},
+    "diodeVoltageDrop": 0.5,
+    "efficiency": 0.88,
+    "currentRippleRatio": 0.3,
+    "operatingPoints": [{
+        "outputVoltages": [24],              # Can be higher or lower than input
+        "outputCurrents": [2],
+        "switchingFrequency": 150000,
+        "ambientTemperature": 30
+    }],
+    "desiredInductance": 60e-6,
+    "desiredTurnsRatios": [1.0]
+}
+inputs = PyOpenMagnetics.process_isolated_buck_boost(isolated_buck_boost)
+```
+
+### Current Transformer
+```python
+# Current sensing transformer
+current_transformer = {
+    "primaryCurrent": {
+        "waveform": {"data": [0, 10, 10, 0], "time": [0, 1e-6, 5e-6, 6e-6]},
+        "frequency": 100000
+    },
+    "operatingPoints": [{
+        "burdenResistance": 10,              # Sense resistor (Ω)
+        "ambientTemperature": 25
+    }]
+}
+# Process with desired turns ratio
+turns_ratio = 100                            # 100:1 CT
+secondary_resistance = 5.0                   # Winding resistance (Ω)
+inputs = PyOpenMagnetics.process_current_transformer(current_transformer, turns_ratio, secondary_resistance)
+```
+
+### High-Current Inductor (Custom Design)
+```python
+# Use rectangular wire for better fill factor
+wire = PyOpenMagnetics.find_wire_by_dimension(0.003, "rectangular", "IEC 60317")
+
+coil = {
+    "bobbin": bobbin,
+    "functionalDescription": [{
+        "name": "Main",
+        "numberTurns": 15,
+        "numberParallels": 2,
+        "wire": wire
+    }]
+}
+
+# Custom inputs for power inductor
+inputs = {
+    "designRequirements": {
+        "magnetizingInductance": {"nominal": 47e-6, "minimum": 42e-6}
+    },
+    "operatingPoints": [{
+        "conditions": {"ambientTemperature": 85},
+        "excitationsPerWinding": [{
+            "frequency": 100000,
+            "current": {
+                "waveform": {"data": [18, 22, 22, 18], "time": [0, 5e-6, 5e-6, 10e-6]}
+            }
+        }]
+    }]
+}
+processed = PyOpenMagnetics.process_inputs(inputs)
+```
+
+## Related Projects
+- **MKF**: C++ magnetics engine - github.com/OpenMagnetics/MKF
+- **MAS**: Magnetic Agnostic Structure JSON schema - github.com/OpenMagnetics/MAS  
+- **OpenMagnetics Web**: Online design tool - openmagnetics.com
+
+## Additional Documentation
+- **notebooks/**: Interactive Jupyter tutorials with visualizations
+- **docs/errors.md**: Common errors and solutions
+- **docs/performance.md**: Operation costs and optimization tips
+- **docs/compatibility.md**: Python/platform version compatibility
+- **api/validation.py**: Runtime JSON schema validation

@@ -131,7 +131,7 @@ json get_core_material_names_by_manufacturer(std::string manufacturerName) {
 
 json get_core_shape_names(bool includeToroidal) {
     try {
-        OpenMagnetics::settings->set_use_toroidal_cores(includeToroidal);
+        OpenMagnetics::settings.set_use_toroidal_cores(includeToroidal);
         auto shapeNames = OpenMagnetics::get_core_shape_names();
         json result = json::array();
         for (auto elem : shapeNames) {
@@ -496,68 +496,512 @@ double calculate_temperature_from_core_thermal_resistance(json coreJson, double 
 
 void register_core_bindings(py::module& m) {
     // Core materials
-    m.def("get_core_materials", &get_core_materials, "Retrieve all available core materials as JSON objects");
+    m.def("get_core_materials", &get_core_materials,
+        R"pbdoc(
+        Retrieve all available core materials from the database.
+        
+        Returns complete material specifications including:
+        - Manufacturer information
+        - Permeability curves
+        - Steinmetz coefficients for loss calculations
+        - Saturation characteristics
+        - Temperature coefficients
+        
+        Returns:
+            JSON array of CoreMaterial objects with full specifications.
+        
+        Example:
+            >>> materials = PyMKF.get_core_materials()
+            >>> ferroxcube = [m for m in materials if "Ferroxcube" in m["manufacturerInfo"]["name"]]
+        )pbdoc");
+    
     m.def("get_material_permeability", &get_material_permeability, 
-        "Calculate initial permeability for a material at given temperature, DC bias, and frequency",
+        R"pbdoc(
+        Calculate initial permeability for a material under specific conditions.
+        
+        Accounts for temperature dependence, DC bias effects, and frequency
+        roll-off based on material characterization data.
+        
+        Args:
+            material_name: Name of the core material (e.g., "3C95", "N87").
+            temperature: Operating temperature in Celsius.
+            magnetic_field_dc_bias: DC magnetic field bias in A/m.
+            frequency: Operating frequency in Hz.
+        
+        Returns:
+            Initial relative permeability (dimensionless).
+        
+        Example:
+            >>> mu_i = PyMKF.get_material_permeability("3C95", 25, 0, 100000)
+            >>> print(f"Permeability at 100kHz: {mu_i:.0f}")
+        )pbdoc",
         py::arg("material_name"), py::arg("temperature"), py::arg("magnetic_field_dc_bias"), py::arg("frequency"));
+    
     m.def("get_material_resistivity", &get_material_resistivity,
-        "Calculate resistivity for a material at given temperature",
+        R"pbdoc(
+        Calculate electrical resistivity for a core material.
+        
+        Core resistivity affects eddy current losses and is temperature-dependent.
+        
+        Args:
+            material_name: Name of the core material.
+            temperature: Temperature in Celsius.
+        
+        Returns:
+            Resistivity in Ohm·m.
+        )pbdoc",
         py::arg("material_name"), py::arg("temperature"));
+    
     m.def("get_core_material_steinmetz_coefficients", &get_core_material_steinmetz_coefficients,
-        "Retrieve Steinmetz coefficients for core loss calculation at given frequency",
+        R"pbdoc(
+        Retrieve Steinmetz coefficients for core loss calculation.
+        
+        Returns k, alpha, beta coefficients for: Pv = k * f^alpha * B^beta
+        Coefficients are interpolated for the specified frequency from
+        manufacturer's multi-range characterization data.
+        
+        Args:
+            material_name: Name of the core material.
+            frequency: Operating frequency in Hz for coefficient selection.
+        
+        Returns:
+            JSON SteinmetzCoreLossesMethodRangeDatum with fields:
+                - k: Steinmetz constant
+                - alpha: Frequency exponent
+                - beta: Flux density exponent
+                - minimumFrequency, maximumFrequency: Valid range
+                - ct0, ct1, ct2: Optional temperature coefficients
+        )pbdoc",
         py::arg("material_name"), py::arg("frequency"));
 
     // Core shapes
-    m.def("get_core_shapes", &get_core_shapes, "Retrieve all available core shapes as JSON objects");
-    m.def("get_core_shape_families", &get_core_shape_families, "Retrieve list of unique core shape families");
+    m.def("get_core_shapes", &get_core_shapes,
+        R"pbdoc(
+        Retrieve all available core shapes from the database.
+        
+        Returns shape specifications including:
+        - Dimensional parameters
+        - Family type (E, ETD, PQ, RM, toroidal, etc.)
+        - Winding window geometry
+        - Magnetic circuit type (open/closed)
+        
+        Returns:
+            JSON array of CoreShape objects.
+        )pbdoc");
+    
+    m.def("get_core_shape_families", &get_core_shape_families,
+        R"pbdoc(
+        Retrieve list of unique core shape families.
+        
+        Families include: E, EI, EFD, EQ, ER, ETD, EC, PQ, PM, RM, T (toroidal),
+        P (pot), U, UI, LP (planar), and others.
+        
+        Returns:
+            JSON array of CoreShapeFamily strings.
+        )pbdoc");
 
     // Name retrieval functions
-    m.def("get_core_material_names", &get_core_material_names, "Retrieve list of all core material names");
+    m.def("get_core_material_names", &get_core_material_names,
+        R"pbdoc(
+        Retrieve list of all core material names in database.
+        
+        Returns:
+            JSON array of material name strings.
+        )pbdoc");
+    
     m.def("get_core_material_names_by_manufacturer", &get_core_material_names_by_manufacturer,
-        "Retrieve core material names filtered by manufacturer",
+        R"pbdoc(
+        Retrieve core material names filtered by manufacturer.
+        
+        Args:
+            manufacturer_name: Manufacturer name (e.g., "TDK", "Ferroxcube").
+        
+        Returns:
+            JSON array of material name strings from that manufacturer.
+        )pbdoc",
         py::arg("manufacturer_name"));
+    
     m.def("get_core_shape_names", &get_core_shape_names,
-        "Retrieve list of core shape names",
+        R"pbdoc(
+        Retrieve list of core shape names.
+        
+        Args:
+            include_toroidal: Whether to include toroidal shapes.
+        
+        Returns:
+            JSON array of shape name strings (e.g., "E 42/21/15", "ETD 49").
+        )pbdoc",
         py::arg("include_toroidal"));
 
     // Lookup functions
-    m.def("find_core_material_by_name", &find_core_material_by_name, "Find core material data by name");
-    m.def("find_core_shape_by_name", &find_core_shape_by_name, "Find core shape data by name");
+    m.def("find_core_material_by_name", &find_core_material_by_name,
+        R"pbdoc(
+        Find complete core material data by name.
+        
+        Args:
+            name: Material name (e.g., "3C95", "N87", "N49").
+        
+        Returns:
+            JSON CoreMaterial object with full specification, or error.
+        )pbdoc",
+        py::arg("name"));
+    
+    m.def("find_core_shape_by_name", &find_core_shape_by_name,
+        R"pbdoc(
+        Find complete core shape data by name.
+        
+        Args:
+            name: Shape name (e.g., "E 42/21/15", "ETD 49/25/16").
+        
+        Returns:
+            JSON CoreShape object with full dimensional data, or error.
+        )pbdoc",
+        py::arg("name"));
 
     // Core calculations
-    m.def("calculate_core_data", &calculate_core_data, "Process core data and return complete description");
-    m.def("calculate_core_processed_description", &calculate_core_processed_description, "Calculate processed description for a core");
-    m.def("calculate_core_geometrical_description", &calculate_core_geometrical_description, "Calculate geometrical description for a core");
-    m.def("calculate_core_gapping", &calculate_core_gapping, "Calculate gapping configuration for a core");
-    m.def("load_core_data", &load_core_data, "Load core data from JSON");
-    m.def("get_material_data", &get_material_data, "Get material data by name");
-    m.def("get_core_temperature_dependant_parameters", &get_core_temperature_dependant_parameters, "Get temperature-dependent core parameters");
-    m.def("calculate_shape_data", &calculate_shape_data, "Calculate shape parameters");
-    m.def("get_shape_data", &get_shape_data, "Get shape data by name");
+    m.def("calculate_core_data", &calculate_core_data,
+        R"pbdoc(
+        Process core functional description and compute all derived parameters.
+        
+        Takes a core functional description (shape, material, gapping) and
+        calculates the processed description including:
+        - Effective magnetic parameters (Ae, le, Ve)
+        - Winding window dimensions
+        - Column geometry
+        - Geometrical description for visualization
+        
+        Args:
+            core_data_json: JSON object with functionalDescription containing:
+                - shape: CoreShape object or shape name string
+                - material: CoreMaterial object or material name string
+                - gapping: Array of CoreGap objects
+                - numberStacks: Number of stacked cores (default 1)
+            include_material_data: Whether to include full material curves.
+        
+        Returns:
+            JSON Core object with functionalDescription, processedDescription,
+            and geometricalDescription fully populated.
+        
+        Example:
+            >>> core_data = {
+            ...     "functionalDescription": {
+            ...         "shape": "E 42/21/15",
+            ...         "material": "3C95",
+            ...         "gapping": [{"type": "subtractive", "length": 0.001}],
+            ...         "numberStacks": 1
+            ...     }
+            ... }
+            >>> core = PyMKF.calculate_core_data(core_data, False)
+            >>> print(f"Ae = {core['processedDescription']['effectiveParameters']['effectiveArea']*1e6:.1f} mm²")
+        )pbdoc",
+        py::arg("core_data_json"), py::arg("include_material_data"));
+    
+    m.def("calculate_core_processed_description", &calculate_core_processed_description,
+        R"pbdoc(
+        Calculate only the processed description for a core.
+        
+        Faster than calculate_core_data when only effective parameters are needed.
+        
+        Args:
+            core_data_json: JSON object with functionalDescription.
+        
+        Returns:
+            JSON CoreProcessedDescription with effectiveParameters,
+            windingWindows, and columns.
+        )pbdoc",
+        py::arg("core_data_json"));
+    
+    m.def("calculate_core_geometrical_description", &calculate_core_geometrical_description,
+        R"pbdoc(
+        Calculate geometrical description for core visualization.
+        
+        Generates 3D piece geometry for CAD export or rendering.
+        
+        Args:
+            core_data_json: JSON object with functionalDescription.
+        
+        Returns:
+            JSON array of CoreGeometricalDescriptionElement objects.
+        )pbdoc",
+        py::arg("core_data_json"));
+    
+    m.def("calculate_core_gapping", &calculate_core_gapping,
+        R"pbdoc(
+        Process and calculate gapping configuration for a core.
+        
+        Computes gap areas, positions, and fringing factors.
+        
+        Args:
+            core_data_json: JSON object with core and gapping specification.
+        
+        Returns:
+            JSON array of processed CoreGap objects.
+        )pbdoc",
+        py::arg("core_data_json"));
+    
+    m.def("load_core_data", &load_core_data,
+        R"pbdoc(
+        Load and process multiple cores from JSON array.
+        
+        Args:
+            cores_json: JSON array of core specifications.
+        
+        Returns:
+            JSON array of processed Core objects.
+        )pbdoc",
+        py::arg("cores_json"));
+    
+    m.def("get_material_data", &get_material_data,
+        R"pbdoc(
+        Get complete material data by name.
+        
+        Args:
+            material_name: Name of the material.
+        
+        Returns:
+            JSON CoreMaterial object.
+        )pbdoc",
+        py::arg("material_name"));
+    
+    m.def("get_core_temperature_dependant_parameters", &get_core_temperature_dependant_parameters,
+        R"pbdoc(
+        Get temperature-dependent magnetic parameters for a core.
+        
+        Calculates key parameters at the specified temperature:
+        
+        Args:
+            core_data: JSON object with core specification.
+            temperature: Temperature in Celsius.
+        
+        Returns:
+            JSON object with:
+                - magneticFluxDensitySaturation: Bsat in Tesla
+                - magneticFieldStrengthSaturation: Hsat in A/m
+                - initialPermeability: μi (dimensionless)
+                - effectivePermeability: μe (dimensionless)
+                - reluctance: Core reluctance in A/Wb
+                - permeance: Inverse reluctance in Wb/A
+                - resistivity: Core resistivity in Ohm·m
+        )pbdoc",
+        py::arg("core_data"), py::arg("temperature"));
+    
+    m.def("calculate_shape_data", &calculate_shape_data,
+        R"pbdoc(
+        Calculate complete core data from shape only.
+        
+        Creates a core with dummy material for shape analysis.
+        
+        Args:
+            shape_json: JSON CoreShape object.
+        
+        Returns:
+            JSON Core object with processed dimensions.
+        )pbdoc",
+        py::arg("shape_json"));
+    
+    m.def("get_shape_data", &get_shape_data,
+        R"pbdoc(
+        Get shape data by name.
+        
+        Args:
+            shape_name: Name of the shape.
+        
+        Returns:
+            JSON CoreShape object.
+        )pbdoc",
+        py::arg("shape_name"));
 
     // Availability queries
-    m.def("get_available_shape_families", &get_available_shape_families, "Get list of available shape families");
-    m.def("get_available_core_materials", &get_available_core_materials, "Get list of available core materials");
-    m.def("get_available_core_manufacturers", &get_available_core_manufacturers, "Get list of core manufacturers");
-    m.def("get_available_core_shape_families", &get_available_core_shape_families, "Get list of available core shape families");
-    m.def("get_available_core_shapes", &get_available_core_shapes, "Get list of available core shapes");
-    m.def("get_available_cores", &get_available_cores, "Get list of all available cores");
+    m.def("get_available_shape_families", &get_available_shape_families,
+        R"pbdoc(
+        Get list of all supported shape family types.
+        
+        Returns:
+            List of family name strings.
+        )pbdoc");
+    
+    m.def("get_available_core_materials", &get_available_core_materials,
+        R"pbdoc(
+        Get list of available core materials, optionally filtered by manufacturer.
+        
+        Args:
+            manufacturer: Manufacturer name filter (empty for all).
+        
+        Returns:
+            List of material name strings.
+        )pbdoc",
+        py::arg("manufacturer"));
+    
+    m.def("get_available_core_manufacturers", &get_available_core_manufacturers,
+        R"pbdoc(
+        Get list of all core material manufacturers in database.
+        
+        Returns:
+            List of manufacturer name strings (TDK, Ferroxcube, Fair-Rite, etc.).
+        )pbdoc");
+    
+    m.def("get_available_core_shape_families", &get_available_core_shape_families,
+        R"pbdoc(
+        Get list of all core shape families.
+        
+        Returns:
+            List of family name strings.
+        )pbdoc");
+    
+    m.def("get_available_core_shapes", &get_available_core_shapes,
+        R"pbdoc(
+        Get list of all available core shape names.
+        
+        Returns:
+            List of shape name strings.
+        )pbdoc");
+    
+    m.def("get_available_cores", &get_available_cores,
+        R"pbdoc(
+        Get all available pre-configured cores from database.
+        
+        Returns complete Core objects ready for use, typically representing
+        manufacturer stock items.
+        
+        Returns:
+            JSON array of Core objects.
+        )pbdoc");
 
     // Gap and reluctance
-    m.def("calculate_gap_reluctance", &calculate_gap_reluctance, "Calculate magnetic reluctance of an air gap");
-    m.def("get_gap_reluctance_model_information", &get_gap_reluctance_model_information, "Get information about gap reluctance models");
+    m.def("calculate_gap_reluctance", &calculate_gap_reluctance,
+        R"pbdoc(
+        Calculate magnetic reluctance of an air gap.
+        
+        Uses analytical models to compute gap reluctance including fringing.
+        
+        Args:
+            core_gap_data: JSON CoreGap object with gap geometry.
+            model_name_string: Reluctance model name:
+                - "ZHANG": Zhang's improved method
+                - "MUEHLETHALER": 3D reluctance approach
+                - "PARTRIDGE": McLyman handbook method
+                - "EFFECTIVE_AREA": Area-based approximation
+                - "STENGLEIN": Large gap method
+                - "BALAKRISHNAN": Schwarz-Christoffel method
+                - "CLASSIC": Basic uniform field
+        
+        Returns:
+            JSON AirGapReluctanceOutput with:
+                - reluctance: Gap reluctance in A/Wb
+                - fringingFactor: Fringing flux correction factor
+        )pbdoc",
+        py::arg("core_gap_data"), py::arg("model_name_string"));
+    
+    m.def("get_gap_reluctance_model_information", &get_gap_reluctance_model_information,
+        R"pbdoc(
+        Get documentation for available gap reluctance models.
+        
+        Returns:
+            JSON object with:
+                - information: Description of each model
+                - errors: Typical error percentages
+                - internal_links: OpenMagnetics documentation links
+                - external_links: Academic reference links
+        )pbdoc");
+    
     m.def("calculate_inductance_from_number_turns_and_gapping", &calculate_inductance_from_number_turns_and_gapping,
-        "Calculate inductance from turns count and gap configuration");
+        R"pbdoc(
+        Calculate inductance from turns count and gap configuration.
+        
+        Uses reluctance model to compute: L = N² / R_total
+        
+        Args:
+            core_data: JSON object with core specification.
+            coil_data: JSON object with coil specification (for turns).
+            operating_point_data: JSON operating point for DC bias consideration.
+            models_data: JSON dict with "reluctance" model selection.
+        
+        Returns:
+            Magnetizing inductance in Henries.
+        )pbdoc",
+        py::arg("core_data"), py::arg("coil_data"), py::arg("operating_point_data"), py::arg("models_data"));
+    
     m.def("calculate_number_turns_from_gapping_and_inductance", &calculate_number_turns_from_gapping_and_inductance,
-        "Calculate required number of turns from gap and target inductance");
+        R"pbdoc(
+        Calculate required turns from gap and target inductance.
+        
+        Computes: N = sqrt(L * R_total)
+        
+        Args:
+            core_data: JSON object with core specification.
+            inputs_data: JSON Inputs with magnetizingInductance requirement.
+            models_data: JSON dict with "reluctance" model selection.
+        
+        Returns:
+            Required number of turns (may be non-integer).
+        )pbdoc",
+        py::arg("core_data"), py::arg("inputs_data"), py::arg("models_data"));
+    
     m.def("calculate_gapping_from_number_turns_and_inductance", &calculate_gapping_from_number_turns_and_inductance,
-        "Calculate required gap from turns count and target inductance");
+        R"pbdoc(
+        Calculate required gap from turns count and target inductance.
+        
+        Iteratively solves for gap length to achieve target inductance.
+        
+        Args:
+            core_data: JSON object with core specification.
+            coil_data: JSON object with coil specification.
+            inputs_data: JSON Inputs with magnetizingInductance requirement.
+            gapping_type_json: Gap type ("SUBTRACTIVE", "ADDITIVE", "DISTRIBUTED").
+            decimals: Precision in decimal places for gap length.
+            models_data: JSON dict with "reluctance" model selection.
+        
+        Returns:
+            JSON Core object with updated gapping configuration.
+        )pbdoc",
+        py::arg("core_data"), py::arg("coil_data"), py::arg("inputs_data"),
+        py::arg("gapping_type_json"), py::arg("decimals"), py::arg("models_data"));
 
     // Additional core functions
-    m.def("calculate_core_maximum_magnetic_energy", &calculate_core_maximum_magnetic_energy, "Calculate maximum magnetic energy in core");
-    m.def("calculate_saturation_current", &calculate_saturation_current, "Calculate saturation current");
-    m.def("calculate_temperature_from_core_thermal_resistance", &calculate_temperature_from_core_thermal_resistance, 
-        "Calculate temperature rise from thermal resistance");
+    m.def("calculate_core_maximum_magnetic_energy", &calculate_core_maximum_magnetic_energy,
+        R"pbdoc(
+        Calculate maximum magnetic energy storage capacity of core.
+        
+        Energy = 0.5 * L * I²_sat or from gap volume and saturation.
+        
+        Args:
+            core_data_json: JSON object with core specification.
+            operating_point_json: JSON operating point (optional, for DC bias).
+        
+        Returns:
+            Maximum storable magnetic energy in Joules.
+        )pbdoc",
+        py::arg("core_data_json"), py::arg("operating_point_json"));
+    
+    m.def("calculate_saturation_current", &calculate_saturation_current,
+        R"pbdoc(
+        Calculate saturation current for a complete magnetic.
+        
+        The current at which core reaches saturation flux density.
+        
+        Args:
+            magnetic_json: JSON Magnetic object (core + coil).
+            temperature: Operating temperature in Celsius.
+        
+        Returns:
+            Saturation current in Amperes.
+        )pbdoc",
+        py::arg("magnetic_json"), py::arg("temperature"));
+    
+    m.def("calculate_temperature_from_core_thermal_resistance", &calculate_temperature_from_core_thermal_resistance,
+        R"pbdoc(
+        Calculate core temperature from thermal resistance and losses.
+        
+        T_core = T_ambient + P_loss * R_thermal
+        
+        Args:
+            core_json: JSON Core object with thermal resistance data.
+            total_losses: Total power dissipation in Watts.
+        
+        Returns:
+            Estimated core temperature in Celsius.
+        )pbdoc", 
+        py::arg("core_json"), py::arg("total_losses"));
 }
 
 } // namespace PyMKF

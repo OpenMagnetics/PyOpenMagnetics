@@ -1,1 +1,1 @@
-"""PyMKF Test Suite - Python tests for OpenMagnetics MKF library."""
+"""PyOpenMagnetics Test Suite - Python tests for OpenMagnetics MKF library."""

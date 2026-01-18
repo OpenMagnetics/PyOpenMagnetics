@@ -1,5 +1,5 @@
 """
-Tests for PyMKF Magnetic Adviser.
+Tests for PyOpenMagnetics Magnetic Adviser.
 
 These tests mirror TestMagneticAdviser.cpp from MKF, verifying the magnetic
 adviser functionality for recommending optimal complete magnetic designs
@@ -7,7 +7,7 @@ including core, winding, and all parameters.
 """
 import pytest
 import json
-import PyMKF
+import PyOpenMagnetics
 
 
 def parse_json_result(result):
@@ -28,10 +28,10 @@ class TestMagneticAdviserBasic:
         Magnetic adviser should return recommendations for inductor inputs.
         Similar to Test_MagneticAdviser_Toroidal_Cores_All_Cores.
         """
-        processed_inputs = PyMKF.process_inputs(inductor_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
         # API: calculate_advised_magnetics(inputs, max_results, core_mode)
-        result_json = PyMKF.calculate_advised_magnetics(processed_inputs, 5, "available cores")
+        result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
         results = parse_json_result(result_json)
         
         assert isinstance(results, list)
@@ -42,9 +42,9 @@ class TestMagneticAdviserBasic:
         Advised magnetics should contain required Mas fields.
         Similar to checks in TestMagneticAdviser.cpp that verify magnetic structure.
         """
-        processed_inputs = PyMKF.process_inputs(inductor_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
-        result_json = PyMKF.calculate_advised_magnetics(processed_inputs, 3, "available cores")
+        result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 3, "available cores")
         results = parse_json_result(result_json)
         
         if len(results) > 0:
@@ -67,9 +67,9 @@ class TestMagneticAdviserCoreModes:
         Test with AVAILABLE_CORES mode (uses all available cores).
         Similar to Test_MagneticAdviser_Toroidal_Cores_All_Cores.
         """
-        processed_inputs = PyMKF.process_inputs(inductor_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
-        result_json = PyMKF.calculate_advised_magnetics(processed_inputs, 5, "available cores")
+        result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
         results = parse_json_result(result_json)
         
         assert isinstance(results, list)
@@ -79,9 +79,9 @@ class TestMagneticAdviserCoreModes:
         Test with STANDARD_CORES mode (uses standard core shapes/materials).
         Similar to Test_MagneticAdviser_Toroidal_Cores_Standard_Cores.
         """
-        processed_inputs = PyMKF.process_inputs(inductor_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
-        result_json = PyMKF.calculate_advised_magnetics(processed_inputs, 5, "standard cores")
+        result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "standard cores")
         results = parse_json_result(result_json)
         
         assert isinstance(results, list)
@@ -92,9 +92,9 @@ class TestMagneticAdviserInputTypes:
 
     def test_with_inductor_inputs(self, inductor_inputs, reset_settings):
         """Test magnetic adviser with simple inductor inputs."""
-        processed_inputs = PyMKF.process_inputs(inductor_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
-        result_json = PyMKF.calculate_advised_magnetics(processed_inputs, 5, "available cores")
+        result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
         results = parse_json_result(result_json)
         
         assert isinstance(results, list)
@@ -105,9 +105,9 @@ class TestMagneticAdviserInputTypes:
         Test magnetic adviser with transformer (multi-winding) inputs.
         Similar to Test_MagneticAdviser_Insulation_Requirements.
         """
-        processed_inputs = PyMKF.process_inputs(transformer_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(transformer_inputs)
         
-        result_json = PyMKF.calculate_advised_magnetics(processed_inputs, 5, "available cores")
+        result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
         results = parse_json_result(result_json)
         
         assert isinstance(results, list)
@@ -118,9 +118,9 @@ class TestMagneticAdviserInputTypes:
         Test magnetic adviser with high frequency (~500kHz) inputs.
         Similar to high frequency tests in TestMagneticAdviser.cpp.
         """
-        processed_inputs = PyMKF.process_inputs(high_frequency_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(high_frequency_inputs)
         
-        result_json = PyMKF.calculate_advised_magnetics(processed_inputs, 5, "available cores")
+        result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
         results = parse_json_result(result_json)
         
         assert isinstance(results, list)
@@ -131,9 +131,9 @@ class TestMagneticAdviserInputTypes:
         Test magnetic adviser with flyback transformer inputs.
         Similar to MagneticAdviserJsonHV and MagneticAdviserJsonLV tests.
         """
-        processed_inputs = PyMKF.process_inputs(flyback_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(flyback_inputs)
         
-        result_json = PyMKF.calculate_advised_magnetics(processed_inputs, 5, "available cores")
+        result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
         results = parse_json_result(result_json)
         
         assert isinstance(results, list)
@@ -147,13 +147,13 @@ class TestMagneticAdviserFiltering:
         Should respect max_results limit.
         Similar to result limiting in TestMagneticAdviser.cpp.
         """
-        processed_inputs = PyMKF.process_inputs(inductor_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
         results_5 = parse_json_result(
-            PyMKF.calculate_advised_magnetics(processed_inputs, 5, "available cores")
+            PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
         )
         results_2 = parse_json_result(
-            PyMKF.calculate_advised_magnetics(processed_inputs, 2, "available cores")
+            PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 2, "available cores")
         )
         
         assert len(results_2) <= 2
@@ -164,9 +164,9 @@ class TestMagneticAdviserFiltering:
         Should be able to request a single result.
         Similar to tests that request maximumNumberResults=1.
         """
-        processed_inputs = PyMKF.process_inputs(inductor_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
-        result_json = PyMKF.calculate_advised_magnetics(processed_inputs, 1, "available cores")
+        result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 1, "available cores")
         results = parse_json_result(result_json)
         
         assert len(results) <= 1
@@ -181,9 +181,9 @@ class TestMagneticAdviserFromCatalog:
         Test magnetic adviser from catalog with empty catalog.
         Should handle empty catalog gracefully.
         """
-        processed_inputs = PyMKF.process_inputs(inductor_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
-        result = PyMKF.calculate_advised_magnetics_from_catalog(processed_inputs, [], 5)
+        result = PyOpenMagnetics.calculate_advised_magnetics_from_catalog(processed_inputs, [], 5)
         result_data = parse_json_result(result)
         
         # Should return empty or error gracefully
@@ -195,7 +195,7 @@ class TestMagneticAdviserFromCatalog:
         Test magnetic adviser from catalog with actual magnetic components.
         Similar to catalog-based filtering in TestMagneticAdviser.cpp.
         """
-        processed_inputs = PyMKF.process_inputs(inductor_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
         # Create a simple magnetic catalog entry
         catalog = [
@@ -228,7 +228,7 @@ class TestMagneticAdviserFromCatalog:
             }
         ]
         
-        result = PyMKF.calculate_advised_magnetics_from_catalog(processed_inputs, catalog, 5)
+        result = PyOpenMagnetics.calculate_advised_magnetics_from_catalog(processed_inputs, catalog, 5)
         result_data = parse_json_result(result)
         
         assert isinstance(result_data, dict)
@@ -244,11 +244,11 @@ class TestMagneticAdviserFromCache:
         Test magnetic adviser from cache when cache is empty.
         Should return appropriate error message.
         """
-        processed_inputs = PyMKF.process_inputs(inductor_inputs)
+        processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
         filter_flow = []
         
-        result = PyMKF.calculate_advised_magnetics_from_cache(processed_inputs, filter_flow, 5)
+        result = PyOpenMagnetics.calculate_advised_magnetics_from_cache(processed_inputs, filter_flow, 5)
         
         # Should handle empty cache - returns error string "Exception: No magnetics found in cache"
         # or a result structure with empty data

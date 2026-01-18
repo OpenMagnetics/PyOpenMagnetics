@@ -311,6 +311,27 @@ PyOpenMagnetics.set_settings(settings)
 
 Contributions are welcome! Please see the [OpenMagnetics](https://github.com/OpenMagnetics) organization for contribution guidelines.
 
+## Documentation
+
+### Quick Start
+- **[llms.txt](llms.txt)** - Comprehensive API reference optimized for AI assistants and quick lookup
+- **[examples/](examples/)** - Practical example scripts for common design workflows
+- **[PyOpenMagnetics.pyi](PyOpenMagnetics.pyi)** - Type stubs for IDE autocompletion
+
+### Tutorials
+- **[notebooks/](notebooks/)** - Interactive Jupyter notebook tutorials with visualizations
+  - [Getting Started](notebooks/01_getting_started.ipynb) - Introduction to PyOpenMagnetics
+  - [Buck Inductor](notebooks/02_buck_inductor.ipynb) - Complete inductor design workflow
+  - [Core Losses](notebooks/03_core_losses.ipynb) - In-depth core loss analysis
+
+### Reference
+- **[docs/errors.md](docs/errors.md)** - Common errors and solutions
+- **[docs/performance.md](docs/performance.md)** - Performance optimization guide
+- **[docs/compatibility.md](docs/compatibility.md)** - Python/platform version compatibility
+
+### Validation
+- **[api/validation.py](api/validation.py)** - Runtime JSON schema validation for inputs
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

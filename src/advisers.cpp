@@ -30,7 +30,7 @@ json calculate_advised_cores(json inputsJson, json weightsJson, int maximumNumbe
             to_json(aux, masMagnetic.first);
             results.push_back(aux);
         }
-        OpenMagnetics::settings->reset();
+        OpenMagnetics::settings.reset();
 
         return results;
     }
@@ -69,7 +69,7 @@ json calculate_advised_magnetics(json inputsJson, int maximumNumberResults, json
 
 json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson, int maximumNumberResults) {
     try {
-        OpenMagnetics::settings->set_coil_delimit_and_compact(true);
+        OpenMagnetics::settings.set_coil_delimit_and_compact(true);
         OpenMagnetics::Inputs inputs(inputsJson);
         std::map<OpenMagnetics::MagneticFilters, double> weights;
 
@@ -113,7 +113,7 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
 
 json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson, int maximumNumberResults) {
     try {
-        OpenMagnetics::settings->set_coil_delimit_and_compact(true);
+        OpenMagnetics::settings.set_coil_delimit_and_compact(true);
         OpenMagnetics::Inputs inputs(inputsJson);
 
         std::vector<OpenMagnetics::MagneticFilterOperation> filterFlow;

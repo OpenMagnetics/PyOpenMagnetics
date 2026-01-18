@@ -1,12 +1,12 @@
 """
-Pytest configuration and shared fixtures for PyMKF tests.
+Pytest configuration and shared fixtures for PyOpenMagnetics tests.
 
 These fixtures mirror the patterns used in MKF C++ tests, providing
 common test data structures for inputs, operating points, and cores.
 """
 import pytest
 import json
-import PyMKF
+import PyOpenMagnetics
 
 
 # ============================================================================
@@ -307,7 +307,7 @@ def efficiency_weights():
 
 @pytest.fixture
 def reset_settings():
-    """Reset PyMKF settings before and after test."""
-    PyMKF.reset_settings()
+    """Reset PyOpenMagnetics settings before and after test."""
+    PyOpenMagnetics.reset_settings()
     yield
-    PyMKF.reset_settings()
+    PyOpenMagnetics.reset_settings()

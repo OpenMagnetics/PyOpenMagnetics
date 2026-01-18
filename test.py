@@ -1,11 +1,11 @@
-import PyMKF
+import PyOpenMagnetics
 
 
 def get_area_product(core):
     return core["processedDescription"]["columns"][0]["area"] * core["processedDescription"]["windingWindows"][0]["area"]
 
 
-cores = PyMKF.get_available_cores()
+cores = PyOpenMagnetics.get_available_cores()
 print(len(cores))
 
 target_area_product_cm4 = 70

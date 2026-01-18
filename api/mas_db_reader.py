@@ -5,7 +5,7 @@ from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.dialects import postgresql
 import os
 import MAS
-import PyMKF
+import PyOpenMagnetics
 
 
 class Database:
@@ -26,7 +26,7 @@ class IntermediateMasTable(Database):
 
     def expand_material(self, magnetic):
         material_name = magnetic.core.functionalDescription.material
-        material_data = PyMKF.get_material_data(material_name)
+        material_data = PyOpenMagnetics.get_material_data(material_name)
         magnetic.core.functionalDescription.material = MAS.CoreMaterial.from_dict(material_data)
         return magnetic
 

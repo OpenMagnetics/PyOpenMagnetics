@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "PyOpenMagnetics"
-version = "1.0.2"
+version = "1.0.3"
 requires-python = ">=3.8"
 authors = [
   { name="Alfonso Martinez", email="Alfonso_VII@hotmail.com" },
@@ -22,12 +22,13 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://openmagnetics.com"
-Repository = "https://github.com/OpenMagnetics/PyMKF"
+Repository = "https://github.com/OpenMagnetics/PyOpenMagnetics"
 Contact = "https://www.linkedin.com/in/alfonso-martinez-de-la-torre/"
 
 [tool.scikit-build]
 build-dir = "build/{wheel_tag}"
 cmake.verbose = true
+sdist.exclude = [".venv*", ".venv*/**", "build", "build/**", "dist", "dist/**", "*.egg-info", "__pycache__", "*.pyc"]
 
 [[tool.scikit-build.overrides]]
 if.platform-system = "^linux"
