@@ -45,7 +45,7 @@ jobs:
 
       - name: Verify installation
         run: |
-          python -c "import PyOpenMagnetics; print(f'PyOpenMagnetics v{PyOpenMagnetics.__version__ if hasattr(PyOpenMagnetics, \"__version__\") else \"unknown\"} loaded with {len(dir(PyOpenMagnetics))} functions')"
+          python -c "import PyOpenMagnetics; print('PyOpenMagnetics loaded with', len(dir(PyOpenMagnetics)), 'functions')"
 
       - name: Run tests
         run: |
