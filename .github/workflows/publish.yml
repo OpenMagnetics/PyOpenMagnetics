@@ -30,7 +30,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "18"
 
       - name: Install quicktype
         run: npm install -g quicktype
@@ -45,13 +45,20 @@ jobs:
           CIBW_BUILD: cp310-* cp311-* cp312-* cp313-*
           # Skip 32-bit builds, musllinux, and PyPy
           CIBW_SKIP: "*-win32 *-manylinux_i686 *musllinux* pp*"
-          # Use manylinux_2_28 (AlmaLinux 8, glibc 2.28) for Node.js 20 compatibility
+          # Use manylinux_2_28 (AlmaLinux 8) for C++23 support (GCC 12+ via gcc-toolset)
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-          # Install Node.js and quicktype in the build container (Linux)
+          # Install Node.js 18 and quicktype in the build container (Linux)
+          # Also install gcc-toolset-13 for C++23 support
           CIBW_BEFORE_ALL_LINUX: |
-            curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - && dnf install -y nodejs && npm install -g quicktype
+            dnf install -y gcc-toolset-13 && \
+            source /opt/rh/gcc-toolset-13/enable && \
+            curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && \
+            dnf install -y nodejs && \
+            npm install -g quicktype
           CIBW_BEFORE_ALL_MACOS: npm install -g quicktype
           CIBW_BEFORE_ALL_WINDOWS: npm install -g quicktype
+          # Enable gcc-toolset-13 before build for C++23
+          CIBW_ENVIRONMENT_LINUX: PATH=/opt/rh/gcc-toolset-13/root/usr/bin:$PATH LD_LIBRARY_PATH=/opt/rh/gcc-toolset-13/root/usr/lib64:$LD_LIBRARY_PATH
           # Install build dependencies
           CIBW_BEFORE_BUILD: pip install scikit-build-core cmake ninja pybind11
           # Test the wheel
@@ -78,7 +85,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "18"
 
       - name: Install quicktype
         run: npm install -g quicktype
