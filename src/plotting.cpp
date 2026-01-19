@@ -1,129 +1,192 @@
 #include "plotting.h"
+#include <filesystem>
+#include <fstream>
 
 namespace PyMKF {
 
-json plot_core(json coreDataJson, bool useColors) {
+json plot_core(json magneticJson, std::string outputPath) {
     try {
+        OpenMagnetics::Magnetic magnetic(magneticJson);
+        
+        // Use provided path or default to temp directory
+        std::filesystem::path filePath = outputPath.empty() 
+            ? std::filesystem::temp_directory_path() / "pyom_plot_core.svg"
+            : std::filesystem::path(outputPath);
+        
+        // Create the painter and paint the core only
+        OpenMagnetics::Painter painter(filePath, false, false, false);
+        painter.paint_core(magnetic);
+        
+        // Export and get the SVG string
+        std::string svgContent = painter.export_svg();
+        
         json result;
         result["success"] = true;
-        result["message"] = "Core plotting function placeholder";
+        result["svg"] = svgContent;
         return result;
     }
     catch (const std::exception &exc) {
         json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
+        exception["success"] = false;
+        exception["error"] = "Exception: " + std::string{exc.what()};
         return exception;
     }
 }
 
-json plot_core_2d(json coreDataJson, int axis, json windingWindowsJson, bool useColors) {
+json plot_magnetic(json magneticJson, std::string outputPath) {
     try {
+        OpenMagnetics::Magnetic magnetic(magneticJson);
+        
+        // Use provided path or default to temp directory
+        std::filesystem::path filePath = outputPath.empty() 
+            ? std::filesystem::temp_directory_path() / "pyom_plot_magnetic.svg"
+            : std::filesystem::path(outputPath);
+        
+        // Create the painter and paint the full magnetic (core, bobbin, coil)
+        OpenMagnetics::Painter painter(filePath, false, false, false);
+        painter.paint_core(magnetic);
+        painter.paint_bobbin(magnetic);
+        painter.paint_coil_turns(magnetic);
+        
+        // Export and get the SVG string
+        std::string svgContent = painter.export_svg();
+        
         json result;
         result["success"] = true;
-        result["message"] = "Core 2D plotting function placeholder";
+        result["svg"] = svgContent;
         return result;
     }
     catch (const std::exception &exc) {
         json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
+        exception["success"] = false;
+        exception["error"] = "Exception: " + std::string{exc.what()};
         return exception;
     }
 }
 
-json plot_field_2d(json coreDataJson, json operatingPointJson, int axis, bool useColors, double currentReference) {
+json plot_magnetic_field(json magneticJson, json operatingPointJson, std::string outputPath) {
     try {
+        OpenMagnetics::Magnetic magnetic(magneticJson);
+        OperatingPoint operatingPoint(operatingPointJson);
+        
+        // Use provided path or default to temp directory
+        std::filesystem::path filePath = outputPath.empty() 
+            ? std::filesystem::temp_directory_path() / "pyom_plot_magnetic_field.svg"
+            : std::filesystem::path(outputPath);
+        
+        // Create the painter (use BasicPainter by passing false for colorBar to get SVG content back)
+        OpenMagnetics::Painter painter(filePath, false, false, false);
+        
+        // Paint the magnetic field, core, and coil turns
+        painter.paint_magnetic_field(operatingPoint, magnetic);
+        painter.paint_core(magnetic);
+        painter.paint_coil_turns(magnetic);
+        
+        // Export and get the SVG string
+        std::string svgContent = painter.export_svg();
+        
         json result;
         result["success"] = true;
-        result["message"] = "Field 2D plotting function placeholder";
+        result["svg"] = svgContent;
         return result;
     }
     catch (const std::exception &exc) {
         json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
+        exception["success"] = false;
+        exception["error"] = "Exception: " + std::string{exc.what()};
         return exception;
     }
 }
 
-json plot_field_map(json coreDataJson, json operatingPointJson, int axis, int mirroringDimension, bool useColors) {
+json plot_electric_field(json magneticJson, json operatingPointJson, std::string outputPath) {
     try {
+        OpenMagnetics::Magnetic magnetic(magneticJson);
+        OperatingPoint operatingPoint(operatingPointJson);
+        
+        // Use provided path or default to temp directory
+        std::filesystem::path filePath = outputPath.empty() 
+            ? std::filesystem::temp_directory_path() / "pyom_plot_electric_field.svg"
+            : std::filesystem::path(outputPath);
+        
+        // Create the painter (use BasicPainter by passing false for colorBar to get SVG content back)
+        OpenMagnetics::Painter painter(filePath, false, false, false);
+        
+        // Paint the electric field, core, and coil turns
+        painter.paint_electric_field(operatingPoint, magnetic);
+        painter.paint_core(magnetic);
+        painter.paint_coil_turns(magnetic);
+        
+        // Export and get the SVG string
+        std::string svgContent = painter.export_svg();
+        
         json result;
         result["success"] = true;
-        result["message"] = "Field map plotting function placeholder";
+        result["svg"] = svgContent;
         return result;
     }
     catch (const std::exception &exc) {
         json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
+        exception["success"] = false;
+        exception["error"] = "Exception: " + std::string{exc.what()};
         return exception;
     }
 }
 
-json plot_wire(json wireDataJson, bool useColors) {
+json plot_wire(json wireDataJson, std::string outputPath) {
     try {
+        OpenMagnetics::Wire wire(wireDataJson);
+        
+        // Use provided path or default to temp directory
+        std::filesystem::path filePath = outputPath.empty() 
+            ? std::filesystem::temp_directory_path() / "pyom_plot_wire.svg"
+            : std::filesystem::path(outputPath);
+        
+        // Create the painter and paint the wire
+        OpenMagnetics::Painter painter(filePath, false, false, false);
+        painter.paint_wire(wire);
+        
+        // Export and get the SVG string
+        std::string svgContent = painter.export_svg();
+        
         json result;
         result["success"] = true;
-        result["message"] = "Wire plotting function placeholder";
+        result["svg"] = svgContent;
         return result;
     }
     catch (const std::exception &exc) {
         json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
+        exception["success"] = false;
+        exception["error"] = "Exception: " + std::string{exc.what()};
         return exception;
     }
 }
 
-json plot_bobbin(json bobbinDataJson, bool useColors) {
+json plot_bobbin(json magneticJson, std::string outputPath) {
     try {
+        OpenMagnetics::Magnetic magnetic(magneticJson);
+        
+        // Use provided path or default to temp directory
+        std::filesystem::path filePath = outputPath.empty() 
+            ? std::filesystem::temp_directory_path() / "pyom_plot_bobbin.svg"
+            : std::filesystem::path(outputPath);
+        
+        // Create the painter and paint the core and bobbin
+        OpenMagnetics::Painter painter(filePath, false, false, false);
+        painter.paint_core(magnetic);
+        painter.paint_bobbin(magnetic);
+        
+        // Export and get the SVG string
+        std::string svgContent = painter.export_svg();
+        
         json result;
         result["success"] = true;
-        result["message"] = "Bobbin plotting function placeholder";
+        result["svg"] = svgContent;
         return result;
     }
     catch (const std::exception &exc) {
         json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
-}
-
-json plot_core_piece(json corePieceDataJson, bool useColors) {
-    try {
-        json result;
-        result["success"] = true;
-        result["message"] = "Core piece plotting function placeholder";
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
-}
-
-json plot_core_piece_2d(json corePieceDataJson, int axis, json windingWindowsJson, bool useColors) {
-    try {
-        json result;
-        result["success"] = true;
-        result["message"] = "Core piece 2D plotting function placeholder";
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
-}
-
-json plot_coil_2d(json coilDataJson, int axis, bool mirroredTurns, bool useColors) {
-    try {
-        json result;
-        result["success"] = true;
-        result["message"] = "Coil 2D plotting function placeholder";
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
+        exception["success"] = false;
+        exception["error"] = "Exception: " + std::string{exc.what()};
         return exception;
     }
 }
@@ -131,137 +194,112 @@ json plot_coil_2d(json coilDataJson, int axis, bool mirroredTurns, bool useColor
 void register_plotting_bindings(py::module& m) {
     m.def("plot_core", &plot_core,
         R"pbdoc(
-        Generate a 3D visualization of a magnetic core.
+        Generate a 2D cross-section visualization of a magnetic core as SVG.
         
         Args:
-            coreDataJson: JSON object with core specification.
-            useColors: Whether to use colored rendering.
+            magneticJson: JSON object with complete magnetic specification (core + coil).
+            outputPath: Optional file path to save SVG. If empty, uses temp directory.
         
         Returns:
-            JSON object with plotting result status.
+            JSON object with:
+            - success: Boolean indicating operation success
+            - svg: SVG string content of the visualization
+            - error: Error message if success is false
         )pbdoc",
-        py::arg("coreDataJson"), py::arg("useColors") = false);
+        py::arg("magneticJson"), py::arg("outputPath") = "");
     
-    m.def("plot_core_2d", &plot_core_2d,
+    m.def("plot_magnetic", &plot_magnetic,
         R"pbdoc(
-        Generate a 2D cross-section view of a magnetic core.
+        Generate a complete visualization of the magnetic assembly as SVG.
+        
+        Shows the full magnetic including core, bobbin, and coil turns.
         
         Args:
-            coreDataJson: JSON object with core specification.
-            axis: Axis for cross-section (0=X, 1=Y, 2=Z).
-            windingWindowsJson: Optional winding window overlay data.
-            useColors: Whether to use colored rendering.
+            magneticJson: JSON object with complete magnetic specification.
+            outputPath: Optional file path to save SVG. If empty, uses temp directory.
         
         Returns:
-            JSON object with plotting result status.
+            JSON object with:
+            - success: Boolean indicating operation success
+            - svg: SVG string content of the visualization
+            - error: Error message if success is false
         )pbdoc",
-        py::arg("coreDataJson"), py::arg("axis") = 1, 
-        py::arg("windingWindowsJson") = json(), py::arg("useColors") = false);
+        py::arg("magneticJson"), py::arg("outputPath") = "");
     
-    m.def("plot_field_2d", &plot_field_2d,
+    m.def("plot_magnetic_field", &plot_magnetic_field,
         R"pbdoc(
-        Plot magnetic field distribution in 2D cross-section.
+        Plot magnetic field distribution in 2D cross-section as SVG.
+        
+        Generates a visualization showing the magnetic field strength across
+        the winding window, with arrows indicating field direction.
         
         Args:
-            coreDataJson: JSON object with core specification.
-            operatingPointJson: Operating conditions for field calculation.
-            axis: Axis for cross-section (0=X, 1=Y, 2=Z).
-            useColors: Whether to use colored rendering.
-            currentReference: Reference current for field scaling.
+            magneticJson: JSON object with complete magnetic specification.
+            operatingPointJson: Operating conditions including excitation currents.
+            outputPath: Optional file path to save SVG. If empty, uses temp directory.
         
         Returns:
-            JSON object with plotting result status.
+            JSON object with:
+            - success: Boolean indicating operation success
+            - svg: SVG string content of the field visualization
+            - error: Error message if success is false
         )pbdoc",
-        py::arg("coreDataJson"), py::arg("operatingPointJson"), 
-        py::arg("axis") = 1, py::arg("useColors") = false, py::arg("currentReference") = -1);
+        py::arg("magneticJson"), py::arg("operatingPointJson"), py::arg("outputPath") = "");
     
-    m.def("plot_field_map", &plot_field_map,
+    m.def("plot_electric_field", &plot_electric_field,
         R"pbdoc(
-        Plot magnetic field map with field lines and intensity.
+        Plot electric field distribution in 2D cross-section as SVG.
+        
+        Generates a visualization showing the electric field (voltage gradient)
+        across the winding window.
         
         Args:
-            coreDataJson: JSON object with core specification.
-            operatingPointJson: Operating conditions for field calculation.
-            axis: Axis for view (0=X, 1=Y, 2=Z).
-            mirroringDimension: Dimension for symmetry mirroring.
-            useColors: Whether to use colored rendering.
+            magneticJson: JSON object with complete magnetic specification.
+            operatingPointJson: Operating conditions including excitation voltages.
+            outputPath: Optional file path to save SVG. If empty, uses temp directory.
         
         Returns:
-            JSON object with plotting result status.
+            JSON object with:
+            - success: Boolean indicating operation success
+            - svg: SVG string content of the field visualization
+            - error: Error message if success is false
         )pbdoc",
-        py::arg("coreDataJson"), py::arg("operatingPointJson"), 
-        py::arg("axis") = 1, py::arg("mirroringDimension") = 1, py::arg("useColors") = false);
+        py::arg("magneticJson"), py::arg("operatingPointJson"), py::arg("outputPath") = "");
     
     m.def("plot_wire", &plot_wire,
         R"pbdoc(
-        Generate a visualization of a wire cross-section.
+        Generate a visualization of a wire cross-section as SVG.
+        
+        Shows the wire structure including conductor, insulation layers,
+        and for Litz wire, the individual strands arrangement.
         
         Args:
             wireDataJson: JSON object with wire specification.
-            useColors: Whether to use colored rendering.
+            outputPath: Optional file path to save SVG. If empty, uses temp directory.
         
         Returns:
-            JSON object with plotting result status.
+            JSON object with:
+            - success: Boolean indicating operation success
+            - svg: SVG string content of the wire visualization
+            - error: Error message if success is false
         )pbdoc",
-        py::arg("wireDataJson"), py::arg("useColors") = false);
+        py::arg("wireDataJson"), py::arg("outputPath") = "");
     
     m.def("plot_bobbin", &plot_bobbin,
         R"pbdoc(
-        Generate a visualization of a bobbin.
+        Generate a visualization of a bobbin with its core as SVG.
         
         Args:
-            bobbinDataJson: JSON object with bobbin specification.
-            useColors: Whether to use colored rendering.
+            magneticJson: JSON object with complete magnetic specification.
+            outputPath: Optional file path to save SVG. If empty, uses temp directory.
         
         Returns:
-            JSON object with plotting result status.
+            JSON object with:
+            - success: Boolean indicating operation success
+            - svg: SVG string content of the bobbin visualization
+            - error: Error message if success is false
         )pbdoc",
-        py::arg("bobbinDataJson"), py::arg("useColors") = false);
-    
-    m.def("plot_core_piece", &plot_core_piece,
-        R"pbdoc(
-        Generate a 3D visualization of a single core piece.
-        
-        Args:
-            corePieceDataJson: JSON object with core piece specification.
-            useColors: Whether to use colored rendering.
-        
-        Returns:
-            JSON object with plotting result status.
-        )pbdoc",
-        py::arg("corePieceDataJson"), py::arg("useColors") = false);
-    
-    m.def("plot_core_piece_2d", &plot_core_piece_2d,
-        R"pbdoc(
-        Generate a 2D cross-section view of a single core piece.
-        
-        Args:
-            corePieceDataJson: JSON object with core piece specification.
-            axis: Axis for cross-section (0=X, 1=Y, 2=Z).
-            windingWindowsJson: Optional winding window overlay data.
-            useColors: Whether to use colored rendering.
-        
-        Returns:
-            JSON object with plotting result status.
-        )pbdoc",
-        py::arg("corePieceDataJson"), py::arg("axis") = 1, 
-        py::arg("windingWindowsJson") = json(), py::arg("useColors") = false);
-    
-    m.def("plot_coil_2d", &plot_coil_2d,
-        R"pbdoc(
-        Generate a 2D visualization of coil winding arrangement.
-        
-        Args:
-            coilDataJson: JSON object with coil specification.
-            axis: Axis for view (0=X, 1=Y, 2=Z).
-            mirroredTurns: Whether to show mirrored turn positions.
-            useColors: Whether to use colored rendering.
-        
-        Returns:
-            JSON object with plotting result status.
-        )pbdoc",
-        py::arg("coilDataJson"), py::arg("axis") = 1, 
-        py::arg("mirroredTurns") = true, py::arg("useColors") = false);
+        py::arg("magneticJson"), py::arg("outputPath") = "");
 }
 
-} // namespace PyMKF
+} // namespace PyMKF} // namespace PyMKF
