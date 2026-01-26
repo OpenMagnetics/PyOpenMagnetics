@@ -190,6 +190,126 @@ json extract_column_names(json fileJson) {
     }
 }
 
+json calculate_inductance_matrix(json magneticJson, double frequency, json modelsData) {
+    try {
+        OpenMagnetics::Magnetic magnetic(magneticJson);
+        
+        auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
+        if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
+            OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
+        }
+
+        OpenMagnetics::Inductance inductance(reluctanceModelName);
+        auto inductanceMatrix = inductance.calculate_inductance_matrix(magnetic, frequency);
+
+        json result;
+        to_json(result, inductanceMatrix);
+        return result;
+    }
+    catch (const std::exception &exc) {
+        json exception;
+        exception["data"] = "Exception: " + std::string{exc.what()};
+        return exception;
+    }
+}
+
+json calculate_leakage_inductance(json magneticJson, double frequency, size_t sourceIndex) {
+    try {
+        OpenMagnetics::Magnetic magnetic(magneticJson);
+
+        auto leakageInductanceOutput = OpenMagnetics::LeakageInductance().calculate_leakage_inductance_all_windings(magnetic, frequency, sourceIndex);
+
+        json result;
+        to_json(result, leakageInductanceOutput);
+        return result;
+    }
+    catch (const std::exception &exc) {
+        json exception;
+        exception["data"] = "Exception: " + std::string{exc.what()};
+        return exception;
+    }
+}
+
+json calculate_dc_resistance_per_winding(json coilJson, double temperature) {
+    try {
+        OpenMagnetics::Coil coil(coilJson, false);
+        
+        auto resistances = OpenMagnetics::WindingOhmicLosses::calculate_dc_resistance_per_winding(coil, temperature);
+
+        json result = resistances;
+        return result;
+    }
+    catch (const std::exception &exc) {
+        json exception;
+        exception["data"] = "Exception: " + std::string{exc.what()};
+        return exception;
+    }
+}
+
+json calculate_resistance_matrix(json magneticJson, double temperature, double frequency) {
+    try {
+        OpenMagnetics::Magnetic magnetic(magneticJson);
+        
+        OpenMagnetics::WindingLosses windingLosses;
+        auto resistanceMatrix = windingLosses.calculate_resistance_matrix(magnetic, temperature, frequency);
+
+        json result;
+        to_json(result, resistanceMatrix);
+        return result;
+    }
+    catch (const std::exception &exc) {
+        json exception;
+        exception["data"] = "Exception: " + std::string{exc.what()};
+        return exception;
+    }
+}
+
+json calculate_stray_capacitance(json coilJson, json operatingPointJson, json modelsData) {
+    try {
+        OpenMagnetics::Coil coil(coilJson, false);
+        OperatingPoint operatingPoint(operatingPointJson);
+        
+        auto strayCapacitanceModelName = OpenMagnetics::StrayCapacitanceModels::ALBACH;
+        if (!modelsData.is_null() && modelsData.find("strayCapacitance") != modelsData.end()) {
+            OpenMagnetics::from_json(modelsData["strayCapacitance"], strayCapacitanceModelName);
+        }
+
+        OpenMagnetics::StrayCapacitance strayCapacitance(strayCapacitanceModelName);
+        auto strayCapacitanceOutput = strayCapacitance.calculate_capacitance(coil);
+
+        json result;
+        to_json(result, strayCapacitanceOutput);
+        return result;
+    }
+    catch (const std::exception &exc) {
+        json exception;
+        exception["data"] = "Exception: " + std::string{exc.what()};
+        return exception;
+    }
+}
+
+json calculate_maxwell_capacitance_matrix(json coilJson, json capacitanceAmongWindingsJson) {
+    try {
+        OpenMagnetics::Coil coil(coilJson, false);
+        auto capacitanceAmongWindings = capacitanceAmongWindingsJson.get<std::map<std::string, std::map<std::string, double>>>();
+
+        auto maxwellMatrix = OpenMagnetics::StrayCapacitance::calculate_maxwell_capacitance_matrix(coil, capacitanceAmongWindings);
+
+        json result = json::array();
+        for (const auto& matrix : maxwellMatrix) {
+            json matrixJson;
+            to_json(matrixJson, matrix);
+            result.push_back(matrixJson);
+        }
+        return result;
+    }
+    catch (const std::exception &exc) {
+        json exception;
+        exception["data"] = "Exception: " + std::string{exc.what()};
+        return exception;
+    }
+}
+
 void register_simulation_bindings(py::module& m) {
     m.def("simulate", &simulate,
         R"pbdoc(
@@ -303,6 +423,102 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             JSON array of column name strings.
+        )pbdoc");
+    
+    m.def("calculate_inductance_matrix", &calculate_inductance_matrix,
+        R"pbdoc(
+        Calculate the complete inductance matrix for a magnetic component.
+        
+        Computes the inductance matrix at the specified frequency, including
+        self inductances (diagonal elements) and mutual inductances (off-diagonal).
+        
+        Args:
+            magnetic_json: JSON object containing magnetic component specification.
+            frequency: Operating frequency in Hz.
+            models_json: JSON object specifying which models to use (e.g., reluctance model).
+        
+        Returns:
+            JSON object with the inductance matrix at the specified frequency.
+        )pbdoc");
+    
+    m.def("calculate_leakage_inductance", &calculate_leakage_inductance,
+        R"pbdoc(
+        Calculate leakage inductance between windings.
+        
+        Computes the leakage inductance from a source winding to all other windings.
+        
+        Args:
+            magnetic_json: JSON object containing magnetic component specification.
+            frequency: Operating frequency in Hz.
+            source_index: Index of the source winding (0-based).
+        
+        Returns:
+            JSON object with leakage inductance values to each winding.
+        )pbdoc");
+    
+    m.def("calculate_dc_resistance_per_winding", &calculate_dc_resistance_per_winding,
+        R"pbdoc(
+        Calculate DC resistance for each winding.
+        
+        Computes the DC resistance of each winding based on wire properties
+        and temperature.
+        
+        Args:
+            coil_json: JSON object containing coil specification with turns and wire info.
+            temperature: Temperature in degrees Celsius for resistance calculation.
+        
+        Returns:
+            JSON array with DC resistance value for each winding in Ohms.
+        )pbdoc");
+    
+    m.def("calculate_resistance_matrix", &calculate_resistance_matrix,
+        R"pbdoc(
+        Calculate the resistance matrix for a magnetic component.
+        
+        Computes the frequency-dependent resistance matrix including self and mutual
+        resistances. Uses the Spreen (1990) method with inductance ratio scaling
+        for proper mutual resistance calculation.
+        
+        Args:
+            magnetic_json: JSON object containing magnetic component specification.
+            temperature: Temperature in degrees Celsius for resistance calculation.
+            frequency: Operating frequency in Hz.
+        
+        Returns:
+            JSON object with resistance matrix (magnitude and frequency).
+        )pbdoc");
+    
+    m.def("calculate_stray_capacitance", &calculate_stray_capacitance,
+        R"pbdoc(
+        Calculate stray capacitance for a coil.
+        
+        Computes turn-to-turn and winding-to-winding capacitances using the
+        specified capacitance model.
+        
+        Args:
+            coil_json: JSON object containing coil specification with turns.
+            operating_point_json: JSON object with operating conditions for voltage distribution.
+            models_json: JSON object specifying capacitance model (e.g., "Albach", "Koch").
+        
+        Returns:
+            JSON object with capacitance values including capacitance among turns,
+            capacitance among windings, and Maxwell capacitance matrix.
+        )pbdoc");
+    
+    m.def("calculate_maxwell_capacitance_matrix", &calculate_maxwell_capacitance_matrix,
+        R"pbdoc(
+        Calculate Maxwell capacitance matrix from inter-winding capacitances.
+        
+        Converts inter-winding capacitance values to the standard Maxwell
+        capacitance matrix format used in circuit simulation.
+        
+        Args:
+            coil_json: JSON object containing coil specification.
+            capacitance_among_windings_json: JSON object with capacitance values
+                between each pair of windings.
+        
+        Returns:
+            JSON array containing the Maxwell capacitance matrix.
         )pbdoc");
 }
 
