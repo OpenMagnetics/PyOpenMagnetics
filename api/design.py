@@ -328,8 +328,12 @@ class BuckBuilder(TopologyBuilder):
     def get_calculated_parameters(self) -> dict:
         self._validate_params()
         L = self._calculate_inductance()
+        d_max = self._vout / self._vin_min  # Duty cycle at min Vin
+        delta_i = self._ripple_ratio * self._iout
+        i_peak = self._iout + delta_i / 2
         return {"vin_min": self._vin_min, "vin_max": self._vin_max, "vout": self._vout, "iout": self._iout,
-                "inductance_uH": L * 1e6, "output_power_w": self._vout * self._iout, "frequency_kHz": self._frequency / 1000}
+                "inductance_uH": L * 1e6, "output_power_w": self._vout * self._iout, "frequency_kHz": self._frequency / 1000,
+                "duty_cycle": d_max, "i_ripple_pp": delta_i, "i_peak": i_peak}
 
 
 # =============================================================================
@@ -470,7 +474,7 @@ class InductorBuilder(TopologyBuilder):
 
     def get_calculated_parameters(self) -> dict:
         self._validate_params()
-        return {"inductance_uH": self._inductance * 1e6, "idc": self._idc, "iac_pp": self._iac_pp,
+        return {"inductance_uH": self._inductance * 1e6, "i_dc": self._idc, "i_ripple_pp": self._iac_pp,
                 "i_peak": self._idc + self._iac_pp / 2, "frequency_kHz": self._frequency / 1000}
 
 
