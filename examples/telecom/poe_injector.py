@@ -13,6 +13,7 @@ Specifications:
 
 from api.design import Design
 
+MAX_RESULTS = 50
 
 def design_poe_injector():
     print("=" * 60)
@@ -38,7 +39,7 @@ def design_poe_injector():
     print(f"  Duty cycle (D):      {params['duty_cycle_low_line']:.2%}")
 
     print("\nFinding optimal designs...")
-    results = design.solve(max_results=3)
+    results = design.solve(max_results=MAX_RESULTS)
 
     if not results:
         print("No suitable designs found.")

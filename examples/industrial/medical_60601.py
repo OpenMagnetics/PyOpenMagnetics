@@ -43,7 +43,7 @@ def design_medical_60601():
     print("      Triple-insulated wire or margin tape required")
 
     print("\nFinding optimal designs...")
-    results = design.solve(max_results=3)
+    results = design.solve(max_results=MAX_RESULTS)
 
     if not results:
         print("No suitable designs found.")

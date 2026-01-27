@@ -41,7 +41,7 @@ def design_usb_pd_20w():
 
     # Get design recommendations
     print("\nFinding optimal designs...")
-    results = design.solve(max_results=3)
+    results = design.solve(max_results=MAX_RESULTS)
 
     if not results:
         print("No suitable designs found. Try relaxing constraints.")

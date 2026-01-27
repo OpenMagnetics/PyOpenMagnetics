@@ -8,7 +8,25 @@ This example demonstrates designing a buck converter output inductor:
 4. Verify losses and saturation
 """
 
+import json
 import PyOpenMagnetics
+
+
+def _parse_magnetics_result(result):
+    """Parse the result from calculate_advised_magnetics into a list."""
+    if isinstance(result, str):
+        return json.loads(result)
+    elif isinstance(result, dict):
+        data = result.get("data", result)
+        if isinstance(data, str):
+            if data.startswith("Exception:"):
+                print(f"Error: {data}")
+                return []
+            return json.loads(data)
+        return data if isinstance(data, list) else [data]
+    elif isinstance(result, list):
+        return result
+    return [result] if result else []
 
 
 def design_buck_inductor():
@@ -104,12 +122,13 @@ def design_buck_inductor():
         "COST": 0.3
     }
     
-    magnetics = PyOpenMagnetics.calculate_advised_magnetics(
+    magnetics_raw = PyOpenMagnetics.calculate_advised_magnetics(
         processed,
-        max_results=5,
-        core_mode="STANDARD_CORES"
+        5,
+        "STANDARD_CORES"
     )
-    
+    magnetics = _parse_magnetics_result(magnetics_raw)
+
     print(f"  Found {len(magnetics)} suitable designs")
     
     # Analyze designs

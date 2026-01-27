@@ -63,7 +63,7 @@ class TestFlybackBuilder:
 
     def test_solve_flyback(self):
         from api.design import Design
-        results = Design.flyback().vin_ac(85, 265).output(12, 5).fsw(100e3).solve(max_results=3)
+        results = Design.flyback().vin_ac(85, 265).output(12, 5).fsw(100e3).solve(max_results=MAX_RESULTS)
         assert isinstance(results, list)
 
 
@@ -86,7 +86,7 @@ class TestBuckBuilder:
 
     def test_solve_buck(self):
         from api.design import Design
-        results = Design.buck().vin(12, 24).vout(5).iout(3).fsw(500e3).solve(max_results=3)
+        results = Design.buck().vin(12, 24).vout(5).iout(3).fsw(500e3).solve(max_results=MAX_RESULTS)
         assert isinstance(results, list)
 
     def test_invalid_vout(self):
@@ -107,7 +107,7 @@ class TestBoostBuilder:
 
     def test_solve_boost(self):
         from api.design import Design
-        results = Design.boost().vin(3.0, 4.2).vout(5).pout(2).fsw(1e6).solve(max_results=3)
+        results = Design.boost().vin(3.0, 4.2).vout(5).pout(2).fsw(1e6).solve(max_results=MAX_RESULTS)
         assert isinstance(results, list)
 
 
@@ -128,7 +128,7 @@ class TestInductorBuilder:
 
     def test_solve_inductor(self):
         from api.design import Design
-        results = Design.inductor().inductance(100e-6).idc(5).iac_pp(1).fsw(100e3).solve(max_results=3)
+        results = Design.inductor().inductance(100e-6).idc(5).iac_pp(1).fsw(100e3).solve(max_results=MAX_RESULTS)
         assert isinstance(results, list)
 
 

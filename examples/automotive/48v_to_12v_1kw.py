@@ -38,7 +38,7 @@ def design_48v_to_12v_1kw():
     print(f"  Duty cycle:    {params['duty_cycle']:.2%}")
 
     print("\nFinding optimal designs...")
-    results = design.solve(max_results=3)
+    results = design.solve(max_results=MAX_RESULTS)
 
     if not results:
         print("No suitable designs found.")

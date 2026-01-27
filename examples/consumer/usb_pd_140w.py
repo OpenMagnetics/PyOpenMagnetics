@@ -38,7 +38,7 @@ def design_usb_pd_140w():
     print(f"  Duty cycle (D):      {params['duty_cycle_low_line']:.2%}")
 
     print("\nFinding optimal designs...")
-    results = design.solve(max_results=3)
+    results = design.solve(max_results=MAX_RESULTS)
 
     if not results:
         print("No suitable designs found.")

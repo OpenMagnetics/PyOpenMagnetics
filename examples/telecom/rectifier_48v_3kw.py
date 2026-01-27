@@ -13,6 +13,7 @@ Specifications:
 
 from api.design import Design
 
+MAX_RESULTS = 50
 
 def design_rectifier_48v_3kw():
     print("=" * 60)
@@ -35,10 +36,12 @@ def design_rectifier_48v_3kw():
     print(f"  Mag inductance (Lm): {params['magnetizing_inductance_uH']:.1f} uH")
 
     print("\nFinding optimal designs...")
-    results = design.solve(max_results=3)
+    results = design.solve(max_results=MAX_RESULTS, 
+                           verbose=True, auto_relax=True,
+                           output_dir="examples/_output/rectifier_48v_3kw")
 
     if not results:
-        print("No suitable designs found.")
+        print("No suitable designs found even after relaxation.")
         return None
 
     print(f"\nFound {len(results)} designs:\n")

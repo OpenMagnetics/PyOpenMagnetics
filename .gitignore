@@ -1,6 +1,11 @@
 build/
 dist/
 venv/
+docs/_build/
+site/
 
 *.pyc
 __pycache__/
+tmp/
+examples/_output/
+archive/

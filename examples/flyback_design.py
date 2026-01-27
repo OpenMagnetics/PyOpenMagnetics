@@ -10,7 +10,25 @@ This example demonstrates a complete flyback transformer design workflow:
 For more examples, see llms.txt in the PyOpenMagnetics directory.
 """
 
+import json
 import PyOpenMagnetics
+
+
+def _parse_magnetics_result(result):
+    """Parse the result from calculate_advised_magnetics into a list."""
+    if isinstance(result, str):
+        return json.loads(result)
+    elif isinstance(result, dict):
+        data = result.get("data", result)
+        if isinstance(data, str):
+            if data.startswith("Exception:"):
+                print(f"Error: {data}")
+                return []
+            return json.loads(data)
+        return data if isinstance(data, list) else [data]
+    elif isinstance(result, list):
+        return result
+    return [result] if result else []
 
 
 def design_flyback_transformer():
@@ -107,12 +125,13 @@ def design_flyback_transformer():
         "COST": 0.3           # Tertiary: low cost
     }
     
-    magnetics = PyOpenMagnetics.calculate_advised_magnetics(
+    magnetics_raw = PyOpenMagnetics.calculate_advised_magnetics(
         processed_inputs,
-        max_results=3,
-        core_mode="STANDARD_CORES"
+        3,
+        "STANDARD_CORES"
     )
-    
+    magnetics = _parse_magnetics_result(magnetics_raw)
+
     print(f"    ✓ Found {len(magnetics)} suitable designs")
     
     # Step 4: Analyze top recommendations
@@ -144,9 +163,9 @@ def design_flyback_transformer():
         
         # Calculate winding losses
         winding_losses = PyOpenMagnetics.calculate_winding_losses(
-            magnetic, 
+            magnetic,
             processed_inputs["operatingPoints"][0],  # Low line
-            temperature=80  # Estimated operating temperature
+            80  # Estimated operating temperature
         )
         
         core_loss = losses.get("coreLosses", 0)

@@ -612,6 +612,453 @@ MATERIALS_GUIDE = {
 
 
 # =============================================================================
+# POWDER CORE MATERIAL DATABASE
+# =============================================================================
+# Steinmetz parameters for core loss calculation: Pv = k * f^alpha * B^beta
+# Where Pv is in W/m³, f in Hz, B in Tesla
+# Permeability curve: mu_r = mu_i / (a + b * |H/oersted|^c) / 100
+# H in A/m, oersted = 79.5775 A/m
+
+POWDER_CORE_MATERIALS = {
+    # -------------------------------------------------------------------------
+    # MPP (Molypermalloy Powder) - Lowest loss, highest cost
+    # -------------------------------------------------------------------------
+    "CSC_MPP_26u": {
+        "name": "CSC MPP 26µ",
+        "family": "MPP",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 26,
+        "saturation_T": 0.75,
+        "steinmetz": {"k": 32.0, "alpha": 1.27, "beta": 2.18},
+        "permeability_curve": {"a": 0.01, "b": 1.42e-07, "c": 2.030},
+        "frequency_range": (10e3, 500e3),
+        "applications": ["High Q filters", "Resonant inductors", "Low loss PFC"],
+        "notes": "Lowest core loss among powder cores, excellent for high frequency",
+    },
+    "CSC_MPP_60u": {
+        "name": "CSC MPP 60µ",
+        "family": "MPP",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 60,
+        "saturation_T": 0.75,
+        "steinmetz": {"k": 32.0, "alpha": 1.27, "beta": 2.18},
+        "permeability_curve": {"a": 0.01, "b": 1.27e-07, "c": 2.412},
+        "frequency_range": (10e3, 500e3),
+        "applications": ["Flyback inductors", "Switching regulators"],
+    },
+    "Magnetics_MPP_60u": {
+        "name": "Magnetics MPP 60µ",
+        "family": "MPP",
+        "manufacturer": "Magnetics Inc",
+        "permeability": 60,
+        "saturation_T": 0.75,
+        "steinmetz": {"k": 52.3, "alpha": 1.15, "beta": 2.47},
+        "permeability_curve": {"a": 0.01, "b": 2.033e-07, "c": 2.436},
+        "frequency_range": (10e3, 500e3),
+        "applications": ["Flyback inductors", "Switching regulators"],
+    },
+    "CSC_MPP_125u": {
+        "name": "CSC MPP 125µ",
+        "family": "MPP",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 125,
+        "saturation_T": 0.75,
+        "steinmetz": {"k": 17.8, "alpha": 1.35, "beta": 2.03},
+        "permeability_curve": {"a": 0.01, "b": 4.07e-07, "c": 2.523},
+        "frequency_range": (10e3, 300e3),
+        "applications": ["Output filters", "EMI filters"],
+    },
+    "CSC_MPP_147u": {
+        "name": "CSC MPP 147µ",
+        "family": "MPP",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 147,
+        "saturation_T": 0.75,
+        "steinmetz": {"k": 13.7, "alpha": 1.38, "beta": 2.03},
+        "permeability_curve": {"a": 0.01, "b": 7.58e-07, "c": 2.471},
+        "frequency_range": (10e3, 300e3),
+        "applications": ["Output filters", "Noise filters"],
+    },
+    "CSC_MPP_160u": {
+        "name": "CSC MPP 160µ",
+        "family": "MPP",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 160,
+        "saturation_T": 0.75,
+        "steinmetz": {"k": 13.7, "alpha": 1.38, "beta": 2.03},
+        "permeability_curve": {"a": 0.01, "b": 8.20e-07, "c": 2.495},
+        "frequency_range": (10e3, 200e3),
+        "applications": ["Line filters", "Smoothing chokes"],
+    },
+    "CSC_MPP_173u": {
+        "name": "CSC MPP 173µ",
+        "family": "MPP",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 173,
+        "saturation_T": 0.75,
+        "steinmetz": {"k": 13.7, "alpha": 1.38, "beta": 2.03},
+        "permeability_curve": {"a": 0.01, "b": 1.03e-06, "c": 2.513},
+        "frequency_range": (10e3, 200e3),
+        "applications": ["Line filters"],
+    },
+    "CSC_MPP_200u": {
+        "name": "CSC MPP 200µ",
+        "family": "MPP",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 200,
+        "saturation_T": 0.75,
+        "steinmetz": {"k": 14.7, "alpha": 1.37, "beta": 2.05},
+        "permeability_curve": {"a": 0.01, "b": 1.18e-06, "c": 2.524},
+        "frequency_range": (10e3, 150e3),
+        "applications": ["Line filters", "60Hz transformers"],
+    },
+
+    # -------------------------------------------------------------------------
+    # HIGH FLUX - Best DC bias, moderate loss
+    # -------------------------------------------------------------------------
+    "Magnetics_High_Flux_125u": {
+        "name": "Magnetics High Flux 125µ",
+        "family": "High_Flux",
+        "manufacturer": "Magnetics Inc",
+        "permeability": 125,
+        "saturation_T": 1.5,
+        "steinmetz": {"k": 0.0475, "alpha": 1.585, "beta": 1.43},
+        "permeability_curve": {"a": 0.01, "b": 1.46e-06, "c": 2.108},
+        "frequency_range": (10e3, 200e3),
+        "applications": ["DC chokes", "PFC inductors", "Buck/Boost inductors"],
+        "notes": "Highest saturation flux density among powder cores",
+    },
+    "CSC_High_Flux_26u": {
+        "name": "CSC High Flux 26µ",
+        "family": "High_Flux",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 26,
+        "saturation_T": 1.5,
+        "steinmetz": {"k": 52.3, "alpha": 1.09, "beta": 2.25},
+        "permeability_curve": {"a": 0.01, "b": 3.41e-08, "c": 2.087},
+        "frequency_range": (10e3, 300e3),
+        "applications": ["High current DC chokes", "Energy storage"],
+    },
+    "CSC_High_Flux_60u": {
+        "name": "CSC High Flux 60µ",
+        "family": "High_Flux",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 60,
+        "saturation_T": 1.5,
+        "steinmetz": {"k": 45.6, "alpha": 1.11, "beta": 2.28},
+        "permeability_curve": {"a": 0.01, "b": 5.42e-08, "c": 2.326},
+        "frequency_range": (10e3, 250e3),
+        "applications": ["PFC boost inductors", "Buck converters"],
+    },
+    "CSC_High_Flux_125u": {
+        "name": "CSC High Flux 125µ",
+        "family": "High_Flux",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 125,
+        "saturation_T": 1.5,
+        "steinmetz": {"k": 27.0, "alpha": 1.23, "beta": 2.17},
+        "permeability_curve": {"a": 0.01, "b": 2.09e-07, "c": 2.386},
+        "frequency_range": (10e3, 200e3),
+        "applications": ["DC-DC converters", "Output chokes"],
+    },
+    "CSC_High_Flux_147u": {
+        "name": "CSC High Flux 147µ",
+        "family": "High_Flux",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 147,
+        "saturation_T": 1.5,
+        "steinmetz": {"k": 34.4, "alpha": 1.17, "beta": 2.10},
+        "permeability_curve": {"a": 0.01, "b": 1.16e-07, "c": 2.619},
+        "frequency_range": (10e3, 150e3),
+        "applications": ["Smoothing inductors"],
+    },
+    "CSC_High_Flux_160u": {
+        "name": "CSC High Flux 160µ",
+        "family": "High_Flux",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 160,
+        "saturation_T": 1.5,
+        "steinmetz": {"k": 34.4, "alpha": 1.17, "beta": 2.10},
+        "permeability_curve": {"a": 0.01, "b": 2.50e-07, "c": 2.475},
+        "frequency_range": (10e3, 150e3),
+        "applications": ["Line inductors"],
+    },
+
+    # -------------------------------------------------------------------------
+    # SENDUST (Kool Mu equivalent) - Good all-around, cost effective
+    # -------------------------------------------------------------------------
+    "CSC_Sendust_26u": {
+        "name": "CSC Sendust 26µ",
+        "family": "Sendust",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 26,
+        "saturation_T": 1.0,
+        "steinmetz": {"k": 53.4, "alpha": 1.10, "beta": 2.05},
+        "permeability_curve": {"a": 0.01, "b": 1.23e-06, "c": 1.697},
+        "frequency_range": (10e3, 500e3),
+        "applications": ["PFC inductors", "High frequency chokes"],
+        "notes": "Good balance of cost, loss, and DC bias capability",
+    },
+    "CSC_Sendust_60u": {
+        "name": "CSC Sendust 60µ",
+        "family": "Sendust",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 60,
+        "saturation_T": 1.0,
+        "steinmetz": {"k": 62.3, "alpha": 1.10, "beta": 2.21},
+        "permeability_curve": {"a": 0.01, "b": 2.75e-06, "c": 1.782},
+        "frequency_range": (10e3, 300e3),
+        "applications": ["PFC boost inductors", "Output filters"],
+    },
+    "CSC_Sendust_75u": {
+        "name": "CSC Sendust 75µ",
+        "family": "Sendust",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 75,
+        "saturation_T": 1.0,
+        "steinmetz": {"k": 62.3, "alpha": 1.10, "beta": 2.21},
+        "permeability_curve": {"a": 0.01, "b": 4.58e-06, "c": 1.755},
+        "frequency_range": (10e3, 250e3),
+        "applications": ["General purpose inductors"],
+    },
+    "CSC_Sendust_90u": {
+        "name": "CSC Sendust 90µ",
+        "family": "Sendust",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 90,
+        "saturation_T": 1.0,
+        "steinmetz": {"k": 62.3, "alpha": 1.10, "beta": 2.21},
+        "permeability_curve": {"a": 0.01, "b": 9.54e-06, "c": 1.676},
+        "frequency_range": (10e3, 200e3),
+        "applications": ["Line filters", "Output chokes"],
+    },
+    "CSC_Sendust_125u": {
+        "name": "CSC Sendust 125µ",
+        "family": "Sendust",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 125,
+        "saturation_T": 1.0,
+        "steinmetz": {"k": 62.3, "alpha": 1.10, "beta": 2.21},
+        "permeability_curve": {"a": 0.01, "b": 2.41e-05, "c": 1.626},
+        "frequency_range": (10e3, 150e3),
+        "applications": ["EMI filters", "Smoothing chokes"],
+    },
+
+    # -------------------------------------------------------------------------
+    # MEGA FLUX (XFlux equivalent) - Highest DC bias, lowest cost
+    # -------------------------------------------------------------------------
+    "CSC_Mega_Flux_26u": {
+        "name": "CSC Mega Flux 26µ",
+        "family": "Mega_Flux",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 26,
+        "saturation_T": 1.6,
+        "steinmetz": {"k": 117.0, "alpha": 1.10, "beta": 2.17},
+        "permeability_curve": {"a": 0.01, "b": 9.96e-08, "c": 1.883},
+        "frequency_range": (10e3, 200e3),
+        "applications": ["High DC bias chokes", "Extreme energy storage"],
+        "notes": "Highest saturation, best for extreme DC bias applications",
+    },
+    "CSC_Mega_Flux_50u": {
+        "name": "CSC Mega Flux 50µ",
+        "family": "Mega_Flux",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 50,
+        "saturation_T": 1.6,
+        "steinmetz": {"k": 108.0, "alpha": 1.10, "beta": 2.15},
+        "permeability_curve": {"a": 0.01, "b": 7.35e-08, "c": 2.177},
+        "frequency_range": (10e3, 150e3),
+        "applications": ["DC-DC converters", "Solar inverters"],
+    },
+    "CSC_Mega_Flux_60u": {
+        "name": "CSC Mega Flux 60µ",
+        "family": "Mega_Flux",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 60,
+        "saturation_T": 1.6,
+        "steinmetz": {"k": 108.0, "alpha": 1.10, "beta": 2.15},
+        "permeability_curve": {"a": 0.01, "b": 3.30e-07, "c": 1.982},
+        "frequency_range": (10e3, 150e3),
+        "applications": ["EV charger inductors", "High power DC chokes"],
+    },
+    "CSC_Mega_Flux_75u": {
+        "name": "CSC Mega Flux 75µ",
+        "family": "Mega_Flux",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 75,
+        "saturation_T": 1.6,
+        "steinmetz": {"k": 108.0, "alpha": 1.10, "beta": 2.15},
+        "permeability_curve": {"a": 0.01, "b": 1.11e-06, "c": 1.841},
+        "frequency_range": (10e3, 120e3),
+        "applications": ["Automotive DC-DC", "Welding power supplies"],
+    },
+    "CSC_Mega_Flux_90u": {
+        "name": "CSC Mega Flux 90µ",
+        "family": "Mega_Flux",
+        "manufacturer": "CSC (Chang Sung)",
+        "permeability": 90,
+        "saturation_T": 1.6,
+        "steinmetz": {"k": 108.0, "alpha": 1.10, "beta": 2.15},
+        "permeability_curve": {"a": 0.01, "b": 2.01e-06, "c": 1.828},
+        "frequency_range": (10e3, 100e3),
+        "applications": ["Line reactors", "Heavy duty chokes"],
+    },
+
+    # -------------------------------------------------------------------------
+    # FERRITE MATERIALS (for comparison)
+    # -------------------------------------------------------------------------
+    "EPCOS_N97": {
+        "name": "EPCOS N97",
+        "family": "Ferrite",
+        "manufacturer": "TDK/EPCOS",
+        "permeability": 2300,
+        "saturation_T": 0.41,
+        "steinmetz": {"k": 9.76, "alpha": 1.72, "beta": 2.91},
+        "frequency_range": (25e3, 500e3),
+        "applications": ["Power transformers", "Flyback converters"],
+        "notes": "Low loss ferrite, good for 100-300kHz",
+    },
+    "TDK_PC95": {
+        "name": "TDK PC95",
+        "family": "Ferrite",
+        "manufacturer": "TDK",
+        "permeability": 3300,
+        "saturation_T": 0.41,
+        "steinmetz": {"k": 11.8, "alpha": 2.00, "beta": 2.64},
+        "frequency_range": (25e3, 500e3),
+        "applications": ["Power transformers", "High efficiency designs"],
+        "notes": "Lowest loss at 100kHz among standard ferrites",
+    },
+}
+
+
+def get_powder_core_material(name: str) -> dict:
+    """Get material parameters by name."""
+    return POWDER_CORE_MATERIALS.get(name, {})
+
+
+def get_materials_by_family(family: str) -> list[str]:
+    """Get all materials in a family (MPP, High_Flux, Sendust, Mega_Flux, Ferrite)."""
+    return [k for k, v in POWDER_CORE_MATERIALS.items() if v.get("family") == family]
+
+
+def suggest_powder_core_material(
+    dc_bias_amps: float,
+    frequency_hz: float,
+    priority: str = "balanced"
+) -> list[str]:
+    """
+    Suggest appropriate powder core materials based on application requirements.
+
+    Args:
+        dc_bias_amps: DC bias current (higher = need High Flux or Mega Flux)
+        frequency_hz: Operating frequency in Hz
+        priority: "low_loss", "high_bias", "cost", or "balanced"
+
+    Returns:
+        List of recommended material names, best first
+    """
+    suggestions = []
+
+    for name, mat in POWDER_CORE_MATERIALS.items():
+        if mat.get("family") == "Ferrite":
+            continue  # Skip ferrites for powder core suggestion
+
+        freq_range = mat.get("frequency_range", (0, 1e6))
+        if not (freq_range[0] <= frequency_hz <= freq_range[1]):
+            continue
+
+        # Score based on priority
+        score = 0
+        family = mat.get("family", "")
+
+        if priority == "low_loss":
+            if family == "MPP":
+                score = 100
+            elif family == "High_Flux":
+                score = 60
+            elif family == "Sendust":
+                score = 70
+            elif family == "Mega_Flux":
+                score = 40
+        elif priority == "high_bias":
+            if family == "Mega_Flux":
+                score = 100
+            elif family == "High_Flux":
+                score = 90
+            elif family == "Sendust":
+                score = 60
+            elif family == "MPP":
+                score = 40
+        elif priority == "cost":
+            if family == "Mega_Flux":
+                score = 100
+            elif family == "Sendust":
+                score = 90
+            elif family == "High_Flux":
+                score = 60
+            elif family == "MPP":
+                score = 40
+        else:  # balanced
+            if family == "High_Flux":
+                score = 85
+            elif family == "Sendust":
+                score = 80
+            elif family == "MPP":
+                score = 70
+            elif family == "Mega_Flux":
+                score = 75
+
+        # Adjust for DC bias - prefer lower permeability for high bias
+        perm = mat.get("permeability", 60)
+        if dc_bias_amps > 50:
+            if perm <= 60:
+                score += 20
+        elif dc_bias_amps > 20:
+            if perm <= 90:
+                score += 10
+
+        suggestions.append((name, score))
+
+    suggestions.sort(key=lambda x: -x[1])
+    return [name for name, score in suggestions[:5]]
+
+
+def calculate_core_loss(
+    material_name: str,
+    frequency_hz: float,
+    flux_density_t: float,
+    volume_m3: float
+) -> float:
+    """
+    Calculate core loss using Steinmetz equation.
+
+    Pv = k * f^alpha * B^beta (W/m³)
+
+    Args:
+        material_name: Material identifier from POWDER_CORE_MATERIALS
+        frequency_hz: Operating frequency in Hz
+        flux_density_t: Peak flux density in Tesla
+        volume_m3: Core volume in m³
+
+    Returns:
+        Core loss in Watts
+    """
+    mat = POWDER_CORE_MATERIALS.get(material_name)
+    if not mat:
+        raise ValueError(f"Unknown material: {material_name}")
+
+    steinmetz = mat.get("steinmetz", {})
+    k = steinmetz.get("k", 1.0)
+    alpha = steinmetz.get("alpha", 1.5)
+    beta = steinmetz.get("beta", 2.5)
+
+    # Steinmetz equation: Pv = k * f^alpha * B^beta
+    pv = k * (frequency_hz ** alpha) * (flux_density_t ** beta)
+    return pv * volume_m3
+
+
+# =============================================================================
 # DESIGN TRADEOFFS
 # =============================================================================
 

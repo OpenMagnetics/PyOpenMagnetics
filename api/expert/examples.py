@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 from .knowledge import APPLICATIONS, TOPOLOGIES, suggest_topology
 
+MAX_RESULTS = 50
 
 @dataclass
 class DesignExample:

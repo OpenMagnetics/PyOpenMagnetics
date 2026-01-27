@@ -9,8 +9,16 @@ Specifications:
 - Output: 20V @ 3.25A (65W)
 - Switching frequency: 130 kHz (GaN compatible)
 - Target efficiency: >90%
+
+Generated Reports:
+- design_report.png: Main dashboard with Pareto front, radar chart, loss breakdown
+- pareto_detailed.png: Detailed Pareto analysis
+- parallel_coordinates.png: Multi-objective comparison
+- heatmap.png: Design characteristics heatmap
+- report_summary.json: JSON summary with statistics
 """
 
+import os
 from api.design import Design
 
 
@@ -38,7 +46,8 @@ def design_usb_pd_65w():
     print(f"  Duty cycle (D):      {params['duty_cycle_low_line']:.2%}")
 
     print("\nFinding optimal designs...")
-    results = design.solve(max_results=3)
+    output_dir = "examples/_output/usb_pd_65w"
+    results = design.solve(max_results=5, verbose=True, output_dir=output_dir)
 
     if not results:
         print("No suitable designs found.")
@@ -52,10 +61,40 @@ def design_usb_pd_65w():
         print(f"  Total loss: {r.total_loss_w:.3f} W")
         print()
 
+    # Generate comprehensive visual report with matplotlib
+    try:
+        from api.report import generate_design_report
+
+        specs = {
+            "power_w": 65,
+            "frequency_hz": 130e3,
+            "efficiency": 0.90,
+            "topology": "flyback",
+        }
+
+        print("Generating visual reports...")
+        report_path = generate_design_report(
+            results,
+            output_dir,
+            title="USB PD 65W Charger - Design Report",
+            specs=specs,
+            verbose=True
+        )
+
+        print(f"\nReports saved to: {output_dir}/")
+        print("  - design_report.png (main dashboard)")
+        print("  - pareto_detailed.png (Pareto analysis)")
+        print("  - parallel_coordinates.png (multi-objective)")
+        print("  - heatmap.png (characteristics)")
+        print("  - report_summary.json (statistics)")
+
+    except ImportError as e:
+        print(f"\n[Visual reports skipped - matplotlib not installed: {e}]")
+
     return results[0] if results else None
 
 
 if __name__ == "__main__":
     best = design_usb_pd_65w()
     if best:
-        print(f"Recommended: {best.core} with {best.material}")
+        print(f"\nRecommended: {best.core} with {best.material}")

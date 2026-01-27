@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 from typing import Self, Optional, Any
 from dataclasses import dataclass
 
-from . import mas
+from . import waveforms
 
 
 @dataclass
@@ -93,12 +93,42 @@ class TopologyBuilder(ABC):
         return {"designRequirements": self._generate_design_requirements(),
                 "operatingPoints": self._generate_operating_points()}
 
-    def solve(self, max_results: int = 5, core_mode: str = "available cores") -> list:
+    def solve(self, max_results: int = 30, core_mode: str = "available cores",
+              verbose: bool = False, output_dir: Optional[str] = None,
+              auto_relax: bool = False, relax_step: float = 0.1) -> list:
+        """
+        Run the design optimization and return results.
+
+        Args:
+            max_results: Maximum number of designs to return (default: 30)
+            core_mode: "available cores" or "standard cores"
+            verbose: If True, print progress information
+            output_dir: If provided, save detailed results and plots here
+            auto_relax: If True and no results found, automatically relax constraints
+            relax_step: Relaxation step (0.1 = 10% increase per iteration)
+        """
+        import time
         import PyOpenMagnetics
         from .results import DesignResult
 
+        if verbose:
+            print(f"[{time.strftime('%H:%M:%S')}] Processing inputs...")
+
+        start_time = time.time()
         processed = PyOpenMagnetics.process_inputs(self.to_mas())
+
+        if verbose:
+            process_time = time.time() - start_time
+            print(f"[{time.strftime('%H:%M:%S')}] Input processing: {process_time:.2f}s")
+            print(f"[{time.strftime('%H:%M:%S')}] Starting design optimization (this may take 1-2 minutes)...")
+            print(f"[{time.strftime('%H:%M:%S')}] Searching {max_results} designs in '{core_mode}' mode...")
+
+        opt_start = time.time()
         result = PyOpenMagnetics.calculate_advised_magnetics(processed, max_results, core_mode)
+        opt_time = time.time() - opt_start
+
+        if verbose:
+            print(f"[{time.strftime('%H:%M:%S')}] Optimization complete: {opt_time:.2f}s")
 
         if isinstance(result, str):
             results = json.loads(result)
@@ -106,6 +136,19 @@ class TopologyBuilder(ABC):
             data = result.get("data", result)
             if isinstance(data, str):
                 if data.startswith("Exception:"):
+                    if verbose:
+                        print(f"[{time.strftime('%H:%M:%S')}] ERROR: {data}")
+                        # Parse common errors and provide guidance
+                        if "turns ratio" in data.lower() and "greater than 0" in data.lower():
+                            print("\n" + "="*60)
+                            print("DIAGNOSIS: Negative turns ratio detected")
+                            print("="*60)
+                            print("  This usually means a negative output voltage was specified.")
+                            print("  Transformers use absolute voltage values - the polarity is")
+                            print("  determined by winding direction, not the turns ratio.")
+                            print("\n  FIX: Use positive voltage value, e.g.:")
+                            print("       .output(8, 0.2)  instead of  .output(-8, 0.2)")
+                            print("="*60 + "\n")
                     return []
                 results = json.loads(data)
             else:
@@ -113,7 +156,143 @@ class TopologyBuilder(ABC):
         else:
             results = result if isinstance(result, list) else [result] if result else []
 
-        return [DesignResult.from_mas(r) for r in results if isinstance(r, dict) and "magnetic" in r]
+        design_results = [DesignResult.from_mas(r) for r in results if isinstance(r, dict) and "magnetic" in r]
+
+        if verbose:
+            total_time = time.time() - start_time
+            print(f"[{time.strftime('%H:%M:%S')}] Found {len(design_results)} designs in {total_time:.2f}s total")
+
+        # Auto-relax constraints if no results and auto_relax enabled
+        if not design_results and auto_relax:
+            design_results = self._try_relaxed_constraints(
+                max_results, core_mode, verbose, relax_step
+            )
+
+        # Save results and generate Pareto plot if output_dir specified
+        if output_dir and design_results:
+            self._save_results(design_results, output_dir, verbose)
+
+        return design_results
+
+    def _save_results(self, results: list, output_dir: str, verbose: bool = False):
+        """Save results to JSON and generate comprehensive design report."""
+        import os
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Save results as JSON
+        results_data = []
+        for i, r in enumerate(results):
+            results_data.append({
+                "rank": i + 1,
+                "core": r.core,
+                "material": r.material,
+                "primary_turns": r.primary_turns,
+                "primary_wire": r.primary_wire if hasattr(r, 'primary_wire') else "Unknown",
+                "air_gap_mm": r.air_gap_mm,
+                "core_loss_w": r.core_loss_w,
+                "copper_loss_w": r.copper_loss_w,
+                "total_loss_w": r.total_loss_w,
+                "temp_rise_c": r.temp_rise_c if hasattr(r, 'temp_rise_c') else 0,
+            })
+
+        json_path = os.path.join(output_dir, "results.json")
+        with open(json_path, "w") as f:
+            json.dump(results_data, f, indent=2)
+
+        if verbose:
+            print(f"[Results saved to {json_path}]")
+
+        # Generate comprehensive design report with matplotlib
+        try:
+            from .report import generate_design_report
+
+            # Build specs dict from builder state
+            specs = self._get_report_specs()
+
+            # Generate title from topology
+            topology_name = self.__class__.__name__.replace('Builder', '')
+            title = f"{topology_name} Transformer Design Report"
+
+            generate_design_report(results, output_dir, title, specs, verbose)
+
+        except ImportError as e:
+            if verbose:
+                print(f"[Design report skipped - matplotlib not installed: {e}]")
+            # Fall back to basic Pareto plot
+            if len(results) >= 2:
+                try:
+                    self._generate_pareto_plot(results_data, output_dir, verbose)
+                except ImportError:
+                    pass
+
+    def _get_report_specs(self) -> dict:
+        """Get specifications dict for report generation."""
+        specs = {}
+        if hasattr(self, '_frequency'):
+            specs['frequency_hz'] = self._frequency
+        if hasattr(self, '_outputs') and self._outputs:
+            # Handle both dict format {"voltage": v, "current": i} and tuple format (v, i)
+            total_power = 0
+            for output in self._outputs:
+                if isinstance(output, dict):
+                    total_power += output.get('voltage', 0) * output.get('current', 0)
+                elif isinstance(output, (list, tuple)) and len(output) >= 2:
+                    total_power += output[0] * output[1]
+            specs['power_w'] = total_power
+        if hasattr(self, '_efficiency'):
+            specs['efficiency'] = self._efficiency
+        return specs
+
+    def _generate_pareto_plot(self, results_data: list, output_dir: str, verbose: bool = False):
+        """Generate a Pareto front plot showing loss vs core size tradeoff."""
+        import matplotlib
+        matplotlib.use('Agg')  # Non-interactive backend
+        import matplotlib.pyplot as plt
+        import os
+
+        # Extract data for plotting
+        cores = [r["core"] for r in results_data]
+        total_losses = [r["total_loss_w"] for r in results_data]
+        core_losses = [r["core_loss_w"] for r in results_data]
+        copper_losses = [r["copper_loss_w"] for r in results_data]
+
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+        # Plot 1: Total loss ranking
+        ax1 = axes[0]
+        colors = ['green' if i == 0 else 'steelblue' for i in range(len(results_data))]
+        bars = ax1.barh(range(len(cores)), total_losses, color=colors)
+        ax1.set_yticks(range(len(cores)))
+        ax1.set_yticklabels([f"{c}" for c in cores])
+        ax1.set_xlabel('Total Loss (W)')
+        ax1.set_title('Design Comparison - Total Loss')
+        ax1.invert_yaxis()
+
+        # Add value labels
+        for bar, loss in zip(bars, total_losses):
+            ax1.text(bar.get_width() + 0.05, bar.get_y() + bar.get_height()/2,
+                    f'{loss:.2f}W', va='center', fontsize=9)
+
+        # Plot 2: Loss breakdown (stacked bar)
+        ax2 = axes[1]
+        y_pos = range(len(cores))
+        ax2.barh(y_pos, core_losses, label='Core Loss', color='coral')
+        ax2.barh(y_pos, copper_losses, left=core_losses, label='Copper Loss', color='steelblue')
+        ax2.set_yticks(y_pos)
+        ax2.set_yticklabels(cores)
+        ax2.set_xlabel('Loss (W)')
+        ax2.set_title('Loss Breakdown')
+        ax2.legend(loc='lower right')
+        ax2.invert_yaxis()
+
+        plt.tight_layout()
+
+        plot_path = os.path.join(output_dir, "pareto_plot.png")
+        plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+        plt.close()
+
+        if verbose:
+            print(f"[Pareto plot saved to {plot_path}]")
 
     def _get_max_dimensions(self) -> Optional[dict]:
         if not any([self._max_width_mm, self._max_height_mm, self._max_depth_mm]):
@@ -123,6 +302,111 @@ class TopologyBuilder(ABC):
         if self._max_height_mm: dims["height"] = self._max_height_mm / 1000.0
         if self._max_depth_mm: dims["depth"] = self._max_depth_mm / 1000.0
         return dims
+
+    def _try_relaxed_constraints(self, max_results: int, core_mode: str,
+                                  verbose: bool, relax_step: float) -> list:
+        """Try relaxing constraints to find what's blocking the design."""
+        import time
+        import PyOpenMagnetics
+        from .results import DesignResult
+
+        if verbose:
+            print(f"\n[{time.strftime('%H:%M:%S')}] No designs found. Analyzing constraints...")
+
+        # Store original constraints
+        orig_height = self._max_height_mm
+        orig_width = self._max_width_mm
+        orig_depth = self._max_depth_mm
+
+        constraints_relaxed = []
+        results = []
+
+        # Try relaxing dimensions iteratively
+        for iteration in range(1, 6):  # Max 5 iterations (50% relaxation)
+            multiplier = 1 + (relax_step * iteration)
+
+            if orig_height:
+                self._max_height_mm = orig_height * multiplier
+            if orig_width:
+                self._max_width_mm = orig_width * multiplier
+            if orig_depth:
+                self._max_depth_mm = orig_depth * multiplier
+
+            if verbose:
+                relaxed = []
+                if orig_height:
+                    relaxed.append(f"height: {orig_height:.1f}→{self._max_height_mm:.1f}mm")
+                if orig_width:
+                    relaxed.append(f"width: {orig_width:.1f}→{self._max_width_mm:.1f}mm")
+                if orig_depth:
+                    relaxed.append(f"depth: {orig_depth:.1f}→{self._max_depth_mm:.1f}mm")
+                print(f"[{time.strftime('%H:%M:%S')}] Iteration {iteration}: +{relax_step*iteration*100:.0f}% ({', '.join(relaxed)})")
+
+            try:
+                processed = PyOpenMagnetics.process_inputs(self.to_mas())
+                result = PyOpenMagnetics.calculate_advised_magnetics(processed, max_results, core_mode)
+
+                if isinstance(result, str):
+                    parsed = json.loads(result)
+                elif isinstance(result, dict):
+                    data = result.get("data", result)
+                    if isinstance(data, str):
+                        if data.startswith("Exception:"):
+                            continue
+                        parsed = json.loads(data)
+                    else:
+                        parsed = data if isinstance(data, list) else [data]
+                else:
+                    parsed = result if isinstance(result, list) else [result] if result else []
+
+                design_results = [DesignResult.from_mas(r) for r in parsed
+                                  if isinstance(r, dict) and "magnetic" in r]
+
+                if design_results:
+                    if verbose:
+                        print(f"[{time.strftime('%H:%M:%S')}] SUCCESS! Found {len(design_results)} designs")
+                        print(f"\n{'='*60}")
+                        print("BLOCKING CONSTRAINT ANALYSIS:")
+                        print(f"{'='*60}")
+                        if orig_height and self._max_height_mm > orig_height:
+                            print(f"  HEIGHT was too restrictive:")
+                            print(f"    Original: {orig_height:.1f} mm")
+                            print(f"    Required: >{orig_height:.1f} mm (relaxed to {self._max_height_mm:.1f} mm)")
+                        if orig_width and self._max_width_mm > orig_width:
+                            print(f"  WIDTH was too restrictive:")
+                            print(f"    Original: {orig_width:.1f} mm")
+                            print(f"    Required: >{orig_width:.1f} mm (relaxed to {self._max_width_mm:.1f} mm)")
+                        if orig_depth and self._max_depth_mm > orig_depth:
+                            print(f"  DEPTH was too restrictive:")
+                            print(f"    Original: {orig_depth:.1f} mm")
+                            print(f"    Required: >{orig_depth:.1f} mm (relaxed to {self._max_depth_mm:.1f} mm)")
+                        print(f"\nSmallest core found: {design_results[0].core}")
+                        print(f"{'='*60}\n")
+
+                    # Restore original constraints
+                    self._max_height_mm = orig_height
+                    self._max_width_mm = orig_width
+                    self._max_depth_mm = orig_depth
+                    return design_results
+
+            except Exception as e:
+                if verbose:
+                    print(f"[{time.strftime('%H:%M:%S')}] Error: {e}")
+                continue
+
+        # Restore original constraints
+        self._max_height_mm = orig_height
+        self._max_width_mm = orig_width
+        self._max_depth_mm = orig_depth
+
+        if verbose:
+            print(f"[{time.strftime('%H:%M:%S')}] Could not find designs even with +50% relaxation")
+            print("\nPossible issues:")
+            print("  - Frequency may be too high for available core materials")
+            print("  - Power requirements may exceed smallest core capability")
+            print("  - Try different core_mode ('standard cores' vs 'available cores')")
+
+        return []
 
 
 # =============================================================================
@@ -219,8 +503,8 @@ class FlybackBuilder(TopologyBuilder):
         if len(self._outputs) > 1:
             for out in self._outputs[1:]:
                 turns_ratios.append(self._outputs[0]["voltage"] / out["voltage"])
-        insulation = mas.generate_insulation_requirements(self._isolation_type) if self._isolation_type else None
-        return mas.generate_design_requirements(lm, turns_ratios, insulation=insulation,
+        insulation = waveforms.generate_insulation_requirements(self._isolation_type) if self._isolation_type else None
+        return waveforms.generate_design_requirements(lm, turns_ratios, insulation=insulation,
             max_dimensions=self._get_max_dimensions(), name="Flyback Transformer")
 
     def _generate_operating_points(self) -> list[dict]:
@@ -233,14 +517,14 @@ class FlybackBuilder(TopologyBuilder):
         for vin, label in [(vin_min, "Low Line"), (vin_max, "High Line")]:
             if vin == vin_max and vin_max <= vin_min * 1.1: continue
             d = self._calculate_duty_cycle(vin, n)
-            primary_current = mas.flyback_primary_current(vin, vout, pout, n, lm, self._frequency, self._efficiency, self._mode)
-            primary_voltage = mas.rectangular_voltage(vin, 0, d, self._frequency)
+            primary_current = waveforms.flyback_primary_current(vin, vout, pout, n, lm, self._frequency, self._efficiency, self._mode)
+            primary_voltage = waveforms.rectangular_voltage(vin, 0, d, self._frequency)
             excitations = [{"name": "Primary", "current": primary_current, "voltage": primary_voltage}]
             for i, out in enumerate(self._outputs):
-                sec_current = mas.flyback_secondary_current(vin, out["voltage"], out["current"],
+                sec_current = waveforms.flyback_secondary_current(vin, out["voltage"], out["current"],
                     n if i == 0 else n * (vout / out["voltage"]), lm, self._frequency, self._mode)
                 excitations.append({"name": f"Secondary{i+1}" if len(self._outputs) > 1 else "Secondary", "current": sec_current})
-            ops.append(mas.generate_operating_point(self._frequency, excitations, label, self._ambient_temp))
+            ops.append(waveforms.generate_operating_point(self._frequency, excitations, label, self._ambient_temp))
         return ops
 
     def get_calculated_parameters(self) -> dict:
@@ -310,7 +594,7 @@ class BuckBuilder(TopologyBuilder):
 
     def _generate_design_requirements(self) -> dict:
         self._validate_params()
-        return mas.generate_design_requirements(self._calculate_inductance(), [],
+        return waveforms.generate_design_requirements(self._calculate_inductance(), [],
             max_dimensions=self._get_max_dimensions(), name="Buck Inductor")
 
     def _generate_operating_points(self) -> list[dict]:
@@ -319,9 +603,9 @@ class BuckBuilder(TopologyBuilder):
         ops = []
         for vin, label in [(self._vin_max, "Max Vin"), (self._vin_min, "Min Vin")]:
             if vin == self._vin_min and self._vin_max <= self._vin_min * 1.1: continue
-            current = mas.buck_inductor_current(vin, self._vout, self._iout, L, self._frequency)
-            voltage = mas.buck_inductor_voltage(vin, self._vout, self._frequency)
-            ops.append(mas.generate_operating_point(self._frequency,
+            current = waveforms.buck_inductor_current(vin, self._vout, self._iout, L, self._frequency)
+            voltage = waveforms.buck_inductor_voltage(vin, self._vout, self._frequency)
+            ops.append(waveforms.generate_operating_point(self._frequency,
                 [{"name": "Inductor", "current": current, "voltage": voltage}], label, self._ambient_temp))
         return ops
 
@@ -393,7 +677,7 @@ class BoostBuilder(TopologyBuilder):
 
     def _generate_design_requirements(self) -> dict:
         self._validate_params()
-        return mas.generate_design_requirements(self._calculate_inductance(), [],
+        return waveforms.generate_design_requirements(self._calculate_inductance(), [],
             max_dimensions=self._get_max_dimensions(), name="Boost Inductor")
 
     def _generate_operating_points(self) -> list[dict]:
@@ -402,9 +686,9 @@ class BoostBuilder(TopologyBuilder):
         ops = []
         for vin, label in [(self._vin_min, "Min Vin"), (self._vin_max, "Max Vin")]:
             if vin == self._vin_max and self._vin_max <= self._vin_min * 1.1: continue
-            current = mas.boost_inductor_current(vin, self._vout, self._pout, L, self._frequency, self._efficiency)
-            voltage = mas.boost_inductor_voltage(vin, self._vout, self._frequency)
-            ops.append(mas.generate_operating_point(self._frequency,
+            current = waveforms.boost_inductor_current(vin, self._vout, self._pout, L, self._frequency, self._efficiency)
+            voltage = waveforms.boost_inductor_voltage(vin, self._vout, self._frequency)
+            ops.append(waveforms.generate_operating_point(self._frequency,
                 [{"name": "Inductor", "current": current, "voltage": voltage}], label, self._ambient_temp))
         return ops
 
@@ -460,16 +744,16 @@ class InductorBuilder(TopologyBuilder):
 
     def _generate_design_requirements(self) -> dict:
         self._validate_params()
-        return mas.generate_design_requirements(self._inductance, [],
+        return waveforms.generate_design_requirements(self._inductance, [],
             max_dimensions=self._get_max_dimensions(), name="Inductor", tolerance=self._tolerance)
 
     def _generate_operating_points(self) -> list[dict]:
         self._validate_params()
         if self._waveform_type == "sinusoidal":
-            current = mas.sinusoidal_current(self._iac_rms or 0.1, self._frequency, self._idc)
+            current = waveforms.sinusoidal_current(self._iac_rms or 0.1, self._frequency, self._idc)
         else:
-            current = mas.triangular_current(self._idc, self._iac_pp or 0.1, self._duty_cycle, self._frequency)
-        return [mas.generate_operating_point(self._frequency, [{"name": "Inductor", "current": current}],
+            current = waveforms.triangular_current(self._idc, self._iac_pp or 0.1, self._duty_cycle, self._frequency)
+        return [waveforms.generate_operating_point(self._frequency, [{"name": "Inductor", "current": current}],
                                              "Operating Point", self._ambient_temp)]
 
     def get_calculated_parameters(self) -> dict:
@@ -538,7 +822,7 @@ class ForwardBuilder(TopologyBuilder):
         n = self._calculate_turns_ratio()
         lm = self._calculate_magnetizing_inductance()
         turns_ratios = [n] + [n * (o["voltage"] / self._outputs[0]["voltage"]) for o in self._outputs[1:]]
-        return mas.generate_design_requirements(lm, turns_ratios, max_dimensions=self._get_max_dimensions(),
+        return waveforms.generate_design_requirements(lm, turns_ratios, max_dimensions=self._get_max_dimensions(),
                                                 name=f"Forward Transformer ({self._variant})")
 
     def _generate_operating_points(self) -> list[dict]:
@@ -555,12 +839,12 @@ class ForwardBuilder(TopologyBuilder):
             delta_i_mag = vin * ton / lm
             primary_current = {"waveform": {"data": [i_pri - delta_i_mag/2, i_pri + delta_i_mag/2, 0, 0],
                                             "time": [0, ton, ton, period]}}
-            primary_voltage = mas.rectangular_voltage(vin, 0, d, self._frequency)
+            primary_voltage = waveforms.rectangular_voltage(vin, 0, d, self._frequency)
             excitations = [{"name": "Primary", "current": primary_current, "voltage": primary_voltage}]
             for i, out in enumerate(self._outputs):
                 sec_current = {"waveform": {"data": [out["current"], out["current"], 0, 0], "time": [0, ton, ton, period]}}
                 excitations.append({"name": f"Secondary{i+1}" if len(self._outputs) > 1 else "Secondary", "current": sec_current})
-            ops.append(mas.generate_operating_point(self._frequency, excitations, label, self._ambient_temp))
+            ops.append(waveforms.generate_operating_point(self._frequency, excitations, label, self._ambient_temp))
         return ops
 
     def get_calculated_parameters(self) -> dict:
@@ -629,7 +913,7 @@ class LLCBuilder(TopologyBuilder):
         self._validate_params()
         n = self._calculate_turns_ratio()
         turns_ratios = [n] + [n * (o["voltage"] / self._outputs[0]["voltage"]) for o in self._outputs[1:]]
-        return mas.generate_design_requirements(self._calculate_magnetizing_inductance(), turns_ratios,
+        return waveforms.generate_design_requirements(self._calculate_magnetizing_inductance(), turns_ratios,
             leakage_inductance=self._calculate_leakage_inductance(), max_dimensions=self._get_max_dimensions(),
             name="LLC Transformer")
 
@@ -641,13 +925,16 @@ class LLCBuilder(TopologyBuilder):
         vin_nom = (self._vin_min + self._vin_max) / 2
         i_mag_pk = vin_nom / (4 * lm * self._resonant_freq)
         i_pri_rms = math.sqrt((i_load_reflected / math.sqrt(2))**2 + (i_mag_pk / math.sqrt(2))**2)
-        primary_current = mas.sinusoidal_current(i_pri_rms, self._resonant_freq)
-        excitations = [{"name": "Primary", "current": primary_current}]
+        primary_current = waveforms.sinusoidal_current(i_pri_rms, self._resonant_freq)
+        # LLC primary voltage is approximately sinusoidal at resonance
+        v_pri_pk = vin_nom / 2  # Half-bridge LLC
+        primary_voltage = waveforms.sinusoidal_current(v_pri_pk / math.sqrt(2), self._resonant_freq)  # RMS
+        excitations = [{"name": "Primary", "current": primary_current, "voltage": primary_voltage}]
         for i, out in enumerate(self._outputs):
             i_sec_rms = out["current"] * math.pi / (2 * math.sqrt(2))
             excitations.append({"name": f"Secondary{i+1}" if len(self._outputs) > 1 else "Secondary",
-                               "current": mas.sinusoidal_current(i_sec_rms, self._resonant_freq)})
-        return [mas.generate_operating_point(self._resonant_freq, excitations, "Resonant Operation", self._ambient_temp)]
+                               "current": waveforms.sinusoidal_current(i_sec_rms, self._resonant_freq)})
+        return [waveforms.generate_operating_point(self._resonant_freq, excitations, "Resonant Operation", self._ambient_temp)]
 
     def get_calculated_parameters(self) -> dict:
         self._validate_params()

@@ -38,7 +38,7 @@ def design_vfd_dc_link_choke():
     print(f"  Peak current:  {params['i_peak']:.1f} A")
 
     print("\nFinding optimal designs...")
-    results = design.solve(max_results=3)
+    results = design.solve(max_results=MAX_RESULTS)
 
     if not results:
         print("No suitable designs found.")
