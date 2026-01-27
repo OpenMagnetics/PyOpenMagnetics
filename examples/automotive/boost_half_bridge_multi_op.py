@@ -28,12 +28,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 import math
 from dataclasses import dataclass
 from api.design import Design
-from api.expert.knowledge import (
-    suggest_powder_core_material,
-    POWDER_CORE_MATERIALS,
+from examples.common import (
+    DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
 )
-
-MAX_RESULTS = 50
 
 @dataclass
 class OperatingPoint:
@@ -195,19 +192,15 @@ def design_multi_op_inductor():
     print(f"Max I_peak:      {max_i_peak:.1f} A")
     print(f"Max I_dc:        {max_i_dc:.1f} A")
 
-    # Suggest materials based on requirements
+    # Material recommendations for high DC bias applications
     print(f"\n" + "-" * 70)
     print("RECOMMENDED MATERIALS")
     print("-" * 70)
-
-    suggestions = suggest_powder_core_material(max_i_dc, 100e3, "balanced")
-    print("\nRecommended powder core materials (for high DC bias):")
-    for mat_name in suggestions[:4]:
-        mat = POWDER_CORE_MATERIALS.get(mat_name, {})
-        print(f"  - {mat.get('name', mat_name)}")
-        print(f"    {mat.get('family', 'N/A')} family, "
-              f"{mat.get('permeability', 'N/A')}u, "
-              f"Bsat={mat.get('saturation_T', 'N/A')}T")
+    print("\nFor high DC bias inductors, consider powder core materials:")
+    print("  - High Flux (Magnetics): Best DC bias, Bsat=1.5T")
+    print("  - Sendust/Kool Mu: Good all-around, Bsat=1.0T")
+    print("  - Mega Flux/XFlux: Highest saturation, Bsat=1.6T")
+    print("  - MPP: Lowest loss but lower DC bias capability")
 
     # Design using PyOpenMagnetics
     print(f"\n" + "-" * 70)
@@ -235,8 +228,8 @@ def design_multi_op_inductor():
     print(f"  I_ripple:    {params['i_ripple_pp']:.1f} A")
     print(f"  I_peak:      {params['i_peak']:.1f} A")
 
-    print("\nSearching for optimal core designs...")
-    results = design.solve(max_results=5)
+    print(f"\nSearching for optimal core designs (max {DEFAULT_MAX_RESULTS})...")
+    results = design.solve(max_results=DEFAULT_MAX_RESULTS)
 
     if not results:
         print("\nNo suitable designs found with standard cores.")
@@ -246,18 +239,19 @@ def design_multi_op_inductor():
         print("  - Planar transformer construction")
         return None
 
-    print(f"\nFound {len(results)} designs:\n")
-    for i, r in enumerate(results, 1):
-        print(f"Design #{i}: {r.core} / {r.material}")
-        print(f"  Turns:      {r.primary_turns}T")
-        print(f"  Wire:       {r.primary_wire}")
-        print(f"  Air gap:    {r.air_gap_mm:.2f} mm")
-        print(f"  Core loss:  {r.core_loss_w:.2f} W")
-        print(f"  Cu loss:    {r.copper_loss_w:.2f} W")
-        print(f"  Total:      {r.total_loss_w:.2f} W")
-        if r.temp_rise_c:
-            print(f"  Temp rise:  {r.temp_rise_c:.1f} K")
-        print()
+    print_results_summary(results)
+
+    specs = {
+        "power_w": 42500,
+        "frequency_hz": 100e3,
+        "topology": "half_bridge_boost",
+    }
+    generate_example_report(
+        results,
+        "boost_half_bridge_multi_op",
+        "Boost Half-Bridge Multi-OP Inductor - Design Report",
+        specs=specs
+    )
 
     return results[0] if results else None
 

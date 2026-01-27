@@ -64,19 +64,6 @@ pareto_front = optimizer.run(generations=50)
 # Returns Pareto-optimal designs trading off mass vs efficiency
 ```
 
-### Expert Knowledge Base (NEW)
-```python
-from api.expert.knowledge import suggest_powder_core_material, POWDER_CORE_MATERIALS
-
-# Get material recommendations for high DC bias application
-suggestions = suggest_powder_core_material(
-    dc_bias_amps=50,
-    frequency_hz=100e3,
-    priority="high_bias"  # or "low_loss", "cost", "balanced"
-)
-# Returns: ['CSC_Mega_Flux_60u', 'CSC_High_Flux_60u', ...]
-```
-
 ## Installation
 
 ### From PyPI

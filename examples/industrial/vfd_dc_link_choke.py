@@ -11,7 +11,14 @@ Specifications:
 - Frequency: 8 kHz PWM harmonics
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
+
 from api.design import Design
+from examples.common import (
+    DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
+)
 
 
 def design_vfd_dc_link_choke():
@@ -37,22 +44,27 @@ def design_vfd_dc_link_choke():
     print(f"  Ripple (pp):   {params['i_ripple_pp']:.1f} A")
     print(f"  Peak current:  {params['i_peak']:.1f} A")
 
-    print("\nFinding optimal designs...")
-    results = design.solve(max_results=MAX_RESULTS)
+    print(f"\nFinding optimal designs (max {DEFAULT_MAX_RESULTS})...")
+    results = design.solve(max_results=DEFAULT_MAX_RESULTS)
 
     if not results:
         print("No suitable designs found.")
         return None
 
-    print(f"\nFound {len(results)} designs:\n")
-    for i, r in enumerate(results, 1):
-        print(f"Design #{i}: {r.core} / {r.material}")
-        print(f"  Turns:      {r.primary_turns}T, {r.primary_wire}")
-        print(f"  Air gap:    {r.air_gap_mm:.2f} mm")
-        print(f"  Core loss:  {r.core_loss_w:.3f} W")
-        print(f"  Cu loss:    {r.copper_loss_w:.3f} W")
-        print(f"  Total:      {r.total_loss_w:.3f} W")
-        print()
+    print_results_summary(results)
+
+    specs = {
+        "inductance_mH": 1.0,
+        "current_dc_A": 20,
+        "frequency_hz": 8e3,
+        "topology": "inductor",
+    }
+    generate_example_report(
+        results,
+        "vfd_dc_link_choke",
+        "VFD DC Link Choke - Design Report",
+        specs=specs
+    )
 
     return results[0] if results else None
 
@@ -60,4 +72,4 @@ def design_vfd_dc_link_choke():
 if __name__ == "__main__":
     best = design_vfd_dc_link_choke()
     if best:
-        print(f"Recommended: {best.core} with {best.material}")
+        print(f"\nRecommended: {best.core} with {best.material}")

@@ -11,9 +11,15 @@ Specifications:
 - Target efficiency: >96% (LLC resonant)
 """
 
-from api.design import Design
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
-MAX_RESULTS = 50
+from api.design import Design
+from examples.common import (
+    DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
+)
+
 
 def design_rectifier_48v_3kw():
     print("=" * 60)
@@ -35,22 +41,27 @@ def design_rectifier_48v_3kw():
     print(f"  Turns ratio (n):     {params['turns_ratio']:.2f}")
     print(f"  Mag inductance (Lm): {params['magnetizing_inductance_uH']:.1f} uH")
 
-    print("\nFinding optimal designs...")
-    results = design.solve(max_results=MAX_RESULTS, 
-                           verbose=True, auto_relax=True,
-                           output_dir="examples/_output/rectifier_48v_3kw")
+    print(f"\nFinding optimal designs (max {DEFAULT_MAX_RESULTS})...")
+    results = design.solve(max_results=DEFAULT_MAX_RESULTS, verbose=True, auto_relax=True)
 
     if not results:
         print("No suitable designs found even after relaxation.")
         return None
 
-    print(f"\nFound {len(results)} designs:\n")
-    for i, r in enumerate(results, 1):
-        print(f"Design #{i}: {r.core} / {r.material}")
-        print(f"  Primary:    {r.primary_turns}T, {r.primary_wire}")
-        print(f"  Air gap:    {r.air_gap_mm:.2f} mm")
-        print(f"  Total loss: {r.total_loss_w:.3f} W")
-        print()
+    print_results_summary(results)
+
+    specs = {
+        "power_w": 3000,
+        "frequency_hz": 100e3,
+        "efficiency": 0.96,
+        "topology": "LLC",
+    }
+    generate_example_report(
+        results,
+        "rectifier_48v_3kw",
+        "Telecom Rectifier 48V 3kW - Design Report",
+        specs=specs
+    )
 
     return results[0] if results else None
 
@@ -58,4 +69,4 @@ def design_rectifier_48v_3kw():
 if __name__ == "__main__":
     best = design_rectifier_48v_3kw()
     if best:
-        print(f"Recommended: {best.core} with {best.material}")
+        print(f"\nRecommended: {best.core} with {best.material}")

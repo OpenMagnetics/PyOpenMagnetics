@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 import math
 from api.optimization import NSGAOptimizer, create_inductor_optimizer, ParetoFront
 
+MAX_RESULTS = 50
 
 def optimize_boost_inductor():
     """Optimize a boost inductor for mass vs efficiency tradeoff."""

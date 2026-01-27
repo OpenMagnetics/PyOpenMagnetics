@@ -14,7 +14,14 @@ Note: The -8V output is achieved by reversing the winding polarity during assemb
       Both outputs are specified as positive values; the transformer design is the same.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
+
 from api.design import Design
+from examples.common import (
+    DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
+)
 
 
 def design_gate_drive_isolated():
@@ -26,8 +33,6 @@ def design_gate_drive_isolated():
     print("  - Secondary 1: 15V @ 0.5A (positive gate drive)")
     print("  - Secondary 2: 8V @ 0.2A (negative bias, reverse polarity)")
 
-    # For gate drivers, design with two independent secondary windings
-    # The -8V output is achieved by reversing winding polarity during winding
     design = (
         Design.flyback()
         .vin_dc(10, 14)            # 12V +/- tolerance
@@ -45,22 +50,27 @@ def design_gate_drive_isolated():
     print(f"  Turns ratio (n):     {params['turns_ratio']:.2f}")
     print(f"  Mag inductance (Lm): {params['magnetizing_inductance_uH']:.1f} uH")
 
-    print("\nFinding optimal designs...")
-    # auto_relax=True will try relaxing constraints if no solution found
-    results = design.solve(max_results=MAX_RESULTS, verbose=True, auto_relax=True,
-                          output_dir="examples/_output/gate_drive_isolated")
+    print(f"\nFinding optimal designs (max {DEFAULT_MAX_RESULTS})...")
+    results = design.solve(max_results=DEFAULT_MAX_RESULTS, verbose=True, auto_relax=True)
 
     if not results:
         print("No suitable designs found even after relaxation.")
         return None
 
-    print(f"\nFound {len(results)} designs:\n")
-    for i, r in enumerate(results, 1):
-        print(f"Design #{i}: {r.core} / {r.material}")
-        print(f"  Primary:    {r.primary_turns}T, {r.primary_wire}")
-        print(f"  Air gap:    {r.air_gap_mm:.2f} mm")
-        print(f"  Total loss: {r.total_loss_w:.3f} W")
-        print()
+    print_results_summary(results)
+
+    specs = {
+        "power_w": 9.1,  # 15V*0.5A + 8V*0.2A
+        "frequency_hz": 500e3,
+        "efficiency": 0.80,
+        "topology": "flyback",
+    }
+    generate_example_report(
+        results,
+        "gate_drive_isolated",
+        "Isolated Gate Drive Transformer - Design Report",
+        specs=specs
+    )
 
     return results[0] if results else None
 
@@ -68,7 +78,7 @@ def design_gate_drive_isolated():
 if __name__ == "__main__":
     best = design_gate_drive_isolated()
     if best:
-        print(f"Recommended: {best.core} with {best.material}")
+        print(f"\nRecommended: {best.core} with {best.material}")
         print("\nWinding Instructions:")
         print("  1. Wind primary as specified")
         print("  2. Secondary 1 (+15V): Wind in same direction as primary")

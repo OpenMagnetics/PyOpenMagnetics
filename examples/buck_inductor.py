@@ -11,6 +11,7 @@ This example demonstrates designing a buck converter output inductor:
 import json
 import PyOpenMagnetics
 
+MAX_RESULTS = 50
 
 def _parse_magnetics_result(result):
     """Parse the result from calculate_advised_magnetics into a list."""

@@ -27,12 +27,9 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from api.design import Design
-from api.expert.knowledge import (
-    suggest_powder_core_material,
-    POWDER_CORE_MATERIALS,
-    calculate_core_loss
+from examples.common import (
+    DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
 )
-
 
 def design_boost_inductor():
     """Design a boost inductor for EV charger application."""
@@ -67,28 +64,22 @@ def design_boost_inductor():
     i_dc = params['pout'] / 0.98 / params['vin_min']  # Pin / Vin
     print(f"\n  DC current (low line): {i_dc:.1f} A")
 
-    # Suggest appropriate powder core materials
+    # Material recommendations for boost inductors
     print("\n" + "-" * 70)
     print("MATERIAL RECOMMENDATIONS")
     print("-" * 70)
-
-    for priority in ["balanced", "low_loss", "high_bias"]:
-        suggestions = suggest_powder_core_material(i_dc, 100e3, priority)
-        print(f"\nPriority '{priority}':")
-        for mat_name in suggestions[:3]:
-            mat = POWDER_CORE_MATERIALS.get(mat_name, {})
-            print(f"  - {mat.get('name', mat_name)}")
-            print(f"    Family: {mat.get('family', 'N/A')}, "
-                  f"Permeability: {mat.get('permeability', 'N/A')}u, "
-                  f"Saturation: {mat.get('saturation_T', 'N/A')}T")
+    print("\nFor high DC bias boost inductors:")
+    print("  Balanced:   Sendust/Kool Mu 60u - good all-around")
+    print("  Low loss:   MPP 60u - lowest core loss")
+    print("  High bias:  High Flux 60u or Mega Flux 60u - best saturation")
 
     # Run the design solver
     print("\n" + "-" * 70)
     print("DESIGN RESULTS")
     print("-" * 70)
-    print("\nFinding optimal designs...")
+    print(f"\nFinding optimal designs (max {DEFAULT_MAX_RESULTS})...")
 
-    results = design.solve(max_results=5)
+    results = design.solve(max_results=DEFAULT_MAX_RESULTS)
 
     if not results:
         print("No suitable designs found.")
@@ -97,19 +88,20 @@ def design_boost_inductor():
         print("  - Try relaxing constraints (temperature, dimensions)")
         return None
 
-    print(f"\nFound {len(results)} designs:\n")
+    print_results_summary(results)
 
-    for i, r in enumerate(results, 1):
-        print(f"Design #{i}: {r.core} / {r.material}")
-        print(f"  Primary:    {r.primary_turns}T, {r.primary_wire}")
-        print(f"  Air gap:    {r.air_gap_mm:.2f} mm")
-        print(f"  Core loss:  {r.core_loss_w:.2f} W")
-        print(f"  Cu loss:    {r.copper_loss_w:.2f} W")
-        print(f"  Total loss: {r.total_loss_w:.2f} W")
-        print(f"  B peak:     {r.bpk_tesla*1000:.1f} mT")
-        if r.temp_rise_c:
-            print(f"  Temp rise:  {r.temp_rise_c:.1f} K")
-        print()
+    specs = {
+        "power_w": 10000,
+        "frequency_hz": 100e3,
+        "efficiency": 0.98,
+        "topology": "boost",
+    }
+    generate_example_report(
+        results,
+        "boost_inductor_design",
+        "Boost Inductor 10kW - Design Report",
+        specs=specs
+    )
 
     return results[0] if results else None
 

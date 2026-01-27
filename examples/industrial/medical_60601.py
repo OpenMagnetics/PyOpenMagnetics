@@ -13,7 +13,14 @@ Specifications:
 - Target efficiency: >87%
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
+
 from api.design import Design
+from examples.common import (
+    DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
+)
 
 
 def design_medical_60601():
@@ -42,20 +49,28 @@ def design_medical_60601():
     print("\nNote: Medical requires 2xMOPP isolation (4kVrms)")
     print("      Triple-insulated wire or margin tape required")
 
-    print("\nFinding optimal designs...")
-    results = design.solve(max_results=MAX_RESULTS)
+    print(f"\nFinding optimal designs (max {DEFAULT_MAX_RESULTS})...")
+    results = design.solve(max_results=DEFAULT_MAX_RESULTS)
 
     if not results:
         print("No suitable designs found.")
         return None
 
-    print(f"\nFound {len(results)} designs:\n")
-    for i, r in enumerate(results, 1):
-        print(f"Design #{i}: {r.core} / {r.material}")
-        print(f"  Primary:    {r.primary_turns}T, {r.primary_wire}")
-        print(f"  Air gap:    {r.air_gap_mm:.2f} mm")
-        print(f"  Total loss: {r.total_loss_w:.3f} W")
-        print()
+    print_results_summary(results)
+
+    specs = {
+        "power_w": 50,
+        "frequency_hz": 100e3,
+        "efficiency": 0.87,
+        "topology": "flyback",
+        "isolation": "2xMOPP",
+    }
+    generate_example_report(
+        results,
+        "medical_60601",
+        "Medical 60601-1 PSU - Design Report",
+        specs=specs
+    )
 
     return results[0] if results else None
 
@@ -63,4 +78,4 @@ def design_medical_60601():
 if __name__ == "__main__":
     best = design_medical_60601()
     if best:
-        print(f"Recommended: {best.core} with {best.material}")
+        print(f"\nRecommended: {best.core} with {best.material}")

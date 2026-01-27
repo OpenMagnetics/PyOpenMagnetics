@@ -258,21 +258,10 @@ Code analysis tools for maintaining the codebase.
 ### Skill 7: Magnetic Expert Knowledge
 
 **Priority**: P1
-**Status**: ✅ Implemented (Sprint 7)
+**Status**: Archived (moved to `.archive/`)
 
 #### Description
-Domain knowledge base for applications, materials, and tradeoffs.
-
-```python
-from api.expert.knowledge import (
-    APPLICATIONS,        # 20+ application profiles
-    TOPOLOGIES,          # Topology selection guide
-    MATERIALS_GUIDE,     # Material selection
-    TRADEOFFS,           # Engineering tradeoffs explained
-    suggest_topology,
-    suggest_core_material
-)
-```
+Domain knowledge base - archived as functionality integrated into Design API and examples.
 
 ---
 
@@ -284,7 +273,7 @@ from api.expert.knowledge import (
 #### Description
 Upgrade legacy MATLAB/notebook code to fluent API.
 
-- Migrated 25+ powder core materials to knowledge base
+- Created boost waveform calculator
 - Created boost waveform calculator
 - Ported NSGA2 optimization example
 - Archived MATLAB legacy code

@@ -3,6 +3,7 @@ dist/
 venv/
 docs/_build/
 site/
+.claude/
 
 *.pyc
 __pycache__/

@@ -10,9 +10,6 @@ Optimization:
     optimizer = NSGAOptimizer(objectives=["mass", "total_loss"])
     optimizer.add_variable("turns", range=(20, 60))
     pareto_front = optimizer.run()
-
-Expert Knowledge:
-    from api.expert.knowledge import POWDER_CORE_MATERIALS, suggest_powder_core_material
 """
 
 from .design import Design

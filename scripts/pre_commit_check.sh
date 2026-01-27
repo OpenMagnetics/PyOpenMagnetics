@@ -107,7 +107,6 @@ run_check "Import api module" "$PYTHON -c 'import api'"
 run_check "Import api.design" "$PYTHON -c 'from api.design import Design'"
 run_check "Import api.waveforms" "$PYTHON -c 'from api.waveforms import boost_inductor_waveforms'"
 run_check "Import api.optimization" "$PYTHON -c 'from api.optimization import NSGAOptimizer'"
-run_check "Import api.expert.knowledge" "$PYTHON -c 'from api.expert.knowledge import POWDER_CORE_MATERIALS'"
 echo ""
 
 # =============================================================================
