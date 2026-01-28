@@ -1,3 +1,23 @@
+/**
+ * @file common.h
+ * @brief Common includes and shared declarations for PyOpenMagnetics bindings
+ *
+ * This header provides the foundation for all PyOpenMagnetics Python bindings.
+ * It includes necessary pybind11 headers, JSON libraries, and the OpenMagnetics
+ * MAS (Magnetic Agnostic Structure) library.
+ *
+ * @note This file must be included before any other PyMKF headers.
+ *
+ * ## Dependencies
+ * - pybind11: Python/C++ binding library
+ * - nlohmann/json: JSON serialization
+ * - magic_enum: Enum reflection
+ * - OpenMagnetics MAS: Core magnetic design library
+ *
+ * @author OpenMagnetics Contributors
+ * @copyright MIT License
+ */
+
 #pragma once
 
 #include <pybind11/pybind11.h>
@@ -45,9 +65,25 @@ namespace py = pybind11;
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
 
+/**
+ * @namespace PyMKF
+ * @brief PyOpenMagnetics Python bindings namespace
+ *
+ * Contains all functions and declarations for the PyOpenMagnetics Python module.
+ * Functions in this namespace are exposed to Python via pybind11.
+ */
 namespace PyMKF {
 
-// Global database declaration - defined in module.cpp
+/**
+ * @brief Global in-memory cache for MAS (Magnetic Agnostic Structure) objects
+ *
+ * This map stores loaded MAS objects keyed by string identifiers.
+ * Used for caching magnetic designs between Python calls.
+ *
+ * @note Defined in module.cpp, declared extern here for shared access.
+ *
+ * @see load_mas(), read_mas()
+ */
 extern std::map<std::string, OpenMagnetics::Mas> masDatabase;
 
 } // namespace PyMKF

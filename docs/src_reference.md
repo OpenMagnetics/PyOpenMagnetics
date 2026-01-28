@@ -6,6 +6,22 @@ The `src/` directory contains **24 files** (12 headers, 12 implementations) that
 
 **Module Name:** `PyOpenMagnetics`
 
+## Documentation
+
+All source files include comprehensive Doxygen documentation:
+- File-level documentation explaining purpose and usage
+- Function-level documentation with parameters, return values, and examples
+- Cross-references between related modules
+
+### Generating HTML Documentation
+
+```bash
+# From project root
+cd docs
+doxygen Doxyfile
+# Open docs/doxygen/html/index.html in browser
+```
+
 ## Architecture
 
 ```
