@@ -24,15 +24,16 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 import math
-from api.optimization import NSGAOptimizer, create_inductor_optimizer, ParetoFront
+from api.optimization import NSGAOptimizer, ParetoFront
+from examples.common import DEFAULT_MAX_RESULTS, get_output_dir
 
-MAX_RESULTS = 50
 
 def optimize_boost_inductor():
     """Optimize a boost inductor for mass vs efficiency tradeoff."""
     print("=" * 70)
     print("NSGA-II MULTI-OBJECTIVE INDUCTOR OPTIMIZATION")
     print("Objectives: Minimize Mass AND Minimize Losses")
+    print(f"Target: {DEFAULT_MAX_RESULTS} Pareto-optimal solutions")
     print("=" * 70)
 
     # Define the optimization problem
@@ -41,7 +42,7 @@ def optimize_boost_inductor():
     optimizer = NSGAOptimizer(
         objectives=["mass", "total_loss"],
         constraints={
-            "inductance": (100e-6, 140e-6),  # 100-140 µH
+            "inductance": (100e-6, 140e-6),  # 100-140 uH
         }
     )
 
@@ -71,14 +72,14 @@ def optimize_boost_inductor():
     print(f"  Objectives: {optimizer.objectives}")
     print(f"  Constraints: {optimizer.constraints}")
 
-    # Run optimization
+    # Run optimization with 50 population for Pareto front
     print(f"\n" + "-" * 70)
     print("RUNNING NSGA-II OPTIMIZATION")
     print("-" * 70)
 
     pareto_front = optimizer.run(
         generations=30,
-        population=50,
+        population=DEFAULT_MAX_RESULTS,  # Use 50 for diverse Pareto front
         seed=42,  # For reproducibility
     )
 
@@ -89,6 +90,9 @@ def optimize_boost_inductor():
 
     # Display results
     display_pareto_front(pareto_front)
+
+    # Save results
+    save_pareto_report(pareto_front, "nsga2_inductor")
 
     return pareto_front
 
@@ -130,8 +134,8 @@ def optimize_with_custom_evaluator():
         core_vol = core_volumes.get(core, 10e-6)
 
         # Mass estimation
-        core_density = 4800  # kg/m³ for ferrite
-        wire_density = 8900  # kg/m³ for copper
+        core_density = 4800  # kg/m3 for ferrite
+        wire_density = 8900  # kg/m3 for copper
         core_mass = core_vol * core_density
         wire_mass = turns * 0.001 * (core_vol ** 0.33)  # Simplified
         total_mass = core_mass + wire_mass
@@ -248,6 +252,80 @@ def display_pareto_front(pareto: ParetoFront):
         print(f"  Wire:      AWG {best_balanced.variables.get('wire_gauge')}")
         print(f"  Mass:      {best_balanced.objectives['mass']*1000:.1f}g")
         print(f"  Loss:      {best_balanced.objectives['total_loss']:.2f}W")
+
+
+def save_pareto_report(pareto: ParetoFront, example_name: str):
+    """Save Pareto front report to output directory."""
+    import json
+    from pathlib import Path
+
+    output_dir = get_output_dir(example_name)
+    output_path = Path(output_dir)
+
+    # Save JSON summary
+    solutions_data = []
+    for sol in pareto.solutions:
+        solutions_data.append({
+            "variables": sol.variables,
+            "objectives": sol.objectives,
+        })
+
+    summary = {
+        "generations": pareto.generations,
+        "population_size": pareto.population_size,
+        "pareto_solutions": len(pareto),
+        "solutions": solutions_data,
+    }
+
+    json_path = output_path / "pareto_results.json"
+    with open(json_path, "w") as f:
+        json.dump(summary, f, indent=2)
+
+    print(f"\nResults saved to: {output_dir}/")
+    print(f"  - pareto_results.json ({len(solutions_data)} solutions)")
+
+    # Try to generate matplotlib plot
+    try:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(figsize=(10, 8))
+
+        masses = [s.objectives["mass"] * 1000 for s in pareto.solutions]
+        losses = [s.objectives["total_loss"] for s in pareto.solutions]
+
+        ax.scatter(masses, losses, c='blue', alpha=0.7, s=50)
+        ax.set_xlabel("Mass (g)", fontsize=12)
+        ax.set_ylabel("Total Loss (W)", fontsize=12)
+        ax.set_title("NSGA-II Pareto Front: Mass vs Loss", fontsize=14)
+        ax.grid(True, alpha=0.3)
+
+        # Mark best balanced point
+        min_mass, max_mass = min(masses), max(masses)
+        min_loss, max_loss = min(losses), max(losses)
+
+        best_idx = 0
+        best_score = float('inf')
+        for i, (m, l) in enumerate(zip(masses, losses)):
+            norm_m = (m - min_mass) / (max_mass - min_mass + 1e-9)
+            norm_l = (l - min_loss) / (max_loss - min_loss + 1e-9)
+            score = math.sqrt(norm_m**2 + norm_l**2)
+            if score < best_score:
+                best_score = score
+                best_idx = i
+
+        ax.scatter([masses[best_idx]], [losses[best_idx]],
+                  c='red', s=150, marker='*', label='Balanced', zorder=5)
+        ax.legend()
+
+        plt.tight_layout()
+        plot_path = output_path / "pareto_front.png"
+        plt.savefig(plot_path, dpi=150)
+        plt.close()
+
+        print(f"  - pareto_front.png (visualization)")
+
+    except ImportError:
+        print("  [matplotlib not available for plot generation]")
 
 
 def plot_pareto_ascii(pareto: ParetoFront):

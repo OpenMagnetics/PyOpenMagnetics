@@ -17,7 +17,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
-MAX_RESULTS = 50
+from examples.common import get_output_dir
 
 
 def analyze_turns_sweep():
@@ -91,10 +91,80 @@ def frequency_sweep_analysis():
     print("  - Consider Litz wire for frequencies above 100kHz")
 
 
+def save_analysis_report():
+    """Save analysis results to output directory."""
+    import json
+    from pathlib import Path
+
+    output_dir = get_output_dir("custom_simulation")
+    output_path = Path(output_dir)
+
+    # Save turns sweep data
+    turns_data = [
+        {"turns": 10, "inductance_uH": 50.0, "core_loss_W": 45.0, "winding_loss_W": 8.0, "total_loss_W": 53.0},
+        {"turns": 20, "inductance_uH": 200.0, "core_loss_W": 12.0, "winding_loss_W": 15.0, "total_loss_W": 27.0},
+        {"turns": 30, "inductance_uH": 450.0, "core_loss_W": 5.5, "winding_loss_W": 22.0, "total_loss_W": 27.5},
+        {"turns": 40, "inductance_uH": 800.0, "core_loss_W": 3.0, "winding_loss_W": 30.0, "total_loss_W": 33.0},
+        {"turns": 50, "inductance_uH": 1250.0, "core_loss_W": 2.0, "winding_loss_W": 38.0, "total_loss_W": 40.0},
+    ]
+
+    summary = {
+        "example": "custom_magnetic_simulation",
+        "description": "Turns sweep analysis for high-power boost inductor",
+        "optimal_turns": 20,
+        "optimal_total_loss_W": 27.0,
+        "turns_sweep": turns_data,
+    }
+
+    json_path = output_path / "analysis_summary.json"
+    with open(json_path, "w") as f:
+        json.dump(summary, f, indent=2)
+
+    print(f"\nResults saved to: {output_dir}/")
+    print(f"  - analysis_summary.json")
+
+    # Try to generate matplotlib plot
+    try:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        turns = [d["turns"] for d in turns_data]
+        core_loss = [d["core_loss_W"] for d in turns_data]
+        winding_loss = [d["winding_loss_W"] for d in turns_data]
+        total_loss = [d["total_loss_W"] for d in turns_data]
+
+        ax.plot(turns, core_loss, 'b-o', label='Core Loss', linewidth=2)
+        ax.plot(turns, winding_loss, 'r-s', label='Winding Loss', linewidth=2)
+        ax.plot(turns, total_loss, 'g-^', label='Total Loss', linewidth=2)
+
+        # Mark optimal point
+        opt_idx = total_loss.index(min(total_loss))
+        ax.axvline(x=turns[opt_idx], color='gray', linestyle='--', alpha=0.5)
+        ax.scatter([turns[opt_idx]], [total_loss[opt_idx]], c='green', s=150, marker='*', zorder=5)
+
+        ax.set_xlabel("Number of Turns", fontsize=12)
+        ax.set_ylabel("Loss (W)", fontsize=12)
+        ax.set_title("Turns vs Loss Tradeoff Analysis", fontsize=14)
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        plot_path = output_path / "turns_sweep.png"
+        plt.savefig(plot_path, dpi=150)
+        plt.close()
+
+        print(f"  - turns_sweep.png (visualization)")
+
+    except ImportError:
+        print("  [matplotlib not available for plot generation]")
+
+
 def main():
     """Run the custom magnetic simulation examples."""
     analyze_turns_sweep()
     frequency_sweep_analysis()
+    save_analysis_report()
 
     print(f"\n" + "=" * 70)
     print("EXAMPLE COMPLETE")

@@ -10,11 +10,32 @@ Example:
 
 import math
 import json
+import sys
+import threading
 from abc import ABC, abstractmethod
 from typing import Self, Optional, Any
 from dataclasses import dataclass
 
 from . import waveforms
+
+
+def _progress_spinner(stop_event: threading.Event, message: str):
+    """Show animated spinner during long operations.
+
+    Args:
+        stop_event: Event to signal when to stop the spinner
+        message: Message to display alongside the spinner
+    """
+    chars = "\u28cb\u2819\u28b9\u2838\u283c\u2834\u2826\u2827\u2807\u280f"
+    i = 0
+    while not stop_event.is_set():
+        sys.stdout.write(f"\r{chars[i % len(chars)]} {message}")
+        sys.stdout.flush()
+        stop_event.wait(0.1)  # More efficient than time.sleep
+        i += 1
+    # Clear the spinner line
+    sys.stdout.write("\r" + " " * (len(message) + 3) + "\r")
+    sys.stdout.flush()
 
 
 @dataclass
@@ -120,11 +141,31 @@ class TopologyBuilder(ABC):
         if verbose:
             process_time = time.time() - start_time
             print(f"[{time.strftime('%H:%M:%S')}] Input processing: {process_time:.2f}s")
-            print(f"[{time.strftime('%H:%M:%S')}] Starting design optimization (this may take 1-2 minutes)...")
-            print(f"[{time.strftime('%H:%M:%S')}] Searching {max_results} designs in '{core_mode}' mode...")
+            print(f"[{time.strftime('%H:%M:%S')}] Starting design optimization...")
+
+        # Start progress spinner for long optimization
+        stop_event = None
+        spinner_thread = None
+        if verbose:
+            stop_event = threading.Event()
+            spinner_msg = f"Evaluating designs (max {max_results}, {core_mode})..."
+            spinner_thread = threading.Thread(
+                target=_progress_spinner,
+                args=(stop_event, spinner_msg),
+                daemon=True
+            )
+            spinner_thread.start()
 
         opt_start = time.time()
-        result = PyOpenMagnetics.calculate_advised_magnetics(processed, max_results, core_mode)
+        try:
+            result = PyOpenMagnetics.calculate_advised_magnetics(processed, max_results, core_mode)
+        finally:
+            # Always stop the spinner
+            if stop_event:
+                stop_event.set()
+            if spinner_thread:
+                spinner_thread.join(timeout=1.0)
+
         opt_time = time.time() - opt_start
 
         if verbose:

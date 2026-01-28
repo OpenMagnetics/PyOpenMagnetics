@@ -92,6 +92,7 @@ def generate_design_report(
 
     # Generate additional plots
     _generate_pareto_detailed(report_data, output_dir, plt, np, verbose)
+    _generate_volume_loss_pareto(report_data, output_dir, plt, np, verbose)
     _generate_parallel_coordinates(report_data, output_dir, plt, np, verbose)
     _generate_heatmap(report_data, output_dir, plt, np, verbose)
     _save_json_summary(report_data, output_dir, specs, verbose)
@@ -103,6 +104,10 @@ def _extract_report_data(results: List[Any]) -> List[dict]:
     """Extract report data from DesignResult objects."""
     report_data = []
     for i, r in enumerate(results):
+        height = getattr(r, 'height_mm', 0) or 0
+        width = getattr(r, 'width_mm', 0) or 0
+        depth = getattr(r, 'depth_mm', 0) or 0
+        volume = (height * width * depth) / 1000.0 if height and width and depth else 0
         report_data.append({
             "rank": i + 1,
             "core": getattr(r, 'core', 'Unknown'),
@@ -114,6 +119,11 @@ def _extract_report_data(results: List[Any]) -> List[dict]:
             "copper_loss_w": getattr(r, 'copper_loss_w', 0),
             "total_loss_w": getattr(r, 'total_loss_w', 0),
             "temp_rise_c": getattr(r, 'temp_rise_c', 0),
+            "height_mm": height,
+            "width_mm": width,
+            "depth_mm": depth,
+            "volume_cm3": volume,
+            "weight_g": getattr(r, 'weight_g', 0) or 0,
         })
     return report_data
 
@@ -395,6 +405,115 @@ def _generate_pareto_detailed(data: list, output_dir: str, plt, np, verbose: boo
         print(f"[Pareto analysis saved to {path}]")
 
 
+def _generate_volume_loss_pareto(data: list, output_dir: str, plt, np, verbose: bool):
+    """Generate Volume vs Total Loss Pareto plot."""
+    if len(data) < 2:
+        return
+
+    # Check if volume data is available
+    volumes = np.array([d['volume_cm3'] for d in data])
+    if volumes.max() == 0:
+        if verbose:
+            print("[Volume/loss Pareto skipped - no dimension data]")
+        return
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig.suptitle('Volume vs Loss Trade-off Analysis', fontsize=14, fontweight='bold')
+
+    total_losses = np.array([d['total_loss_w'] for d in data])
+    ranks = np.array([d['rank'] for d in data])
+
+    # Plot 1: Volume vs Total Loss scatter with Pareto frontier
+    ax1 = axes[0]
+
+    # Find Pareto-optimal points (minimize both volume and loss)
+    pareto_mask = _find_pareto_front(volumes, total_losses)
+
+    # Size points by efficiency (lower total loss = bigger)
+    if total_losses.max() > total_losses.min():
+        sizes = 200 * (1 - (total_losses - total_losses.min()) /
+                       (total_losses.max() - total_losses.min() + 0.001)) + 50
+    else:
+        sizes = np.full_like(total_losses, 100)
+
+    # Color by rank
+    colors = plt.cm.RdYlGn_r(np.linspace(0, 1, len(data)))
+
+    scatter = ax1.scatter(volumes, total_losses, s=sizes, c=colors,
+                         edgecolors='black', linewidths=1, alpha=0.8)
+
+    # Draw Pareto frontier line
+    if pareto_mask.sum() > 1:
+        pareto_vol = volumes[pareto_mask]
+        pareto_loss = total_losses[pareto_mask]
+        sort_idx = np.argsort(pareto_vol)
+        ax1.plot(pareto_vol[sort_idx], pareto_loss[sort_idx],
+                'b--', alpha=0.6, linewidth=2, label='Pareto Front')
+        ax1.fill_between(pareto_vol[sort_idx], pareto_loss[sort_idx],
+                        total_losses.max() * 1.1, alpha=0.1, color='blue')
+
+    # Annotate top designs and Pareto-optimal ones
+    for i, d in enumerate(data):
+        if i < 3 or pareto_mask[i]:
+            label = f"#{d['rank']}" if i < 3 else "*"
+            ax1.annotate(label, (volumes[i], total_losses[i]),
+                        textcoords="offset points", xytext=(5, 5),
+                        fontsize=8, fontweight='bold')
+
+    ax1.set_xlabel('Volume (cm³)', fontsize=11)
+    ax1.set_ylabel('Total Loss (W)', fontsize=11)
+    ax1.set_title('Volume vs Total Loss', fontsize=12, fontweight='bold')
+    ax1.grid(True, alpha=0.3)
+    handles, labels = ax1.get_legend_handles_labels()
+    if labels:
+        ax1.legend(loc='upper right', fontsize=9)
+
+    # Plot 2: Power density comparison (Loss/Volume)
+    ax2 = axes[1]
+
+    loss_density = total_losses / (volumes + 0.001)  # W/cm³
+    bars_colors = ['#2ecc71' if i == 0 else '#3498db' if i < 3 else '#95a5a6'
+                   for i in range(len(data))]
+
+    # Highlight Pareto-optimal designs
+    for i, is_pareto in enumerate(pareto_mask):
+        if is_pareto and i >= 3:
+            bars_colors[i] = '#9b59b6'  # Purple for Pareto-optimal
+
+    core_labels = [f"#{d['rank']}: {d['core'][:12]}" for d in data]
+    bars = ax2.barh(range(len(data)), loss_density, color=bars_colors, edgecolor='white')
+    ax2.set_yticks(range(len(data)))
+    ax2.set_yticklabels(core_labels, fontsize=9)
+    ax2.set_xlabel('Loss Density (W/cm³)', fontsize=11)
+    ax2.set_title('Loss Density Comparison', fontsize=12, fontweight='bold')
+    ax2.invert_yaxis()
+    ax2.grid(axis='x', alpha=0.3)
+
+    # Add value labels
+    max_density = max(loss_density) if len(loss_density) > 0 else 1
+    for bar, density, vol in zip(bars, loss_density, volumes):
+        ax2.text(bar.get_width() + max_density * 0.02, bar.get_y() + bar.get_height()/2,
+                f'{density:.3f} W/cm³ ({vol:.1f}cm³)', va='center', fontsize=8)
+
+    # Add legend for colors
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor='#2ecc71', label='Best'),
+        Patch(facecolor='#3498db', label='Top 3'),
+        Patch(facecolor='#9b59b6', label='Pareto-optimal'),
+        Patch(facecolor='#95a5a6', label='Other'),
+    ]
+    ax2.legend(handles=legend_elements, loc='lower right', fontsize=8)
+
+    plt.tight_layout()
+    path = os.path.join(output_dir, "volume_loss_pareto.png")
+    plt.savefig(path, dpi=150, bbox_inches='tight')
+    plt.close()
+
+    if verbose:
+        print(f"[Volume/loss Pareto saved to {path}]")
+
+
 def _generate_parallel_coordinates(data: list, output_dir: str, plt, np, verbose: bool):
     """Generate parallel coordinates plot for multi-dimensional comparison."""
     if len(data) < 2:
@@ -535,6 +654,7 @@ def _save_json_summary(data: list, output_dir: str, specs: Optional[dict], verbo
         "files_generated": [
             "design_report.png",
             "pareto_detailed.png",
+            "volume_loss_pareto.png",
             "parallel_coordinates.png",
             "heatmap.png",
             "report_summary.json",
