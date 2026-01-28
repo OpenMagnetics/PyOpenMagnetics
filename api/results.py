@@ -142,15 +142,27 @@ class DesignResult:
             wl = op_output.get("windingLosses", {})
             copper_loss = wl.get("windingLosses", 0.0) if isinstance(wl, dict) else float(wl) if isinstance(wl, (int, float)) else 0.0
 
-        # Dimensions
-        geom_desc = core.get("geometricalDescription", {})
-        if isinstance(geom_desc, list) and geom_desc:
-            geom_desc = geom_desc[0]
-        elif not isinstance(geom_desc, dict):
-            geom_desc = {}
-        height = (geom_desc.get("height", 0.0) or 0.0) * 1000
-        width = (geom_desc.get("width", 0.0) or 0.0) * 1000
-        depth = (geom_desc.get("depth", 0.0) or 0.0) * 1000
+        # Dimensions - extract from shape dimensions (A=width, B=height, C=depth/2)
+        height, width, depth = 0.0, 0.0, 0.0
+        shape_dims = shape_info.get("dimensions", {}) if isinstance(shape_info, dict) else {}
+
+        def get_dim_mm(dim_data):
+            """Extract dimension in mm from MAS dimension object."""
+            if not isinstance(dim_data, dict):
+                return 0.0
+            nominal = dim_data.get("nominal")
+            if nominal is not None:
+                return nominal * 1000
+            min_val = dim_data.get("minimum")
+            max_val = dim_data.get("maximum")
+            if min_val is not None and max_val is not None:
+                return (min_val + max_val) / 2 * 1000
+            return (min_val or max_val or 0.0) * 1000
+
+        if shape_dims:
+            width = get_dim_mm(shape_dims.get("A", {}))
+            height = get_dim_mm(shape_dims.get("B", {}))
+            depth = get_dim_mm(shape_dims.get("C", {})) * 2  # C is typically half-depth
 
         saturation_margin = max(0, (0.35 - bpk) / 0.35) if bpk > 0 else 0.0
         warnings = []

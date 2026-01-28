@@ -44,7 +44,7 @@ def design_din_rail_24v():
     print(f"  Duty cycle (D):      {params['duty_cycle_low_line']:.2%}")
 
     print(f"\nFinding optimal designs (max {DEFAULT_MAX_RESULTS})...")
-    results = design.solve(max_results=DEFAULT_MAX_RESULTS)
+    results = design.solve(max_results=DEFAULT_MAX_RESULTS, verbose=True)
 
     if not results:
         print("No suitable designs found.")

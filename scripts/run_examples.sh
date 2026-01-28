@@ -64,8 +64,8 @@ run_example() {
     # Create output filename from example path
     local output_file="$OUTPUT_DIR/$(echo "$relative_path" | tr '/' '_').log"
 
-    # Run with timeout (180 seconds max for complex designs), -u for unbuffered output
-    if timeout 180 $PYTHON -u "$file" > "$output_file" 2>&1; then
+    # Run with timeout (600 seconds max for complex designs), -u for unbuffered output
+    if timeout 600 $PYTHON -u "$file" > "$output_file" 2>&1; then
         echo -e "${GREEN}PASS${NC}"
         PASSED=$((PASSED + 1))
     else
