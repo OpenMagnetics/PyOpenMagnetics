@@ -13,9 +13,31 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from api.design import Design
+from api.models import (
+    VoltageSpec, CurrentSpec, BuckTopology, PowerSupplySpec, PortSpec
+)
 from examples.common import (
     DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
 )
+
+# Define specifications using datamodels
+psu_spec = PowerSupplySpec(
+    name="Buck Inductor 33W",
+    inputs=[PortSpec(
+        name="12V Input",
+        voltage=VoltageSpec.dc_range(10, 14),
+        current=CurrentSpec.dc(3)
+    )],
+    outputs=[PortSpec(
+        name="3.3V Output",
+        voltage=VoltageSpec.dc(3.3, tolerance_pct=5),
+        current=CurrentSpec.dc(10)
+    )],
+    efficiency=0.95,
+    isolation_v=None  # Non-isolated
+)
+
+topology = BuckTopology(fsw_hz=500e3)
 
 
 def design_buck_inductor():
@@ -35,10 +57,10 @@ def design_buck_inductor():
     print("=" * 60)
 
     # Calculate expected values
-    Vin = 12
-    Vout = 3.3
-    Iout = 10
-    fsw = 500000
+    Vin = psu_spec.inputs[0].voltage.nominal
+    Vout = psu_spec.outputs[0].voltage.nominal
+    Iout = psu_spec.outputs[0].current.nominal
+    fsw = topology.fsw_hz
     ripple_ratio = 0.3
 
     D = Vout / Vin  # Duty cycle ~ 0.275
@@ -60,11 +82,11 @@ def design_buck_inductor():
     # Design using the fluent API
     design = (
         Design.buck()
-        .vin(10, 14)               # 12V +/- tolerance
-        .vout(Vout)                # 3.3V output
-        .iout(Iout)                # 10A output current
-        .fsw(fsw)                  # 500 kHz
-        .ripple(ripple_ratio)      # 30% current ripple
+        .vin(psu_spec.inputs[0].voltage.min, psu_spec.inputs[0].voltage.max)
+        .vout(Vout)
+        .iout(Iout)
+        .fsw(fsw)
+        .ripple_ratio(ripple_ratio)  # 30% current ripple
         .prefer("efficiency")      # Optimize for lowest losses
         .ambient_temperature(50)   # 50C ambient
     )
@@ -82,9 +104,9 @@ def design_buck_inductor():
 
     # Generate visual reports
     specs = {
-        "power_w": Vout * Iout,
-        "frequency_hz": fsw,
-        "topology": "buck",
+        "power_w": psu_spec.total_output_power,
+        "frequency_hz": topology.fsw_hz,
+        "topology": topology.name,
         "inductance_uH": L * 1e6,
     }
     generate_example_report(

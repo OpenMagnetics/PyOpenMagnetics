@@ -16,9 +16,31 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from api.design import Design
+from api.models import (
+    VoltageSpec, CurrentSpec, LLCTopology, PowerSupplySpec, PortSpec
+)
 from examples.common import (
     DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
 )
+
+# Define specifications using datamodels
+psu_spec = PowerSupplySpec(
+    name="Telecom Rectifier 48V 3kW",
+    inputs=[PortSpec(
+        name="PFC DC Bus",
+        voltage=VoltageSpec.dc_range(380, 420),
+        current=CurrentSpec.dc(8)
+    )],
+    outputs=[PortSpec(
+        name="48V Output",
+        voltage=VoltageSpec.dc(48, tolerance_pct=5),
+        current=CurrentSpec.dc(62.5)
+    )],
+    efficiency=0.96,
+    isolation_v=3000
+)
+
+topology = LLCTopology(f_res_hz=100e3, fsw_min_hz=80e3, fsw_max_hz=150e3, Q=0.3)
 
 
 def design_rectifier_48v_3kw():
@@ -29,10 +51,10 @@ def design_rectifier_48v_3kw():
 
     design = (
         Design.llc()
-        .vin_dc(380, 420)          # DC bus from PFC
-        .output(48, 62.5)          # 48V @ 62.5A = 3kW
-        .resonant_frequency(100e3) # 100 kHz resonant
-        .quality_factor(0.3)       # Q factor
+        .vin_dc(psu_spec.inputs[0].voltage.min, psu_spec.inputs[0].voltage.max)
+        .output(psu_spec.outputs[0].voltage.nominal, psu_spec.outputs[0].current.nominal)
+        .resonant_frequency(topology.f_res_hz)
+        .quality_factor(topology.Q)
         .prefer("efficiency")
     )
 
@@ -51,10 +73,10 @@ def design_rectifier_48v_3kw():
     print_results_summary(results)
 
     specs = {
-        "power_w": 3000,
-        "frequency_hz": 100e3,
-        "efficiency": 0.96,
-        "topology": "LLC",
+        "power_w": psu_spec.total_output_power,
+        "frequency_hz": topology.f_res_hz,
+        "efficiency": psu_spec.efficiency,
+        "topology": topology.name,
     }
     generate_example_report(
         results,

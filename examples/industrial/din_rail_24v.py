@@ -17,9 +17,31 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from api.design import Design
+from api.models import (
+    VoltageSpec, CurrentSpec, FlybackTopology, PowerSupplySpec, PortSpec
+)
 from examples.common import (
     DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
 )
+
+# Define specifications using datamodels
+psu_spec = PowerSupplySpec(
+    name="DIN Rail 24V Industrial PSU",
+    inputs=[PortSpec(
+        name="AC Input",
+        voltage=VoltageSpec.ac(230, v_min_rms=85, v_max_rms=264),
+        current=CurrentSpec.dc(0.8)
+    )],
+    outputs=[PortSpec(
+        name="24V Output",
+        voltage=VoltageSpec.dc(24, tolerance_pct=5),
+        current=CurrentSpec.dc(5)
+    )],
+    efficiency=0.89,
+    isolation_v=3000
+)
+
+topology = FlybackTopology(fsw_hz=100e3, max_duty=0.45)
 
 
 def design_din_rail_24v():
@@ -30,10 +52,10 @@ def design_din_rail_24v():
 
     design = (
         Design.flyback()
-        .vin_ac(85, 264)           # Universal AC input
-        .output(24, 5)             # 24V @ 5A = 120W
-        .fsw(100e3)                # 100 kHz
-        .efficiency(0.89)          # Target 89% efficiency
+        .vin_ac(psu_spec.inputs[0].voltage.min, psu_spec.inputs[0].voltage.max)
+        .output(psu_spec.outputs[0].voltage.nominal, psu_spec.outputs[0].current.nominal)
+        .fsw(topology.fsw_hz)
+        .efficiency(psu_spec.efficiency)
         .prefer("efficiency")      # Industrial values efficiency
     )
 
@@ -53,10 +75,10 @@ def design_din_rail_24v():
     print_results_summary(results)
 
     specs = {
-        "power_w": 120,
-        "frequency_hz": 100e3,
-        "efficiency": 0.89,
-        "topology": "flyback",
+        "power_w": psu_spec.total_output_power,
+        "frequency_hz": topology.fsw_hz,
+        "efficiency": psu_spec.efficiency,
+        "topology": topology.name,
     }
     generate_example_report(
         results,

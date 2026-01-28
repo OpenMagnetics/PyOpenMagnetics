@@ -15,9 +15,31 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from api.design import Design
+from api.models import (
+    VoltageSpec, CurrentSpec, FlybackTopology, PowerSupplySpec, PortSpec
+)
 from examples.common import (
     DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
 )
+
+# Define specifications using datamodels
+psu_spec = PowerSupplySpec(
+    name="Flyback Transformer 72W",
+    inputs=[PortSpec(
+        name="AC Input",
+        voltage=VoltageSpec.ac(230, v_min_rms=85, v_max_rms=265),
+        current=CurrentSpec.dc(0.6)
+    )],
+    outputs=[PortSpec(
+        name="DC Output",
+        voltage=VoltageSpec.dc(24, tolerance_pct=5),
+        current=CurrentSpec.dc(3)
+    )],
+    efficiency=0.85,
+    isolation_v=3000
+)
+
+topology = FlybackTopology(fsw_hz=100e3, max_duty=0.45)
 
 
 def design_flyback_transformer():
@@ -38,10 +60,10 @@ def design_flyback_transformer():
     # Step 1: Define the converter using fluent API
     design = (
         Design.flyback()
-        .vin_ac(85, 265)           # Universal AC input
-        .output(24, 3)             # 24V @ 3A = 72W
-        .fsw(100e3)                # 100 kHz switching
-        .efficiency(0.85)          # Target 85% efficiency
+        .vin_ac(psu_spec.inputs[0].voltage.min, psu_spec.inputs[0].voltage.max)
+        .output(psu_spec.outputs[0].voltage.nominal, psu_spec.outputs[0].current.nominal)
+        .fsw(topology.fsw_hz)
+        .efficiency(psu_spec.efficiency)
         .prefer("efficiency")      # Optimize for efficiency
     )
 
@@ -65,10 +87,10 @@ def design_flyback_transformer():
 
     # Step 5: Generate visual reports (Pareto front, etc.)
     specs = {
-        "power_w": 72,
-        "frequency_hz": 100e3,
-        "efficiency": 0.85,
-        "topology": "flyback",
+        "power_w": psu_spec.total_output_power,
+        "frequency_hz": topology.fsw_hz,
+        "efficiency": psu_spec.efficiency,
+        "topology": topology.name,
     }
     generate_example_report(
         results,

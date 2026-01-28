@@ -16,9 +16,31 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from api.design import Design
+from api.models import (
+    VoltageSpec, CurrentSpec, FlybackTopology, PowerSupplySpec, PortSpec
+)
 from examples.common import (
     DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
 )
+
+# Define specifications using datamodels
+psu_spec = PowerSupplySpec(
+    name="PoE Injector",
+    inputs=[PortSpec(
+        name="PoE Input",
+        voltage=VoltageSpec.dc_range(36, 57),
+        current=CurrentSpec.dc(1.0)
+    )],
+    outputs=[PortSpec(
+        name="Isolated Output",
+        voltage=VoltageSpec.dc(12, tolerance_pct=5),
+        current=CurrentSpec.dc(2.5)
+    )],
+    efficiency=0.88,
+    isolation_v=1500
+)
+
+topology = FlybackTopology(fsw_hz=200e3, max_duty=0.45)
 
 
 def design_poe_injector():
@@ -29,10 +51,10 @@ def design_poe_injector():
 
     design = (
         Design.flyback()
-        .vin_dc(36, 57)            # PoE input range
-        .output(12, 2.5)           # 12V @ 2.5A = 30W
-        .fsw(200e3)                # 200 kHz
-        .efficiency(0.88)          # Target 88% efficiency
+        .vin_dc(psu_spec.inputs[0].voltage.min, psu_spec.inputs[0].voltage.max)
+        .output(psu_spec.outputs[0].voltage.nominal, psu_spec.outputs[0].current.nominal)
+        .fsw(topology.fsw_hz)
+        .efficiency(psu_spec.efficiency)
         .max_height(12)            # Compact PoE module
         .max_width(15)
         .prefer("size")
@@ -45,7 +67,7 @@ def design_poe_injector():
     print(f"  Duty cycle (D):      {params['duty_cycle_low_line']:.2%}")
 
     print(f"\nFinding optimal designs (max {DEFAULT_MAX_RESULTS})...")
-    results = design.solve(max_results=DEFAULT_MAX_RESULTS)
+    results = design.solve(max_results=DEFAULT_MAX_RESULTS, verbose=True)
 
     if not results:
         print("No suitable designs found.")
@@ -54,10 +76,10 @@ def design_poe_injector():
     print_results_summary(results)
 
     specs = {
-        "power_w": 30,
-        "frequency_hz": 200e3,
-        "efficiency": 0.88,
-        "topology": "flyback",
+        "power_w": psu_spec.total_output_power,
+        "frequency_hz": topology.fsw_hz,
+        "efficiency": psu_spec.efficiency,
+        "topology": topology.name,
     }
     generate_example_report(
         results,

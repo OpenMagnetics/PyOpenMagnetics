@@ -28,9 +28,31 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 import math
 from dataclasses import dataclass
 from api.design import Design
+from api.models import (
+    VoltageSpec, CurrentSpec, BoostTopology, PowerSupplySpec, PortSpec
+)
 from examples.common import (
     DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
 )
+
+# Define specifications using datamodels
+psu_spec = PowerSupplySpec(
+    name="Boost Half-Bridge Multi-OP Inductor",
+    inputs=[PortSpec(
+        name="Low Voltage Bus",
+        voltage=VoltageSpec.dc_range(200, 450),
+        current=CurrentSpec.dc(100)
+    )],
+    outputs=[PortSpec(
+        name="High Voltage Bus",
+        voltage=VoltageSpec.dc(850, tolerance_pct=5),
+        current=CurrentSpec.dc(50)
+    )],
+    efficiency=0.98,
+    isolation_v=None  # Non-isolated
+)
+
+topology = BoostTopology(fsw_hz=100e3)
 
 @dataclass
 class OperatingPoint:
@@ -229,7 +251,7 @@ def design_multi_op_inductor():
     print(f"  I_peak:      {params['i_peak']:.1f} A")
 
     print(f"\nSearching for optimal core designs (max {DEFAULT_MAX_RESULTS})...")
-    results = design.solve(max_results=DEFAULT_MAX_RESULTS)
+    results = design.solve(max_results=DEFAULT_MAX_RESULTS, verbose=True)
 
     if not results:
         print("\nNo suitable designs found with standard cores.")
@@ -242,8 +264,8 @@ def design_multi_op_inductor():
     print_results_summary(results)
 
     specs = {
-        "power_w": 42500,
-        "frequency_hz": 100e3,
+        "power_w": psu_spec.total_output_power,
+        "frequency_hz": topology.fsw_hz,
         "topology": "half_bridge_boost",
     }
     generate_example_report(

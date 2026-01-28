@@ -27,9 +27,31 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from api.design import Design
+from api.models import (
+    VoltageSpec, CurrentSpec, BoostTopology, PowerSupplySpec, PortSpec
+)
 from examples.common import (
     DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
 )
+
+# Define specifications using datamodels
+psu_spec = PowerSupplySpec(
+    name="Boost Inductor 10kW",
+    inputs=[PortSpec(
+        name="PV/Battery Input",
+        voltage=VoltageSpec.dc_range(200, 450),
+        current=CurrentSpec.dc(50)
+    )],
+    outputs=[PortSpec(
+        name="DC Bus Output",
+        voltage=VoltageSpec.dc(800, tolerance_pct=5),
+        current=CurrentSpec.dc(12.5)
+    )],
+    efficiency=0.98,
+    isolation_v=None  # Non-isolated
+)
+
+topology = BoostTopology(fsw_hz=100e3)
 
 def design_boost_inductor():
     """Design a boost inductor for EV charger application."""
@@ -79,7 +101,7 @@ def design_boost_inductor():
     print("-" * 70)
     print(f"\nFinding optimal designs (max {DEFAULT_MAX_RESULTS})...")
 
-    results = design.solve(max_results=DEFAULT_MAX_RESULTS)
+    results = design.solve(max_results=DEFAULT_MAX_RESULTS, verbose=True)
 
     if not results:
         print("No suitable designs found.")
@@ -91,10 +113,10 @@ def design_boost_inductor():
     print_results_summary(results)
 
     specs = {
-        "power_w": 10000,
-        "frequency_hz": 100e3,
-        "efficiency": 0.98,
-        "topology": "boost",
+        "power_w": psu_spec.total_output_power,
+        "frequency_hz": topology.fsw_hz,
+        "efficiency": psu_spec.efficiency,
+        "topology": topology.name,
     }
     generate_example_report(
         results,

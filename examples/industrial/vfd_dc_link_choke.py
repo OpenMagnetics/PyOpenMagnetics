@@ -16,9 +16,31 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from api.design import Design
+from api.models import (
+    VoltageSpec, CurrentSpec, BuckTopology, PowerSupplySpec, PortSpec
+)
 from examples.common import (
     DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
 )
+
+# Define specifications using datamodels
+psu_spec = PowerSupplySpec(
+    name="VFD DC Link Choke",
+    inputs=[PortSpec(
+        name="DC Bus",
+        voltage=VoltageSpec.dc(540, tolerance_pct=10),
+        current=CurrentSpec.dc(20, ripple_pp=5)
+    )],
+    outputs=[PortSpec(
+        name="Filtered DC",
+        voltage=VoltageSpec.dc(540, tolerance_pct=5),
+        current=CurrentSpec.dc(20)
+    )],
+    efficiency=0.99,
+    isolation_v=None  # Non-isolated
+)
+
+topology = BuckTopology(fsw_hz=8e3)
 
 
 def design_vfd_dc_link_choke():
@@ -31,9 +53,9 @@ def design_vfd_dc_link_choke():
     design = (
         Design.inductor()
         .inductance(1e-3)          # 1mH
-        .idc(20)                   # 20A DC
-        .iac_pp(5)                 # 5A peak-to-peak ripple
-        .fsw(8e3)                  # 8 kHz PWM harmonic
+        .idc(psu_spec.inputs[0].current.nominal)
+        .iac_pp(psu_spec.inputs[0].current.peak_to_peak)
+        .fsw(topology.fsw_hz)
         .prefer("efficiency")      # Low losses for continuous operation
     )
 
@@ -45,7 +67,7 @@ def design_vfd_dc_link_choke():
     print(f"  Peak current:  {params['i_peak']:.1f} A")
 
     print(f"\nFinding optimal designs (max {DEFAULT_MAX_RESULTS})...")
-    results = design.solve(max_results=DEFAULT_MAX_RESULTS)
+    results = design.solve(max_results=DEFAULT_MAX_RESULTS, verbose=True)
 
     if not results:
         print("No suitable designs found.")
@@ -55,8 +77,8 @@ def design_vfd_dc_link_choke():
 
     specs = {
         "inductance_mH": 1.0,
-        "current_dc_A": 20,
-        "frequency_hz": 8e3,
+        "current_dc_A": psu_spec.inputs[0].current.nominal,
+        "frequency_hz": topology.fsw_hz,
         "topology": "inductor",
     }
     generate_example_report(

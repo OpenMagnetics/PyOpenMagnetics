@@ -18,9 +18,31 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from api.design import Design
+from api.models import (
+    VoltageSpec, CurrentSpec, FlybackTopology, PowerSupplySpec, PortSpec
+)
 from examples.common import (
     DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
 )
+
+# Define specifications using datamodels
+psu_spec = PowerSupplySpec(
+    name="Medical 60601-1 PSU",
+    inputs=[PortSpec(
+        name="AC Input",
+        voltage=VoltageSpec.ac(230, v_min_rms=85, v_max_rms=264),
+        current=CurrentSpec.dc(0.4)
+    )],
+    outputs=[PortSpec(
+        name="Isolated Output",
+        voltage=VoltageSpec.dc(12, tolerance_pct=5),
+        current=CurrentSpec.dc(4.17)
+    )],
+    efficiency=0.87,
+    isolation_v=4000  # 2xMOPP
+)
+
+topology = FlybackTopology(fsw_hz=100e3, max_duty=0.45)
 
 
 def design_medical_60601():
@@ -32,10 +54,10 @@ def design_medical_60601():
 
     design = (
         Design.flyback()
-        .vin_ac(85, 264)           # Universal AC input
-        .output(12, 4.17)          # 12V @ 4.17A = 50W
-        .fsw(100e3)                # 100 kHz
-        .efficiency(0.87)          # Target 87% efficiency
+        .vin_ac(psu_spec.inputs[0].voltage.min, psu_spec.inputs[0].voltage.max)
+        .output(psu_spec.outputs[0].voltage.nominal, psu_spec.outputs[0].current.nominal)
+        .fsw(topology.fsw_hz)
+        .efficiency(psu_spec.efficiency)
         .isolation("reinforced", "IEC 60601-1")  # Medical isolation
         .prefer("efficiency")
     )
@@ -50,7 +72,7 @@ def design_medical_60601():
     print("      Triple-insulated wire or margin tape required")
 
     print(f"\nFinding optimal designs (max {DEFAULT_MAX_RESULTS})...")
-    results = design.solve(max_results=DEFAULT_MAX_RESULTS)
+    results = design.solve(max_results=DEFAULT_MAX_RESULTS, verbose=True)
 
     if not results:
         print("No suitable designs found.")
@@ -59,10 +81,10 @@ def design_medical_60601():
     print_results_summary(results)
 
     specs = {
-        "power_w": 50,
-        "frequency_hz": 100e3,
-        "efficiency": 0.87,
-        "topology": "flyback",
+        "power_w": psu_spec.total_output_power,
+        "frequency_hz": topology.fsw_hz,
+        "efficiency": psu_spec.efficiency,
+        "topology": topology.name,
         "isolation": "2xMOPP",
     }
     generate_example_report(

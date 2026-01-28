@@ -19,9 +19,38 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from api.design import Design
+from api.models import (
+    VoltageSpec, CurrentSpec, FlybackTopology, PowerSupplySpec, PortSpec
+)
 from examples.common import (
     DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
 )
+
+# Define specifications using datamodels
+psu_spec = PowerSupplySpec(
+    name="Isolated Gate Drive Transformer",
+    inputs=[PortSpec(
+        name="Auxiliary 12V",
+        voltage=VoltageSpec.dc_range(10, 14),
+        current=CurrentSpec.dc(1.5)
+    )],
+    outputs=[
+        PortSpec(
+            name="Positive Gate Drive",
+            voltage=VoltageSpec.dc(15, tolerance_pct=5),
+            current=CurrentSpec.dc(0.5)
+        ),
+        PortSpec(
+            name="Negative Bias",
+            voltage=VoltageSpec.dc(8, tolerance_pct=5),
+            current=CurrentSpec.dc(0.2)
+        )
+    ],
+    efficiency=0.80,
+    isolation_v=5000
+)
+
+topology = FlybackTopology(fsw_hz=500e3, max_duty=0.45)
 
 
 def design_gate_drive_isolated():
@@ -35,11 +64,11 @@ def design_gate_drive_isolated():
 
     design = (
         Design.flyback()
-        .vin_dc(10, 14)            # 12V +/- tolerance
-        .output(15, 0.5)           # Secondary 1: +15V gate drive
-        .output(8, 0.2)            # Secondary 2: 8V (connect reversed for -8V)
-        .fsw(500e3)                # 500 kHz (good balance of size/losses)
-        .efficiency(0.80)          # Lower efficiency acceptable at low power
+        .vin_dc(psu_spec.inputs[0].voltage.min, psu_spec.inputs[0].voltage.max)
+        .output(psu_spec.outputs[0].voltage.nominal, psu_spec.outputs[0].current.nominal)
+        .output(psu_spec.outputs[1].voltage.nominal, psu_spec.outputs[1].current.nominal)
+        .fsw(topology.fsw_hz)
+        .efficiency(psu_spec.efficiency)
         .max_height(12)            # Compact
         .max_width(15)
         .prefer("size")
@@ -60,10 +89,10 @@ def design_gate_drive_isolated():
     print_results_summary(results)
 
     specs = {
-        "power_w": 9.1,  # 15V*0.5A + 8V*0.2A
-        "frequency_hz": 500e3,
-        "efficiency": 0.80,
-        "topology": "flyback",
+        "power_w": psu_spec.total_output_power,
+        "frequency_hz": topology.fsw_hz,
+        "efficiency": psu_spec.efficiency,
+        "topology": topology.name,
     }
     generate_example_report(
         results,
