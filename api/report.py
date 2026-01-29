@@ -421,7 +421,6 @@ def _generate_volume_loss_pareto(data: list, output_dir: str, plt, np, verbose: 
     fig.suptitle('Volume vs Loss Trade-off Analysis', fontsize=14, fontweight='bold')
 
     total_losses = np.array([d['total_loss_w'] for d in data])
-    ranks = np.array([d['rank'] for d in data])
 
     # Plot 1: Volume vs Total Loss scatter with Pareto frontier
     ax1 = axes[0]
