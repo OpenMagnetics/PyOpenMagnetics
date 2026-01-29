@@ -3,6 +3,9 @@
 import pytest
 import math
 
+# Maximum number of results to request in solve() calls for testing
+MAX_RESULTS = 5
+
 
 class TestDesignImports:
     """Test module imports."""
