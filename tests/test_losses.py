@@ -4,7 +4,6 @@ Tests for PyOpenMagnetics loss calculation functions.
 Covers core losses (multiple models), winding losses (ohmic, skin, proximity),
 wire-level per-meter loss functions, and Steinmetz coefficients.
 """
-import pytest
 import PyOpenMagnetics
 
 

@@ -1,7 +1,9 @@
 """Tests for PyOpenMagnetics Design Builder API."""
 
 import pytest
-import math
+
+# Test configuration
+MAX_RESULTS = 5
 
 
 class TestDesignImports:

@@ -2,8 +2,8 @@
 TAS Output models - Simplified results for basic DC-DC converters.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, Dict
+from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass

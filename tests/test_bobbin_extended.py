@@ -3,7 +3,6 @@ Tests for PyOpenMagnetics bobbin functions (extended coverage).
 
 Covers create_basic_bobbin(), bobbin data access, and bobbin fitting checks.
 """
-import pytest
 import PyOpenMagnetics
 
 

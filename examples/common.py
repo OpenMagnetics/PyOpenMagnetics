@@ -4,7 +4,6 @@ Common utilities for PyOpenMagnetics examples.
 Provides standardized output generation for all examples.
 """
 
-import os
 from pathlib import Path
 from typing import List, Any, Optional, Dict
 

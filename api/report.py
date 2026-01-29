@@ -13,7 +13,6 @@ using matplotlib. Includes:
 import os
 import json
 from typing import List, Optional, Dict, Any
-from dataclasses import dataclass
 
 
 def _ensure_matplotlib():
@@ -144,8 +143,8 @@ def _plot_pareto_front(ax, data: list, plt, np):
     # Color by rank
     colors = plt.cm.RdYlGn_r(np.linspace(0, 1, len(data)))
 
-    scatter = ax.scatter(core_losses, copper_losses, s=sizes, c=colors,
-                        edgecolors='black', linewidths=1, alpha=0.8)
+    ax.scatter(core_losses, copper_losses, s=sizes, c=colors,
+               edgecolors='black', linewidths=1, alpha=0.8)
 
     # Mark Pareto-optimal points
     pareto_mask = _find_pareto_front(core_losses, copper_losses)

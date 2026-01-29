@@ -7,7 +7,6 @@ Waveforms are the universal language that makes TAS topology-agnostic.
 from dataclasses import dataclass
 from typing import List
 from enum import Enum
-import math
 
 
 class WaveformShape(Enum):

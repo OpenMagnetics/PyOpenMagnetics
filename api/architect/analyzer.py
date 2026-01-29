@@ -5,7 +5,6 @@ Tools for analyzing Python modules and suggesting improvements.
 """
 
 import ast
-import os
 from dataclasses import dataclass, field
 from typing import Optional
 from pathlib import Path
@@ -194,6 +193,8 @@ def analyze_module(module_path: str) -> ModuleMetrics:
             if isinstance(tree.body[0].value, ast.Constant):
                 has_docstring = True
     except SyntaxError:
+        # Ignore syntax errors here; docstring detection is best-effort.
+        # Full syntax error handling is performed when analyzing the module below.
         pass
 
     analyzer = CodeAnalyzer(source)
@@ -243,6 +244,8 @@ def analyze_package(package_path: str) -> list[ModuleMetrics]:
         try:
             results.append(analyze_module(str(py_file)))
         except Exception:
+            # Intentionally ignore errors for individual modules so that analysis
+            # can continue for the rest of the package.
             pass
 
     return results

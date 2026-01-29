@@ -4,7 +4,6 @@ Tests for simplified TAS format (basic DC-DC converters).
 
 import pytest
 import json
-import os
 from pathlib import Path
 
 from tas import (
@@ -25,7 +24,6 @@ from tas import (
     ModulationType,
     ControlMode,
     OperatingMode,
-    TASOutputs,
     TASLossBreakdown,
     TASKPIs,
     create_buck_tas,

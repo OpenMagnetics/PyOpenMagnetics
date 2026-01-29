@@ -15,9 +15,8 @@ Example:
     pareto_front = optimizer.run(generations=50)
 """
 
-import math
 from dataclasses import dataclass, field
-from typing import Optional, Callable, Any
+from typing import Optional, Callable
 from abc import ABC, abstractmethod
 
 

@@ -4,7 +4,6 @@ Tests for PyOpenMagnetics settings and configuration functions.
 Covers get_settings(), set_settings(), reset_settings(),
 get_constants(), and get_default_models().
 """
-import pytest
 import PyOpenMagnetics
 
 
