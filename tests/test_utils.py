@@ -5,7 +5,6 @@ Covers waveform processing, harmonics, sampled waveform generation,
 power calculations, and reflected waveform transformations.
 """
 import pytest
-import math
 import PyOpenMagnetics
 
 
