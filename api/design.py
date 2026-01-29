@@ -263,9 +263,9 @@ class TopologyBuilder(ABC):
             if len(results) >= 2:
                 try:
                     self._generate_pareto_plot(results_data, output_dir, verbose)
-                except ImportError as e:
+                except ImportError as e2:
                     if verbose:
-                        print(f"[Pareto plot skipped - plotting dependency not installed: {e}]")
+                        print(f"[Pareto plot skipped - plotting dependency not installed: {e2}]")
 
     def _get_report_specs(self) -> dict:
         """Get specifications dict for report generation."""
