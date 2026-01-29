@@ -1,356 +1,328 @@
-# PyOpenMagnetics - Python Wrapper for OpenMagnetics
+# PyOpenMagnetics
 
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-**PyOpenMagnetics** is a Python wrapper for [MKF (Magnetics Knowledge Foundation)](https://github.com/OpenMagnetics/MKF), the simulation engine of [OpenMagnetics](https://github.com/OpenMagnetics), providing a comprehensive toolkit for designing and analyzing magnetic components such as transformers and inductors.
+**PyOpenMagnetics** is a Python wrapper for [MKF (Magnetics Knowledge Foundation)](https://github.com/OpenMagnetics/MKF), providing a comprehensive toolkit for designing magnetic components (transformers, inductors, chokes) for power electronics.
+
+## Why PyOpenMagnetics?
+
+| Traditional Approach | PyOpenMagnetics |
+|---------------------|-----------------|
+| 50+ lines of JSON configuration | `Design.flyback().vin_ac(85,265).output(12,5).solve()` |
+| Manual waveform calculations | Automatic waveform synthesis |
+| Trial-and-error core selection | AI-powered recommendations |
+| Separate tools for each topology | Unified API for all converters |
 
 ## Features
 
-- 🧲 **Core Database**: Access to extensive database of core shapes, materials, and manufacturers
-- 🔌 **Winding Design**: Automatic winding calculations with support for various wire types (round, litz, rectangular, planar)
-- 📊 **Loss Calculations**: Core losses (Steinmetz), winding losses (DC, skin effect, proximity effect)
-- 🎯 **Design Adviser**: Automated recommendations for optimal magnetic designs
-- 📈 **Signal Processing**: Harmonic analysis, waveform processing
-- 🖼️ **Visualization**: SVG plotting of cores, windings, magnetic fields
-- 🔧 **SPICE Export**: Export magnetic components as SPICE subcircuits
+### Core Engine
+- **Database Access**: 500+ core shapes, 100+ materials, extensive wire library
+- **Loss Models**: Steinmetz, IGSE, MSE, BARG, ROSHEN, ALBACH for core losses
+- **Winding Analysis**: DC, skin effect, proximity effect losses
+- **Design Adviser**: Automated optimal magnetic design recommendations
+- **Visualization**: SVG plotting of cores, windings, magnetic fields
+
+### Fluent Design API (NEW)
+```python
+from api.design import Design
+
+# Design a 65W USB-C charger transformer
+results = (Design.flyback()
+    .vin_ac(85, 265)           # Universal AC input
+    .output(20, 3.25)          # 20V @ 3.25A
+    .fsw(100e3)                # 100kHz switching
+    .prefer("efficiency")
+    .solve())
+
+print(f"Best: {results[0].core} + {results[0].material}")
+print(f"Turns: {results[0].primary_turns}T / {results[0].secondary_turns}T")
+print(f"Losses: {results[0].total_loss_w:.2f}W")
+```
+
+### Supported Topologies
+| Isolated | Non-Isolated | Magnetics |
+|----------|--------------|-----------|
+| Flyback | Buck | Inductor |
+| Forward | Boost | CM Choke |
+| LLC | Buck-Boost | Current Transformer |
+| DAB/CLLC | SEPIC | Gate Drive Transformer |
+
+### Multi-Objective Optimization (NEW)
+```python
+from api.optimization import NSGAOptimizer
+
+optimizer = NSGAOptimizer(
+    objectives=["mass", "total_loss"],
+    constraints={"inductance": (100e-6, 140e-6)}
+)
+optimizer.add_variable("turns", range=(20, 60))
+optimizer.add_variable("core_size", range=(0.5, 2.0))
+
+pareto_front = optimizer.run(generations=50)
+# Returns Pareto-optimal designs trading off mass vs efficiency
+```
 
 ## Installation
 
-### From PyPI (recommended)
-
+### From PyPI
 ```bash
 pip install PyOpenMagnetics
 ```
 
 ### From Source
-
 ```bash
-git clone https://github.com/OpenMagnetics/PyOpenMagnetics.git
-cd PyOpenMagnetics
+git clone https://github.com/OpenMagnetics/PyMKF.git
+cd PyMKF
 pip install .
 ```
 
+### Development Install
+```bash
+pip install -e ".[dev]"
+```
+
+**Build Requirements**: CMake 3.15+, C++23 compiler, Node.js 18+
+
 ## Quick Start
 
-### Basic Example: Creating a Core
-
+### 1. Simple Inductor Design
 ```python
-import PyOpenMagnetics
+from api.design import Design
 
-# Find a core shape by name
-shape = PyOpenMagnetics.find_core_shape_by_name("E 42/21/15")
+# 100µH inductor for buck converter
+design = Design.buck().vin(12, 24).vout(5).iout(3).fsw(500e3)
+results = design.solve()
 
-# Find a core material by name
-material = PyOpenMagnetics.find_core_material_by_name("3C95")
-
-# Create a core with gapping
-core_data = {
-    "functionalDescription": {
-        "shape": shape,
-        "material": material,
-        "gapping": [{"type": "subtractive", "length": 0.001}],  # 1mm gap
-        "numberStacks": 1
-    }
-}
-
-# Calculate complete core data
-core = PyOpenMagnetics.calculate_core_data(core_data, False)
-print(f"Effective area: {core['processedDescription']['effectiveParameters']['effectiveArea']} m²")
+for r in results[:3]:
+    print(f"{r.core}: {r.primary_turns}T, {r.total_loss_w:.2f}W loss")
 ```
 
-### Design Adviser: Get Magnetic Recommendations
+### 2. Flyback Transformer
+```python
+# Multi-output flyback for USB charger
+design = (Design.flyback()
+    .vin_ac(85, 265)
+    .output(12, 2)      # 12V @ 2A
+    .output(5, 0.5)     # 5V @ 0.5A (auxiliary)
+    .fsw(100e3)
+    .isolation("reinforced")
+    .solve())
+```
 
+### 3. Boost Inductor for EV Charger
+```python
+# 10kW boost stage
+design = (Design.boost()
+    .vin(200, 450)
+    .vout(800)
+    .pout(10000)
+    .fsw(100e3)
+    .ambient_temperature(70)
+    .solve())
+```
+
+### 4. Using the Low-Level API
 ```python
 import PyOpenMagnetics
 
-# Define design requirements
+# Direct MAS JSON usage for advanced users
 inputs = {
     "designRequirements": {
-        "magnetizingInductance": {
-            "minimum": 100e-6,  # 100 µH minimum
-            "nominal": 110e-6   # 110 µH nominal
-        },
-        "turnsRatios": [{"nominal": 5.0}]  # 5:1 turns ratio
+        "magnetizingInductance": {"nominal": 100e-6}
     },
-    "operatingPoints": [
-        {
-            "name": "Nominal",
-            "conditions": {"ambientTemperature": 25},
-            "excitationsPerWinding": [
-                {
-                    "name": "Primary",
-                    "frequency": 100000,  # 100 kHz
-                    "current": {
-                        "waveform": {
-                            "data": [0, 1.0, 0],
-                            "time": [0, 5e-6, 10e-6]
-                        }
-                    },
-                    "voltage": {
-                        "waveform": {
-                            "data": [50, 50, -50, -50],
-                            "time": [0, 5e-6, 5e-6, 10e-6]
-                        }
-                    }
-                }
-            ]
-        }
-    ]
+    "operatingPoints": [...]
 }
 
-# Process inputs (adds harmonics and validation)
-processed_inputs = PyOpenMagnetics.process_inputs(inputs)
-
-# Get magnetic recommendations
-# core_mode: "available cores" (stock cores) or "standard cores" (all standard shapes)
-magnetics = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "standard cores")
-
-for i, mag in enumerate(magnetics):
-    if "magnetic" in mag:
-        core = mag["magnetic"]["core"]["functionalDescription"]
-        print(f"{i+1}. {core['shape']['name']} - {core['material']['name']}")
+processed = PyOpenMagnetics.process_inputs(inputs)
+results = PyOpenMagnetics.calculate_advised_magnetics(processed, 5, "standard cores")
 ```
 
-### Calculate Core Losses
+## Project Structure
 
-```python
-import PyOpenMagnetics
-
-# Define core and operating point
-core_data = {...}  # Your core definition
-operating_point = {
-    "name": "Nominal",
-    "conditions": {"ambientTemperature": 25},
-    "excitationsPerWinding": [
-        {
-            "frequency": 100000,
-            "magneticFluxDensity": {
-                "processed": {
-                    "peakToPeak": 0.2,  # 200 mT peak-to-peak
-                    "offset": 0
-                }
-            }
-        }
-    ]
-}
-
-losses = PyOpenMagnetics.calculate_core_losses(core_data, operating_point, "IGSE")
-print(f"Core losses: {losses['coreLosses']} W")
+```
+PyMKF/
+├── api/                      # Python API layer
+│   ├── design.py             # Fluent Design API
+│   ├── mas.py                # MAS waveform generators
+│   ├── optimization.py       # NSGA-II optimizer
+│   ├── results.py            # Result formatting
+│   ├── expert/               # Domain knowledge
+│   │   ├── knowledge.py      # Materials, applications, tradeoffs
+│   │   ├── examples.py       # Example generator
+│   │   └── conversation.py   # Interactive design guide
+│   ├── mcp/                  # MCP server for AI assistants
+│   ├── gui/                  # Streamlit GUI
+│   ├── bridges/              # External tool bridges
+│   │   └── femmt.py          # FEMMT FEM export
+│   └── architect/            # Code analysis tools
+├── examples/                 # Real-world design examples
+│   ├── consumer/             # USB chargers, laptops
+│   ├── automotive/           # EV, 48V systems
+│   ├── industrial/           # DIN rail, medical, VFD
+│   ├── telecom/              # PoE, rectifiers
+│   └── advanced/             # Optimization, custom simulation
+├── src/                      # C++ pybind11 bindings
+├── tests/                    # Pytest test suite
+└── archive/                  # Legacy code reference
 ```
 
-### Winding a Coil
+## Examples
 
-```python
-import PyOpenMagnetics
-
-# Define coil requirements
-coil_functional_description = [
-    {
-        "name": "Primary",
-        "numberTurns": 50,
-        "numberParallels": 1,
-        "wire": "Round 0.5 - Grade 1"
-    },
-    {
-        "name": "Secondary",
-        "numberTurns": 10,
-        "numberParallels": 3,
-        "wire": "Round 1.0 - Grade 1"
-    }
-]
-
-# Wind the coil on the core
-result = PyOpenMagnetics.wind(core_data, coil_functional_description, bobbin_data, [1, 1], [])
-print(f"Winding successful: {result.get('windingResult', 'unknown')}")
+Run individual examples:
+```bash
+python examples/consumer/usb_pd_65w.py
+python examples/automotive/boost_half_bridge_multi_op.py
+python examples/industrial/boost_inductor_design.py
+python examples/advanced/nsga2_inductor_optimization.py
 ```
 
-## Flyback Converter Wizard
-
-PyOpenMagnetics includes a complete flyback converter design wizard. See `flyback.py` for a full example:
-
-```python
-from flyback import design_flyback, create_mas_inputs, get_advised_magnetics
-
-# Define flyback specifications
-specs = {
-    "input_voltage_min": 90,
-    "input_voltage_max": 375,
-    "outputs": [{"voltage": 12, "current": 2, "diode_drop": 0.5}],
-    "switching_frequency": 100000,
-    "max_duty_cycle": 0.45,
-    "efficiency": 0.85,
-    "current_ripple_ratio": 0.4,
-    "force_dcm": False,
-    "safety_margin": 0.85,
-    "ambient_temperature": 40,
-    "max_drain_source_voltage": None,
-}
-
-# Calculate magnetic requirements
-design = design_flyback(specs)
-print(f"Required inductance: {design['min_inductance']*1e6:.1f} µH")
-print(f"Turns ratio: {design['turns_ratios'][0]:.2f}")
-
-# Create inputs for PyOpenMagnetics
-inputs = create_mas_inputs(specs, design)
-
-# Get recommended magnetics
-magnetics = get_advised_magnetics(inputs, max_results=5)
+Run all examples:
+```bash
+./scripts/run_examples.sh
 ```
 
-## API Reference
+## Testing
 
-### Database Access
+```bash
+# Run all tests
+pytest tests/ -v
 
-| Function | Description |
-|----------|-------------|
-| `get_core_materials()` | Get all available core materials |
-| `get_core_shapes()` | Get all available core shapes |
-| `get_wires()` | Get all available wires |
-| `get_bobbins()` | Get all available bobbins |
-| `find_core_material_by_name(name)` | Find core material by name |
-| `find_core_shape_by_name(name)` | Find core shape by name |
-| `find_wire_by_name(name)` | Find wire by name |
+# Run specific test module
+pytest tests/test_design_builder.py -v
 
-### Core Calculations
-
-| Function | Description |
-|----------|-------------|
-| `calculate_core_data(core, process)` | Calculate complete core data |
-| `calculate_core_gapping(core, gapping)` | Calculate gapping configuration |
-| `calculate_inductance_from_number_turns_and_gapping(...)` | Calculate inductance |
-| `calculate_core_losses(core, operating_point, model)` | Calculate core losses |
-
-### Winding Functions
-
-| Function | Description |
-|----------|-------------|
-| `wind(core, coil, bobbin, pattern, layers)` | Wind coils on a core |
-| `calculate_winding_losses(...)` | Calculate total winding losses |
-| `calculate_ohmic_losses(...)` | Calculate DC losses |
-| `calculate_skin_effect_losses(...)` | Calculate skin effect losses |
-| `calculate_proximity_effect_losses(...)` | Calculate proximity effect losses |
-
-### Design Adviser
-
-| Function | Description |
-|----------|-------------|
-| `calculate_advised_cores(inputs, max_results)` | Get recommended cores |
-| `calculate_advised_magnetics(inputs, max, mode)` | Get complete designs |
-| `process_inputs(inputs)` | Process and validate inputs |
-
-### Visualization
-
-| Function | Description |
-|----------|-------------|
-| `plot_core(core, ...)` | Generate SVG of core |
-| `plot_sections(magnetic, ...)` | Plot winding sections |
-| `plot_layers(magnetic, ...)` | Plot winding layers |
-| `plot_turns(magnetic, ...)` | Plot individual turns |
-| `plot_field(magnetic, ...)` | Plot magnetic field |
-
-### Settings
-
-| Function | Description |
-|----------|-------------|
-| `get_settings()` | Get current settings |
-| `set_settings(settings)` | Configure settings |
-| `reset_settings()` | Reset to defaults |
-
-### SPICE Export
-
-| Function | Description |
-|----------|-------------|
-| `export_magnetic_as_subcircuit(magnetic, ...)` | Export as SPICE model |
-
-## Core Materials
-
-PyOpenMagnetics includes materials from major manufacturers:
-
-- **TDK/EPCOS**: N27, N49, N87, N95, N97, etc.
-- **Ferroxcube**: 3C90, 3C94, 3C95, 3F3, 3F4, etc.
-- **Fair-Rite**: Various ferrite materials
-- **Magnetics Inc.**: Powder cores (MPP, High Flux, Kool Mu)
-- **Micrometals**: Iron powder cores
-
-## Core Shapes
-
-Supported shape families include:
-
-- **E cores**: E, EI, EFD, EQ, ER
-- **ETD/EC cores**: ETD, EC
-- **PQ/PM cores**: PQ, PM
-- **RM cores**: RM, RM/ILP
-- **Toroidal**: Various sizes
-- **Pot cores**: P, PT
-- **U/UI cores**: U, UI, UR
-- **Planar**: E-LP, EQ-LP, etc.
-
-## Wire Types
-
-- **Round enamelled wire**: Various AWG and IEC sizes
-- **Litz wire**: Multiple strand configurations
-- **Rectangular wire**: For high-current applications
-- **Foil**: For planar magnetics
-- **Planar PCB**: For integrated designs
-
-## Configuration
-
-Use `set_settings()` to configure:
-
-```python
-settings = PyOpenMagnetics.get_settings()
-settings["coilAllowMarginTape"] = True
-settings["coilWindEvenIfNotFit"] = False
-settings["painterNumberPointsX"] = 50
-PyOpenMagnetics.set_settings(settings)
+# Run with coverage
+pytest tests/ --cov=api --cov-report=html
 ```
 
-## Contributing
-
-Contributions are welcome! Please see the [OpenMagnetics](https://github.com/OpenMagnetics) organization for contribution guidelines.
+Pre-commit validation:
+```bash
+./scripts/pre_commit_check.sh
+```
 
 ## Documentation
 
-### Quick Start
-- **[llms.txt](llms.txt)** - Comprehensive API reference optimized for AI assistants and quick lookup
-- **[examples/](examples/)** - Practical example scripts for common design workflows
-- **[PyOpenMagnetics.pyi](PyOpenMagnetics.pyi)** - Type stubs for IDE autocompletion
+| Resource | Description |
+|----------|-------------|
+| [llms.txt](llms.txt) | Comprehensive API reference (AI-friendly) |
+| [CLAUDE.md](CLAUDE.md) | Development guide for Claude Code |
+| [PRD.md](PRD.md) | Product Requirements Document |
+| [docs/](docs/) | Detailed documentation |
+| [notebooks/](notebooks/) | Interactive tutorials |
 
-### Tutorials
-- **[notebooks/](notebooks/)** - Interactive Jupyter notebook tutorials with visualizations
-  - [Getting Started](notebooks/01_getting_started.ipynb) - Introduction to PyOpenMagnetics
-  - [Buck Inductor](notebooks/02_buck_inductor.ipynb) - Complete inductor design workflow
-  - [Core Losses](notebooks/03_core_losses.ipynb) - In-depth core loss analysis
+## API Reference
 
-### Reference
-- **[docs/errors.md](docs/errors.md)** - Common errors and solutions
-- **[docs/performance.md](docs/performance.md)** - Performance optimization guide
-- **[docs/compatibility.md](docs/compatibility.md)** - Python/platform version compatibility
+### Design Builder
 
-### Validation
-- **[api/validation.py](api/validation.py)** - Runtime JSON schema validation for inputs
+| Method | Description |
+|--------|-------------|
+| `Design.flyback()` | Flyback transformer builder |
+| `Design.buck()` | Buck converter inductor builder |
+| `Design.boost()` | Boost converter inductor builder |
+| `Design.forward()` | Forward transformer builder |
+| `Design.llc()` | LLC resonant transformer builder |
+| `Design.inductor()` | Standalone inductor builder |
+
+### Builder Methods
+
+| Method | Description |
+|--------|-------------|
+| `.vin(min, max)` | Set DC input voltage range |
+| `.vin_ac(min, max)` | Set AC input voltage range |
+| `.vout(voltage)` | Set output voltage |
+| `.output(voltage, current)` | Add output (transformers) |
+| `.fsw(frequency)` | Set switching frequency |
+| `.prefer(priority)` | Set optimization priority |
+| `.solve(max_results)` | Run design optimization |
+
+### Expert Knowledge
+
+| Function | Description |
+|----------|-------------|
+| `suggest_powder_core_material()` | Get material recommendations |
+| `calculate_core_loss()` | Steinmetz loss calculation |
+| `get_application_info()` | Application-specific guidance |
+| `suggest_topology()` | Topology recommendation |
+
+### Optimization
+
+| Class/Function | Description |
+|----------------|-------------|
+| `NSGAOptimizer` | Multi-objective NSGA-II optimizer |
+| `create_inductor_optimizer()` | Pre-configured inductor optimizer |
+| `ParetoFront` | Collection of optimal solutions |
+
+## Core Materials Database
+
+### Ferrite
+- TDK/EPCOS: N27, N49, N87, N95, N97
+- Ferroxcube: 3C90, 3C94, 3C95, 3C97, 3F3, 3F4
+
+### Powder Cores (NEW - 25+ materials)
+- **MPP**: 26µ, 60µ, 125µ, 147µ, 160µ, 173µ, 200µ
+- **High Flux**: 26µ, 60µ, 125µ, 147µ, 160µ
+- **Sendust/Kool Mu**: 26µ, 60µ, 75µ, 90µ, 125µ
+- **Mega Flux/XFlux**: 26µ, 50µ, 60µ, 75µ, 90µ
+
+### Nanocrystalline & Amorphous
+- Vitroperm, Finemet equivalents
+- Metglas amorphous alloys
+
+## Version Tiers
+
+| Feature | FREE | PRO |
+|---------|------|-----|
+| Basic topologies (buck, boost, flyback) | ✅ | ✅ |
+| Design adviser | ✅ | ✅ |
+| Core/material database | ✅ | ✅ |
+| Multi-objective optimization | ❌ | ✅ |
+| MCP server for AI | ❌ | ✅ |
+| Streamlit GUI | ❌ | ✅ |
+| FEMMT bridge | ❌ | ✅ |
+| Expert knowledge base | ❌ | ✅ |
+| Advanced topologies (LLC, DAB) | ❌ | ✅ |
+| Priority support | ❌ | ✅ |
+
+## Contributing
+
+Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+```bash
+# Development setup
+git clone https://github.com/OpenMagnetics/PyMKF.git
+cd PyMKF
+pip install -e ".[dev]"
+pre-commit install
+
+# Run tests before submitting PR
+./scripts/pre_commit_check.sh
+```
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## Related Projects
 
-- [MKF](https://github.com/OpenMagnetics/MKF) - C++ magnetics library
+- [MKF](https://github.com/OpenMagnetics/MKF) - C++ magnetics engine
 - [MAS](https://github.com/OpenMagnetics/MAS) - Magnetic Agnostic Structure schema
 - [OpenMagnetics Web](https://openmagnetics.com) - Online design tool
+- [FEMMT](https://github.com/upb-lea/FEM_Magnetics_Toolbox) - FEM simulation
 
-## References
+## Citation
 
-- Maniktala, S. "Switching Power Supplies A-Z", 2nd Edition
-- Basso, C. "Switch-Mode Power Supplies", 2nd Edition
-- McLyman, C. "Transformer and Inductor Design Handbook"
+If you use PyOpenMagnetics in research, please cite:
+```bibtex
+@software{pyopenmagnetics,
+  title = {PyOpenMagnetics: Python Toolkit for Magnetic Component Design},
+  url = {https://github.com/OpenMagnetics/PyMKF},
+  year = {2024}
+}
+```
 
 ## Support
 
-For questions and support:
-- 🐛 [GitHub Issues](https://github.com/OpenMagnetics/PyOpenMagnetics/issues)
-- 💬 [Discussions](https://github.com/OpenMagnetics/PyOpenMagnetics/discussions)
-- 📧 Contact the maintainers
+- [GitHub Issues](https://github.com/OpenMagnetics/PyMKF/issues)
+- [Discussions](https://github.com/OpenMagnetics/PyMKF/discussions)
+- Email: support@openmagnetics.com
