@@ -1,0 +1,101 @@
+{
+  "metadata": {
+    "name": "Boost 5V to 12V @ 1A",
+    "version": "0.1.0",
+    "description": "Basic boost converter for 5V to 12V conversion",
+    "author": "TAS Generator"
+  },
+  "inputs": {
+    "requirements": {
+      "v_in_min": 4.5,
+      "v_in_max": 5.5,
+      "v_out": 12.0,
+      "i_out_max": 1.0,
+      "efficiency_target": 0.90
+    },
+    "operating_points": [
+      {
+        "name": "full_load",
+        "frequency": 300000,
+        "duty_cycle": 0.583,
+        "mode": "ccm",
+        "ambient_temperature": 25.0,
+        "modulation": {
+          "type": "pwm",
+          "control_mode": "current_mode",
+          "frequency_fixed": true,
+          "max_duty": 0.85
+        },
+        "waveforms": {
+          "inductor_current": {
+            "data": [2.2, 2.8, 2.2],
+            "time": [0.0, 1.944e-6, 3.33e-6],
+            "shape": "triangular",
+            "unit": "A"
+          },
+          "switch_voltage": {
+            "data": [0.0, 0.0, 12.0, 12.0],
+            "time": [0.0, 1.944e-6, 1.944e-6, 3.33e-6],
+            "shape": "rectangular",
+            "unit": "V"
+          }
+        }
+      }
+    ]
+  },
+  "components": {
+    "inductors": [
+      {
+        "name": "L1",
+        "type": "inductor",
+        "inductance": 47e-6,
+        "dcr": 0.03,
+        "saturation_current": 4.0,
+        "description": "Main boost inductor"
+      }
+    ],
+    "capacitors": [
+      {
+        "name": "C_out",
+        "type": "capacitor",
+        "capacitance": 47e-6,
+        "esr": 0.02,
+        "voltage_rating": 16.0,
+        "description": "Output capacitor"
+      }
+    ],
+    "switches": [
+      {
+        "name": "Q1",
+        "type": "switch",
+        "rds_on": 0.02,
+        "v_ds_max": 20.0,
+        "i_d_max": 5.0,
+        "description": "Main switch"
+      }
+    ],
+    "diodes": [
+      {
+        "name": "D1",
+        "type": "diode",
+        "vf": 0.4,
+        "v_rrm": 20.0,
+        "description": "Boost diode"
+      }
+    ]
+  },
+  "outputs": {
+    "losses": {
+      "core_loss": 0.08,
+      "winding_loss": 0.15,
+      "switch_conduction": 0.14,
+      "switch_switching": 0.20,
+      "diode_conduction": 0.40,
+      "capacitor_esr": 0.02,
+      "total": 0.99
+    },
+    "kpis": {
+      "efficiency": 0.924
+    }
+  }
+}

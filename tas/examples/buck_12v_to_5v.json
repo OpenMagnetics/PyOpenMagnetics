@@ -1,0 +1,101 @@
+{
+  "metadata": {
+    "name": "Buck 12V to 5V @ 3A",
+    "version": "0.1.0",
+    "description": "Basic buck converter for 12V to 5V conversion",
+    "author": "TAS Generator"
+  },
+  "inputs": {
+    "requirements": {
+      "v_in_min": 10.0,
+      "v_in_max": 14.0,
+      "v_out": 5.0,
+      "i_out_max": 3.0,
+      "efficiency_target": 0.92
+    },
+    "operating_points": [
+      {
+        "name": "full_load",
+        "frequency": 500000,
+        "duty_cycle": 0.417,
+        "mode": "ccm",
+        "ambient_temperature": 25.0,
+        "modulation": {
+          "type": "pwm",
+          "control_mode": "voltage_mode",
+          "frequency_fixed": true,
+          "max_duty": 0.9
+        },
+        "waveforms": {
+          "inductor_current": {
+            "data": [2.7, 3.3, 2.7],
+            "time": [0.0, 8.33e-7, 2.0e-6],
+            "shape": "triangular",
+            "unit": "A"
+          },
+          "switch_voltage": {
+            "data": [0.0, 0.0, 12.0, 12.0],
+            "time": [0.0, 8.33e-7, 8.33e-7, 2.0e-6],
+            "shape": "rectangular",
+            "unit": "V"
+          }
+        }
+      }
+    ]
+  },
+  "components": {
+    "inductors": [
+      {
+        "name": "L1",
+        "type": "inductor",
+        "inductance": 22e-6,
+        "dcr": 0.015,
+        "saturation_current": 5.0,
+        "description": "Main buck inductor"
+      }
+    ],
+    "capacitors": [
+      {
+        "name": "C_out",
+        "type": "capacitor",
+        "capacitance": 100e-6,
+        "esr": 0.01,
+        "voltage_rating": 10.0,
+        "description": "Output capacitor"
+      }
+    ],
+    "switches": [
+      {
+        "name": "Q1",
+        "type": "switch",
+        "rds_on": 0.01,
+        "v_ds_max": 30.0,
+        "i_d_max": 10.0,
+        "description": "High-side switch"
+      }
+    ],
+    "diodes": [
+      {
+        "name": "D1",
+        "type": "diode",
+        "vf": 0.5,
+        "v_rrm": 30.0,
+        "description": "Freewheeling diode"
+      }
+    ]
+  },
+  "outputs": {
+    "losses": {
+      "core_loss": 0.05,
+      "winding_loss": 0.12,
+      "switch_conduction": 0.09,
+      "switch_switching": 0.15,
+      "diode_conduction": 0.25,
+      "capacitor_esr": 0.01,
+      "total": 0.67
+    },
+    "kpis": {
+      "efficiency": 0.957
+    }
+  }
+}

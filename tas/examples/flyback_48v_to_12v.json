@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "name": "Flyback 48V to 12V @ 2A Isolated",
+    "version": "0.1.0",
+    "description": "Isolated flyback converter for telecom applications",
+    "author": "TAS Generator"
+  },
+  "inputs": {
+    "requirements": {
+      "v_in_min": 36.0,
+      "v_in_max": 60.0,
+      "v_out": 12.0,
+      "i_out_max": 2.0,
+      "efficiency_target": 0.88,
+      "isolation_voltage": 1500.0
+    },
+    "operating_points": [
+      {
+        "name": "full_load",
+        "frequency": 100000,
+        "duty_cycle": 0.35,
+        "mode": "ccm",
+        "ambient_temperature": 25.0,
+        "modulation": {
+          "type": "pwm",
+          "control_mode": "current_mode",
+          "frequency_fixed": true,
+          "max_duty": 0.5
+        },
+        "waveforms": {
+          "primary_current": {
+            "data": [0.4, 1.2, 0.0, 0.0, 0.4],
+            "time": [0.0, 3.5e-6, 3.5e-6, 1.0e-5, 1.0e-5],
+            "shape": "custom",
+            "unit": "A"
+          },
+          "secondary_current": {
+            "data": [0.0, 0.0, 4.8, 1.6, 0.0],
+            "time": [0.0, 3.5e-6, 3.5e-6, 1.0e-5, 1.0e-5],
+            "shape": "custom",
+            "unit": "A"
+          }
+        }
+      },
+      {
+        "name": "light_load",
+        "frequency": 100000,
+        "duty_cycle": 0.15,
+        "mode": "dcm",
+        "ambient_temperature": 25.0,
+        "modulation": {
+          "type": "pfm",
+          "control_mode": "current_mode",
+          "frequency_fixed": false
+        }
+      }
+    ]
+  },
+  "components": {
+    "magnetics": [
+      {
+        "name": "T1",
+        "type": "magnetic",
+        "magnetizing_inductance": 200e-6,
+        "leakage_inductance": 2e-6,
+        "turns_ratio": 4.0,
+        "core_material": "N87",
+        "core_shape": "E 25/13/7",
+        "description": "Flyback transformer"
+      }
+    ],
+    "capacitors": [
+      {
+        "name": "C_out",
+        "type": "capacitor",
+        "capacitance": 220e-6,
+        "esr": 0.015,
+        "voltage_rating": 25.0,
+        "description": "Output capacitor"
+      }
+    ],
+    "switches": [
+      {
+        "name": "Q1",
+        "type": "switch",
+        "rds_on": 0.08,
+        "v_ds_max": 100.0,
+        "i_d_max": 3.0,
+        "description": "Primary switch"
+      }
+    ],
+    "diodes": [
+      {
+        "name": "D1",
+        "type": "diode",
+        "vf": 0.5,
+        "v_rrm": 40.0,
+        "description": "Secondary rectifier"
+      }
+    ]
+  },
+  "outputs": {
+    "losses": {
+      "core_loss": 0.35,
+      "winding_loss": 0.45,
+      "switch_conduction": 0.12,
+      "switch_switching": 0.40,
+      "diode_conduction": 0.60,
+      "capacitor_esr": 0.05,
+      "total": 1.97
+    },
+    "kpis": {
+      "efficiency": 0.924
+    }
+  }
+}
