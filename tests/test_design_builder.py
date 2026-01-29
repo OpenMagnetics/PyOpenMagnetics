@@ -3,6 +3,9 @@
 import pytest
 import math
 
+# Maximum results for solver tests
+MAX_RESULTS = 3
+
 
 class TestDesignImports:
     """Test module imports."""
