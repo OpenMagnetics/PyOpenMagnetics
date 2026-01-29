@@ -438,8 +438,8 @@ def _generate_volume_loss_pareto(data: list, output_dir: str, plt, np, verbose: 
     # Color by rank
     colors = plt.cm.RdYlGn_r(np.linspace(0, 1, len(data)))
 
-    scatter = ax1.scatter(volumes, total_losses, s=sizes, c=colors,
-                         edgecolors='black', linewidths=1, alpha=0.8)
+    ax1.scatter(volumes, total_losses, s=sizes, c=colors,
+                edgecolors='black', linewidths=1, alpha=0.8)
 
     # Draw Pareto frontier line
     if pareto_mask.sum() > 1:
