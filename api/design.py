@@ -359,7 +359,6 @@ class TopologyBuilder(ABC):
         orig_width = self._max_width_mm
         orig_depth = self._max_depth_mm
 
-        constraints_relaxed = []
 
         # Try relaxing dimensions iteratively
         for iteration in range(1, 6):  # Max 5 iterations (50% relaxation)
