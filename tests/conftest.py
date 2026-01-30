@@ -311,3 +311,64 @@ def reset_settings():
     PyOpenMagnetics.reset_settings()
     yield
     PyOpenMagnetics.reset_settings()
+
+
+# ============================================================================
+# Bobbin Test Fixtures
+# ============================================================================
+
+@pytest.fixture
+def computed_core(sample_core_data):
+    """Computed core data from sample ETD 49 core."""
+    return PyOpenMagnetics.calculate_core_data(sample_core_data, False)
+
+
+@pytest.fixture
+def basic_bobbin(computed_core):
+    """Basic bobbin created from computed core."""
+    return PyOpenMagnetics.create_basic_bobbin(computed_core, 0.001)
+
+
+@pytest.fixture
+def wound_inductor_coil(computed_core, basic_bobbin):
+    """A wound inductor coil with 20 turns."""
+    coil_data = {
+        "bobbin": basic_bobbin,
+        "functionalDescription": [
+            {
+                "name": "Primary",
+                "numberTurns": 20,
+                "numberParallels": 1,
+                "isolationSide": "primary",
+                "wire": "Round 0.5 - Grade 1"
+            }
+        ]
+    }
+    # wind(coil_json, repetitions, proportion_per_winding, pattern, margin_pairs)
+    return PyOpenMagnetics.wind(coil_data, 1, [1.0], [0], [])
+
+
+@pytest.fixture
+def wound_transformer_coil(computed_core, basic_bobbin):
+    """A wound transformer coil with primary and secondary."""
+    coil_data = {
+        "bobbin": basic_bobbin,
+        "functionalDescription": [
+            {
+                "name": "Primary",
+                "numberTurns": 20,
+                "numberParallels": 1,
+                "isolationSide": "primary",
+                "wire": "Round 0.5 - Grade 1"
+            },
+            {
+                "name": "Secondary",
+                "numberTurns": 40,
+                "numberParallels": 1,
+                "isolationSide": "secondary",
+                "wire": "Round 0.3 - Grade 1"
+            }
+        ]
+    }
+    # wind(coil_json, repetitions, proportion_per_winding, pattern, margin_pairs)
+    return PyOpenMagnetics.wind(coil_data, 1, [0.5, 0.5], [0, 1], [])
