@@ -199,7 +199,7 @@ def analyze_module(module_path: str) -> ModuleMetrics:
     analyzer = CodeAnalyzer(source)
     try:
         analyzer.analyze()
-    except SyntaxError as e:
+    except SyntaxError:
         return ModuleMetrics(
             path=str(path),
             name=path.stem,

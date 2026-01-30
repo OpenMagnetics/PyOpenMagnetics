@@ -447,7 +447,7 @@ def print_validation_report(data: Dict[str, Any], data_type: str = "inputs") -> 
 # Make common functions available at module level
 __all__ = [
     'validate_inputs',
-    'validate_magnetic', 
+    'validate_magnetic',
     'validate_core',
     'validate_operating_point',
     'validate_waveform',
