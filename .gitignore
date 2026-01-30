@@ -1,6 +1,7 @@
 build/
 dist/
 venv/
+.venv/
 docs/_build/
 site/
 .claude/
@@ -10,3 +11,10 @@ __pycache__/
 tmp/
 examples/_output/
 archive/
+
+# Compiled extensions
+*.so
+*.pyd
+*.dll
+*.dylib
+*.egg-info/
