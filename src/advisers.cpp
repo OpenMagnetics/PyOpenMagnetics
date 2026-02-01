@@ -24,12 +24,31 @@ json calculate_advised_cores(json inputsJson, json weightsJson, int maximumNumbe
         coreAdviser.set_mode(coreMode);
         auto masMagnetics = coreAdviser.get_advised_core(inputs, weights, maximumNumberResults);
 
-        json results = json::array();
-        for (auto& masMagnetic : masMagnetics) {
-            json aux;
-            to_json(aux, masMagnetic.first);
-            results.push_back(aux);
+        auto scoringsPerFilter = coreAdviser.get_scorings();
+
+        json results = json();
+        results["data"] = json::array();
+        for (auto& [masMagnetic, scoring] : masMagnetics) {
+            std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+            json result;
+            json masJson;
+            to_json(masJson, masMagnetic);
+            result["mas"] = masJson;
+            result["scoring"] = scoring;
+            if (scoringsPerFilter.count(name)) {
+                json filterScorings;
+                for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+                    filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
+                }
+                result["scoringPerFilter"] = filterScorings;
+            }
+            results["data"].push_back(result);
         }
+
+        sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
+            return b1["scoring"] > b2["scoring"];
+        });
+
         OpenMagnetics::settings.reset();
 
         return results;
@@ -51,12 +70,30 @@ json calculate_advised_magnetics(json inputsJson, int maximumNumberResults, json
         magneticAdviser.set_core_mode(coreMode);
         auto masMagnetics = magneticAdviser.get_advised_magnetic(inputs, maximumNumberResults);
 
-        json results = json::array();
+        auto scoringsPerFilter = magneticAdviser.get_scorings();
+
+        json results = json();
+        results["data"] = json::array();
         for (auto& [masMagnetic, scoring] : masMagnetics) {
-            json aux;
-            to_json(aux, masMagnetic);
-            results.push_back(aux);
+            std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+            json result;
+            json masJson;
+            to_json(masJson, masMagnetic);
+            result["mas"] = masJson;
+            result["scoring"] = scoring;
+            if (scoringsPerFilter.count(name)) {
+                json filterScorings;
+                for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+                    filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
+                }
+                result["scoringPerFilter"] = filterScorings;
+            }
+            results["data"].push_back(result);
         }
+
+        sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
+            return b1["scoring"] > b2["scoring"];
+        });
 
         return results;
     }
@@ -83,7 +120,7 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
         OpenMagnetics::MagneticAdviser magneticAdviser;
         auto masMagnetics = magneticAdviser.get_advised_magnetic(inputs, catalog, maximumNumberResults);
 
-        auto scorings = magneticAdviser.get_scorings();
+        auto scoringsPerFilter = magneticAdviser.get_scorings();
 
         json results = json();
         results["data"] = json::array();
@@ -94,6 +131,13 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
             to_json(masJson, masMagnetic);
             result["mas"] = masJson;
             result["scoring"] = scoring;
+            if (scoringsPerFilter.count(name)) {
+                json filterScorings;
+                for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+                    filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
+                }
+                result["scoringPerFilter"] = filterScorings;
+            }
             results["data"].push_back(result);
         }
 
@@ -129,7 +173,7 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
         OpenMagnetics::MagneticAdviser magneticAdviser;
         auto masMagnetics = magneticAdviser.get_advised_magnetic(inputs, OpenMagnetics::magneticsCache.get(), filterFlow, maximumNumberResults);
 
-        auto scorings = magneticAdviser.get_scorings();
+        auto scoringsPerFilter = magneticAdviser.get_scorings();
 
         json results = json();
         results["data"] = json::array();
@@ -140,6 +184,13 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
             to_json(masJson, masMagnetic);
             result["mas"] = masJson;
             result["scoring"] = scoring;
+            if (scoringsPerFilter.count(name)) {
+                json filterScorings;
+                for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+                    filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
+                }
+                result["scoringPerFilter"] = filterScorings;
+            }
             results["data"].push_back(result);
         }
 
@@ -171,13 +222,19 @@ void register_adviser_bindings(py::module& m) {
             core_mode_json: Core selection mode - "AVAILABLE_CORES" or "STANDARD_CORES".
         
         Returns:
-            JSON array of recommended cores sorted by score (best first).
-            Each element contains core data with functional and processed descriptions.
+            JSON object with "data" array containing ranked results.
+            Each result has:
+            - "mas": Mas object with magnetic data
+            - "scoring": Overall float score
+            - "scoringPerFilter": Object with individual scores per filter
+              (e.g., {"COST": 0.8, "EFFICIENCY": 0.9, "DIMENSIONS": 0.7})
         
         Example:
             >>> inputs = PyMKF.process_inputs(raw_inputs)
             >>> weights = {"COST": 1, "EFFICIENCY": 1, "DIMENSIONS": 0.5}
-            >>> cores = PyMKF.calculate_advised_cores(inputs, weights, 10, "AVAILABLE_CORES")
+            >>> result = PyMKF.calculate_advised_cores(inputs, weights, 10, "AVAILABLE_CORES")
+            >>> for item in result["data"]:
+            ...     print(f"Score: {item['scoring']}, Per filter: {item['scoringPerFilter']}")
         )pbdoc",
         py::arg("inputs_json"), py::arg("weights_json"), 
         py::arg("max_results"), py::arg("core_mode_json"));
@@ -197,12 +254,18 @@ void register_adviser_bindings(py::module& m) {
             core_mode_json: Core selection mode - "AVAILABLE_CORES" or "STANDARD_CORES".
         
         Returns:
-            JSON array of complete Mas objects sorted by score (best first).
-            Each Mas contains: magnetic (core + coil), inputs, and optionally outputs.
+            JSON object with "data" array containing ranked results.
+            Each result has:
+            - "mas": Mas object with magnetic, inputs, and optionally outputs
+            - "scoring": Overall float score
+            - "scoringPerFilter": Object with individual scores per filter
+              (e.g., {"COST": 0.8, "LOSSES": 0.9, "DIMENSIONS": 0.7})
         
         Example:
             >>> inputs = PyMKF.process_inputs(raw_inputs)
-            >>> magnetics = PyMKF.calculate_advised_magnetics(inputs, 5, "AVAILABLE_CORES")
+            >>> result = PyMKF.calculate_advised_magnetics(inputs, 5, "AVAILABLE_CORES")
+            >>> for item in result["data"]:
+            ...     print(f"Score: {item['scoring']}, Per filter: {item['scoringPerFilter']}")
         )pbdoc",
         py::arg("inputs_json"), py::arg("max_results"), py::arg("core_mode_json"));
     
@@ -220,14 +283,17 @@ void register_adviser_bindings(py::module& m) {
         
         Returns:
             JSON object with "data" array containing ranked results.
-            Each result has "mas" (Mas object) and "scoring" (float score).
+            Each result has:
+            - "mas": Mas object with magnetic data
+            - "scoring": Overall float score
+            - "scoringPerFilter": Object with individual scores per filter
         
         Example:
             >>> inputs = PyMKF.process_inputs(raw_inputs)
             >>> catalog = [magnetic1, magnetic2, magnetic3]
             >>> result = PyMKF.calculate_advised_magnetics_from_catalog(inputs, catalog, 5)
             >>> for item in result["data"]:
-            ...     print(f"Score: {item['scoring']}")
+            ...     print(f"Score: {item['scoring']}, Per filter: {item['scoringPerFilter']}")
         )pbdoc",
         py::arg("inputs_json"), py::arg("catalog_json"), py::arg("max_results"));
     
@@ -247,6 +313,10 @@ void register_adviser_bindings(py::module& m) {
         Returns:
             JSON object with "data" array containing ranked results,
             or error string if cache is empty.
+            Each result has:
+            - "mas": Mas object with magnetic data
+            - "scoring": Overall float score
+            - "scoringPerFilter": Object with individual scores per filter
         
         Note:
             Cache must be populated before calling this function.
