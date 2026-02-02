@@ -10,6 +10,7 @@
 #include "plotting.h"
 #include "settings.h"
 #include "utils.h"
+#include "logging.h"
 
 PYBIND11_MODULE(PyOpenMagnetics, m) {
     m.doc() = "OpenMagnetics Python bindings for magnetic component design";
@@ -26,4 +27,5 @@ PYBIND11_MODULE(PyOpenMagnetics, m) {
     PyMKF::register_plotting_bindings(m);
     PyMKF::register_settings_bindings(m);
     PyMKF::register_utils_bindings(m);
+    PyMKF::register_logging_bindings(m);
 }
