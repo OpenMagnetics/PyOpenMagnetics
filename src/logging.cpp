@@ -1,5 +1,11 @@
 #include "logging.h"
 
+// On Windows, ERROR is defined as a macro in windows.h/wingdi.h
+// We need to undef it to use LogLevel::ERROR without macro expansion issues
+#ifdef ERROR
+#undef ERROR
+#endif
+
 namespace PyMKF {
 
 // Static shared pointer to the string sink for capturing logs
