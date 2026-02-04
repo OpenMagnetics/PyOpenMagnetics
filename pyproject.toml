@@ -56,11 +56,13 @@ before-all = [
   "npm --version",
   "npm install -g quicktype@23.0.170"
 ]
+environment = { GIT_LFS_SKIP_SMUDGE=1, CMAKE_BUILD_PARALLEL_LEVEL="4" }
 
 [tool.cibuildwheel.macos]
 before-all = "npm --version && npm install -g quicktype@23.0.170"
-environment = { MACOSX_DEPLOYMENT_TARGET="14.0", GIT_LFS_SKIP_SMUDGE=1 }
+environment = { MACOSX_DEPLOYMENT_TARGET="14.0", GIT_LFS_SKIP_SMUDGE=1, CMAKE_BUILD_PARALLEL_LEVEL="3" }
 
 [tool.cibuildwheel.windows]
 before-all = "rmdir /S /Q build && npm --version && npm install -g quicktype@23.0.170"
 archs = ["AMD64"]
+environment = { GIT_LFS_SKIP_SMUDGE=1, CMAKE_BUILD_PARALLEL_LEVEL="2" }
