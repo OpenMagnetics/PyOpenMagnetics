@@ -104,11 +104,12 @@ def design_buck_inductor():
         "COST": 0.3
     }
     
-    magnetics = PyOpenMagnetics.calculate_advised_magnetics(
-        processed,
-        max_results=5,
-        core_mode="STANDARD_CORES"
+    result = PyOpenMagnetics.calculate_advised_magnetics(
+        processed, 5, "STANDARD_CORES"
     )
+    
+    # Extract magnetics list from result (v1.1.2+ format: {"data": [...]})
+    magnetics = result["data"] if isinstance(result, dict) and "data" in result else result
     
     print(f"  Found {len(magnetics)} suitable designs")
     
@@ -121,8 +122,10 @@ def design_buck_inductor():
         "reluctance": "ZHANG"
     }
     
-    for i, mas in enumerate(magnetics[:3]):
-        if "magnetic" not in mas:
+    for i, item in enumerate(magnetics[:3]):
+        # In v1.1.2+, each item has "mas" containing the magnetic data
+        mas = item.get("mas", item) if isinstance(item, dict) else item
+        if not isinstance(mas, dict) or "magnetic" not in mas:
             continue
             
         magnetic = mas["magnetic"]

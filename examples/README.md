@@ -60,17 +60,18 @@ inputs = {
 processed = PyOpenMagnetics.process_inputs(inputs)
 
 # 3. Get recommendations
-magnetics = PyOpenMagnetics.calculate_advised_magnetics(processed, 5, "STANDARD_CORES")
+result = PyOpenMagnetics.calculate_advised_magnetics(processed, 5, "STANDARD_CORES")
 
-# 4. Analyze results
-for mag in magnetics:
+# 4. Analyze results - result["data"] contains list of {mas, scoring, scoringPerFilter}
+for item in result["data"]:
+    mag = item["mas"]["magnetic"]
     losses = PyOpenMagnetics.calculate_core_losses(
-        mag["magnetic"]["core"],
-        mag["magnetic"]["coil"],
+        mag["core"],
+        mag["coil"],
         processed,
         {"coreLosses": "IGSE", "reluctance": "ZHANG"}
     )
-    print(f"Core losses: {losses['coreLosses']:.3f} W")
+    print(f"Core losses: {losses['coreLosses']:.3f} W, Score: {item['scoring']:.3f}")
 ```
 
 ## Additional Resources

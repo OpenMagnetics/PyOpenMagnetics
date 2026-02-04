@@ -107,11 +107,17 @@ def design_flyback_transformer():
         "COST": 0.3           # Tertiary: low cost
     }
     
-    magnetics = PyOpenMagnetics.calculate_advised_magnetics(
-        processed_inputs,
-        max_results=3,
-        core_mode="STANDARD_CORES"
+    result = PyOpenMagnetics.calculate_advised_magnetics(
+        processed_inputs, 3, "STANDARD_CORES"
     )
+    
+    # Extract magnetics list from result (v1.1.2+ format: {"data": [...]})
+    # Note: If there's an error, data will be a string containing the exception message
+    data = result.get("data", result) if isinstance(result, dict) else result
+    if isinstance(data, str):
+        print(f"    ✗ Error: {data}")
+        return None
+    magnetics = data
     
     print(f"    ✓ Found {len(magnetics)} suitable designs")
     
@@ -125,8 +131,10 @@ def design_flyback_transformer():
         "coreTemperature": "MANIKTALA"
     }
     
-    for i, mas in enumerate(magnetics):
-        if "magnetic" not in mas:
+    for i, item in enumerate(magnetics):
+        # In v1.1.2+, each item has "mas" containing the magnetic data
+        mas = item.get("mas", item) if isinstance(item, dict) else item
+        if not isinstance(mas, dict) or "magnetic" not in mas:
             continue
             
         magnetic = mas["magnetic"]
@@ -154,6 +162,9 @@ def design_flyback_transformer():
         total_loss = core_loss + winding_loss
         
         print(f"\nDesign #{i+1}: {shape_name} / {material_name}")
+        # Show scoring if available (v1.1.2+)
+        if 'scoring' in item:
+            print(f"  Score:          {item['scoring']:.3f}")
         print(f"  Core losses:    {core_loss:.3f} W")
         print(f"  Winding losses: {winding_loss:.3f} W")
         print(f"  Total losses:   {total_loss:.3f} W")
@@ -167,7 +178,11 @@ def design_flyback_transformer():
     print("\n" + "=" * 60)
     print("Design complete! Best design is #1")
     
-    return magnetics[0] if magnetics else None
+    # Return the first item's mas for backward compatibility
+    if magnetics:
+        first_item = magnetics[0]
+        return first_item.get("mas", first_item) if isinstance(first_item, dict) else first_item
+    return None
 
 
 def explore_core_database():

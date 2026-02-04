@@ -505,6 +505,13 @@ def calculate_advised_cores(
         weights: {"EFFICIENCY": 1.0, "DIMENSIONS": 0.5, "COST": 0.3}.
         max_results: Maximum number of recommendations.
         core_mode: "STANDARD_CORES" or "AVAILABLE_CORES" (stock only).
+        
+    Returns:
+        JSON object with "data" array containing ranked results.
+        Each result has:
+        - "mas": Mas object with magnetic, inputs, and optionally outputs
+        - "scoring": Overall float score
+        - "scoringPerFilter": Object with individual scores per filter
     """
     ...
 
@@ -512,11 +519,27 @@ def calculate_advised_magnetics(
     inputs: Inputs,
     max_results: int = 5,
     core_mode: str = "STANDARD_CORES"
-) -> List[Mas]:
+) -> JsonDict:
     """Get complete magnetic designs (core + winding).
     
+    Args:
+        inputs: Processed inputs (from process_inputs).
+        max_results: Maximum number of recommendations.
+        core_mode: "STANDARD_CORES" or "AVAILABLE_CORES" (stock only).
+    
     Returns:
-        List of Mas objects with magnetic and outputs populated.
+        JSON object with "data" array containing ranked results.
+        Each result has:
+        - "mas": Mas object with magnetic, inputs, and optionally outputs
+        - "scoring": Overall float score
+        - "scoringPerFilter": Object with individual scores per filter
+          (e.g., {"COST": 0.8, "LOSSES": 0.9, "DIMENSIONS": 0.7})
+    
+    Example:
+        >>> result = PyOpenMagnetics.calculate_advised_magnetics(inputs, 5, "STANDARD_CORES")
+        >>> for item in result["data"]:
+        ...     mag = item["mas"]["magnetic"]
+        ...     print(f"Score: {item['scoring']}, Core: {mag['core']['functionalDescription']['shape']['name']}")
     """
     ...
 
@@ -524,8 +547,16 @@ def calculate_advised_magnetics_from_catalog(
     inputs: Inputs,
     catalog: List[Magnetic],
     max_results: int = 5
-) -> List[Mas]:
-    """Get designs from custom catalog of magnetics."""
+) -> JsonDict:
+    """Get designs from custom catalog of magnetics.
+    
+    Returns:
+        JSON object with "data" array containing ranked results.
+        Each result has:
+        - "mas": Mas object with magnetic data
+        - "scoring": Overall float score
+        - "scoringPerFilter": Object with individual scores per filter
+    """
     ...
 
 # =============================================================================

@@ -104,12 +104,13 @@ processed_inputs = PyOpenMagnetics.process_inputs(inputs)
 
 # Get magnetic recommendations
 # core_mode: "available cores" (stock cores) or "standard cores" (all standard shapes)
-magnetics = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "standard cores")
+result = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "standard cores")
 
-for i, mag in enumerate(magnetics):
-    if "magnetic" in mag:
-        core = mag["magnetic"]["core"]["functionalDescription"]
-        print(f"{i+1}. {core['shape']['name']} - {core['material']['name']}")
+# Result format: {"data": [{"mas": {...}, "scoring": float, "scoringPerFilter": {...}}, ...]}
+for i, item in enumerate(result["data"]):
+    mag = item["mas"]["magnetic"]
+    core = mag["core"]["functionalDescription"]
+    print(f"{i+1}. {core['shape']['name']} - {core['material']['name']} (score: {item['scoring']:.3f})")
 ```
 
 ### Calculate Core Losses

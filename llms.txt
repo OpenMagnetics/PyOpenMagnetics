@@ -368,21 +368,25 @@ cores = PyOpenMagnetics.calculate_advised_cores(
 )
 
 # Get complete magnetic designs
-magnetics = PyOpenMagnetics.calculate_advised_magnetics(
+result = PyOpenMagnetics.calculate_advised_magnetics(
     processed,
     max_results=5,
     core_mode="STANDARD_CORES"
 )
 
-# Each result contains complete Mas object:
-for mag in magnetics:
-    core_name = mag["magnetic"]["core"]["functionalDescription"]["shape"]["name"]
-    material = mag["magnetic"]["core"]["functionalDescription"]["material"]["name"]
+# Result structure: {"data": [{"mas": {...}, "scoring": float, "scoringPerFilter": {...}}, ...]}
+for item in result["data"]:
+    mag = item["mas"]["magnetic"]
+    core_name = mag["core"]["functionalDescription"]["shape"]["name"]
+    material = mag["core"]["functionalDescription"]["material"]["name"]
+    score = item["scoring"]
+    print(f"{core_name} - {material} (score: {score:.3f})")
     
 # From custom catalog
-catalog_results = PyOpenMagnetics.calculate_advised_magnetics_from_catalog(
+catalog_result = PyOpenMagnetics.calculate_advised_magnetics_from_catalog(
     processed, catalog_magnetics, max_results=5
 )
+# Same result structure as calculate_advised_magnetics
 ```
 
 ### Simulation
@@ -538,7 +542,8 @@ flyback = {
     "desiredTurnsRatios": [8.0, 19.2]        # N_pri/N_sec for each output
 }
 inputs = PyOpenMagnetics.process_flyback(flyback)
-magnetics = PyOpenMagnetics.calculate_advised_magnetics(inputs, 5, "STANDARD_CORES")
+result = PyOpenMagnetics.calculate_advised_magnetics(inputs, 5, "STANDARD_CORES")
+# Result format: {"data": [{"mas": {...}, "scoring": float, "scoringPerFilter": {...}}, ...]}
 ```
 
 ### Buck Converter (Non-Isolated Step-Down)
