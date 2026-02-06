@@ -1,8 +1,8 @@
+
+#include "logging.h"
 #ifdef ERROR
 #undef ERROR
 #endif
-
-#include "logging.h"
 
 namespace PyMKF {
 
@@ -187,4 +187,3 @@ void register_logging_bindings(py::module& m) {
 }
 
 } // namespace PyMKF
-
