@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "PyOpenMagnetics"
-version = "1.1.4"
+version = "1.1.5"
 requires-python = ">=3.8"
 authors = [
   { name="Alfonso Martinez", email="Alfonso_VII@hotmail.com" },
@@ -65,4 +65,5 @@ environment = { MACOSX_DEPLOYMENT_TARGET="14.0", GIT_LFS_SKIP_SMUDGE=1, CMAKE_BU
 [tool.cibuildwheel.windows]
 before-all = "rmdir /S /Q build && npm --version && npm install -g quicktype@23.0.170"
 archs = ["AMD64"]
+
 environment = { GIT_LFS_SKIP_SMUDGE=1, CMAKE_BUILD_PARALLEL_LEVEL="2" }
