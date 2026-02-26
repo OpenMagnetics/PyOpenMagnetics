@@ -107,6 +107,8 @@ FetchContent_Declare(rapidfuzz
 FetchContent_MakeAvailable(rapidfuzz)
 
 message(STATUS "Fetching MKF")
+# Force fresh clone by using a unique timestamp - update this when MKF changes
+set(MKF_FORCE_REFRESH "2025-02-26-01")
 FetchContent_Declare(MKF
         GIT_REPOSITORY https://github.com/OpenMagnetics/MKF.git
         GIT_TAG main
@@ -116,6 +118,8 @@ FetchContent_Declare(MKF
 message(STATUS "Fetching mas")
 # Skip Git LFS to avoid bandwidth quota issues - data files are optional for build
 set(ENV{GIT_LFS_SKIP_SMUDGE} "1")
+# Force fresh clone by using a unique timestamp - update this when MAS changes
+set(MAS_FORCE_REFRESH "2025-02-26-01")
 FetchContent_Declare(
        mas
        GIT_REPOSITORY https://github.com/OpenMagnetics/MAS.git
@@ -144,6 +148,8 @@ message(STATUS "Compiling MAS")
 
 add_custom_command(
   OUTPUT "${MAS_DIRECTORY}/MAS.hpp"
+  # Force regeneration by removing output first
+  COMMAND ${CMAKE_COMMAND} -E remove -f ${MAS_DIRECTORY}/MAS.hpp
   COMMAND quicktype -l c++ -s schema ${MAS_DIR}/schemas/MAS.json 
     -S ${MAS_DIR}/schemas/magnetic.json
     -S ${MAS_DIR}/schemas/magnetic/core.json
