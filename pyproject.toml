@@ -57,7 +57,7 @@ before-all = [
   "npm --version",
   "npm install -g quicktype@23.0.170"
 ]
-environment = { GIT_LFS_SKIP_SMUDGE=1, CMAKE_BUILD_PARALLEL_LEVEL="4" }
+environment = { GIT_LFS_SKIP_SMUDGE=1, CMAKE_BUILD_PARALLEL_LEVEL="3" }
 
 [tool.cibuildwheel.macos]
 before-all = "npm --version && npm install -g quicktype@23.0.170"

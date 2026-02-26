@@ -130,15 +130,29 @@ message(STATUS "Fetching Properties mas")
 FetchContent_GetProperties(mas)
 message(STATUS "Fetching Properties MKF")
 FetchContent_GetProperties(MKF)
-message(STATUS ${MAS_POPULATED})
+message(STATUS "MAS_POPULATED: ${MAS_POPULATED}")
+message(STATUS "MKF_POPULATED: ${MKF_POPULATED}")
+
+# Always repopulate to ensure we get the latest
 if(NOT MAS_POPULATED)
-    message(STATUS "Populating MKF")
+    message(STATUS "Populating MAS")
     FetchContent_Populate(mas)
+else()
+    message(STATUS "MAS already populated at: ${mas_SOURCE_DIR}")
+    # Show git log to verify version
+    execute_process(
+        COMMAND git -C ${mas_SOURCE_DIR} log --oneline -1
+        OUTPUT_VARIABLE MAS_GIT_LOG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    message(STATUS "MAS version: ${MAS_GIT_LOG}")
 endif()
-message(STATUS ${MKF_POPULATED})
+
 if(NOT MKF_POPULATED)
     message(STATUS "Populating MKF")
     FetchContent_Populate(MKF)
+else()
+    message(STATUS "MKF already populated at: ${MKF_SOURCE_DIR}")
 endif()
 
 message(STATUS ${MAS_SOURCE_DIR})
