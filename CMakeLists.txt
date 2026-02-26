@@ -32,8 +32,8 @@ else ()
 endif()
 
 SET(MAS_DIRECTORY "${CMAKE_BINARY_DIR}/MAS/")
-SET(MAS_DIR "${CMAKE_BINARY_DIR}/_deps/mas-src/")
-SET(MKF_DIR "${CMAKE_BINARY_DIR}/_deps/mkf-src/")
+SET(MAS_DIR "${CMAKE_BINARY_DIR}/_deps/mas-src")
+SET(MKF_DIR "${CMAKE_BINARY_DIR}/_deps/mkf-src")
 SET(FETCHCONTENT_QUIET FALSE)
 
 message(STATUS MAS_DIRECTORY)
