@@ -50,6 +50,7 @@ build-verbosity = 1
 
 [tool.cibuildwheel.linux]
 before-all = [
+  "rm -rf /project/build",
   "dnf -y module reset nodejs",
   "dnf -y module enable nodejs:20",
   "dnf -y install nodejs npm",

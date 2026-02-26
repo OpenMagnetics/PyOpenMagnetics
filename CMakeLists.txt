@@ -109,7 +109,9 @@ FetchContent_MakeAvailable(rapidfuzz)
 message(STATUS "Fetching MKF")
 FetchContent_Declare(MKF
         GIT_REPOSITORY https://github.com/OpenMagnetics/MKF.git
-        GIT_TAG main)
+        GIT_TAG main
+        GIT_PROGRESS TRUE
+        GIT_SHALLOW TRUE)
 
 message(STATUS "Fetching mas")
 # Skip Git LFS to avoid bandwidth quota issues - data files are optional for build
@@ -118,7 +120,7 @@ FetchContent_Declare(
        mas
        GIT_REPOSITORY https://github.com/OpenMagnetics/MAS.git
        GIT_TAG main
-)
+       GIT_SHALLOW TRUE)
 
 message(STATUS "Fetching Properties mas")
 FetchContent_GetProperties(mas)
@@ -134,6 +136,7 @@ if(NOT MKF_POPULATED)
     message(STATUS "Populating MKF")
     FetchContent_Populate(MKF)
 endif()
+
 message(STATUS ${MAS_SOURCE_DIR})
 
 message(STATUS "Compiling MAS")
@@ -181,6 +184,10 @@ add_custom_command(
     -S ${MAS_DIR}/schemas/inputs/topologies/isolatedBuck.json
     -S ${MAS_DIR}/schemas/inputs/topologies/isolatedBuckBoost.json
     -S ${MAS_DIR}/schemas/inputs/topologies/pushPull.json
+    -S ${MAS_DIR}/schemas/inputs/topologies/dualActiveBridge.json
+    -S ${MAS_DIR}/schemas/inputs/topologies/llcResonant.json
+    -S ${MAS_DIR}/schemas/inputs/topologies/cllcResonant.json
+    -S ${MAS_DIR}/schemas/inputs/topologies/phaseShiftFullBridge.json
     -o ${MAS_DIRECTORY}/MAS.hpp --namespace MAS --source-style single-source --type-style pascal-case --member-style underscore-case --enumerator-style upper-underscore-case --no-boost
   USES_TERMINAL)
 
