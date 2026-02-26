@@ -133,19 +133,23 @@ FetchContent_GetProperties(MKF)
 message(STATUS "MAS_POPULATED: ${MAS_POPULATED}")
 message(STATUS "MKF_POPULATED: ${MKF_POPULATED}")
 
-# Always repopulate to ensure we get the latest
-if(NOT MAS_POPULATED)
-    message(STATUS "Populating MAS")
-    FetchContent_Populate(mas)
-else()
-    message(STATUS "MAS already populated at: ${mas_SOURCE_DIR}")
-    # Show git log to verify version
-    execute_process(
-        COMMAND git -C ${mas_SOURCE_DIR} log --oneline -1
-        OUTPUT_VARIABLE MAS_GIT_LOG
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    message(STATUS "MAS version: ${MAS_GIT_LOG}")
+# Always delete and repopulate MAS to ensure we get the latest
+if(EXISTS ${CMAKE_BINARY_DIR}/_deps/mas-src)
+    message(STATUS "Removing old MAS source to force fresh clone")
+    file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/_deps/mas-src)
+endif()
+message(STATUS "Populating MAS")
+FetchContent_Populate(mas)
+# Show git log to verify version
+execute_process(
+    COMMAND git -C ${mas_SOURCE_DIR} log --oneline -1
+    OUTPUT_VARIABLE MAS_GIT_LOG
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_VARIABLE MAS_GIT_ERROR
+)
+message(STATUS "MAS version: ${MAS_GIT_LOG}")
+if(MAS_GIT_ERROR)
+    message(STATUS "MAS git error: ${MAS_GIT_ERROR}")
 endif()
 
 if(NOT MKF_POPULATED)
