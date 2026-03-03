@@ -689,6 +689,55 @@ def get_default_models() -> JsonDict:
 # CONVERTER TOPOLOGY PROCESSORS
 # =============================================================================
 
+def process_converter(topology: str, converter: JsonDict, use_ngspice: bool = True) -> JsonDict:
+    """Process a converter topology specification to Inputs.
+    
+    Generic endpoint that dispatches to the appropriate topology processor.
+    
+    Args:
+        topology: Topology name ("flyback", "buck", "boost", "single_switch_forward",
+                 "two_switch_forward", "active_clamp_forward", "push_pull", "llc",
+                 "cllc", "dab", "phase_shifted_full_bridge", "phase_shifted_half_bridge",
+                 "isolated_buck", "isolated_buck_boost", "current_transformer")
+        converter: JSON object with converter specification per MAS schema
+        use_ngspice: If True, uses ngspice simulation for waveform extraction
+    
+    Returns:
+        JSON object with "designRequirements" and "operatingPoints"
+        On error, returns {"error": "..."}
+    """
+    ...
+
+def design_magnetics_from_converter(
+    topology: str,
+    converter: JsonDict,
+    max_results: int = 1,
+    core_mode: str = "AVAILABLE_CORES",
+    use_ngspice: bool = True,
+    weights: Optional[Dict[str, float]] = None
+) -> JsonDict:
+    """Design magnetic components from a converter specification.
+    
+    High-level endpoint that combines converter processing with magnetic adviser
+    to go from converter specification directly to ranked magnetic designs.
+    
+    Args:
+        topology: Topology name (see process_converter for list)
+        converter: JSON object with converter specification per MAS schema
+        max_results: Maximum number of magnetic designs to return
+        core_mode: Core selection mode - "AVAILABLE_CORES" or "STANDARD_CORES"
+        use_ngspice: If True, uses ngspice simulation for waveform extraction
+        weights: Optional filter weights (e.g., {"COST": 1.0, "LOSSES": 2.0})
+    
+    Returns:
+        JSON object with "data" array containing ranked results.
+        Each result has:
+        - "mas": Mas object with magnetic design
+        - "scoring": Overall float score
+        - "scoringPerFilter": Object with individual filter scores
+    """
+    ...
+
 def process_flyback(flyback: JsonDict) -> Inputs:
     """Process Flyback converter specification to Inputs."""
     ...

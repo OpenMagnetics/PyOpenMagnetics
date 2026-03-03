@@ -33,6 +33,7 @@
 #include "processors/Inputs.h"
 #include "processors/MagneticSimulator.h"
 #include "processors/CircuitSimulatorInterface.h"
+#include "processors/NgspiceRunner.h"
 #include "support/Painter.h"
 #include "support/Utils.h"
 
