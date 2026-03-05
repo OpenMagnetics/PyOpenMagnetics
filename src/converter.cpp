@@ -435,6 +435,7 @@ json process_converter(const std::string& topologyName, json converterJson, bool
     return process_converter_internal(topologyName, converterJson, useNgspice);
 }
 
+// Simplified design_magnetics_from_converter using MKF template method
 json design_magnetics_from_converter(
     const std::string& topologyName, 
     json converterJson, 
@@ -443,15 +444,9 @@ json design_magnetics_from_converter(
     bool useNgspice, 
     json weightsJson) {
     
+    (void)useNgspice;  // Template method always uses ngspice
+    
     try {
-        json inputsJson = process_converter_internal(topologyName, converterJson, useNgspice);
-        
-        if (inputsJson.contains("error")) {
-            return inputsJson;
-        }
-        
-        OpenMagnetics::Inputs inputs(inputsJson);
-        
         OpenMagnetics::CoreAdviser::CoreAdviserModes coreMode;
         from_json(coreModeJson, coreMode);
         
@@ -468,12 +463,90 @@ json design_magnetics_from_converter(
         magneticAdviser.set_core_mode(coreMode);
         
         std::vector<std::pair<OpenMagnetics::Mas, double>> masMagnetics;
-        if (weights.empty()) {
-            masMagnetics = magneticAdviser.get_advised_magnetic(inputs, maxResults);
-        } else {
-            masMagnetics = magneticAdviser.get_advised_magnetic(inputs, weights, maxResults);
+        
+        // Use MKF template method - handles all converters automatically
+        if (topologyName == "flyback" || topologyName == "advanced_flyback") {
+            OpenMagnetics::Flyback converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty() 
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "buck" || topologyName == "advanced_buck") {
+            OpenMagnetics::Buck converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "boost" || topologyName == "advanced_boost") {
+            OpenMagnetics::Boost converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "single_switch_forward") {
+            OpenMagnetics::SingleSwitchForward converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "two_switch_forward") {
+            OpenMagnetics::TwoSwitchForward converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "active_clamp_forward") {
+            OpenMagnetics::ActiveClampForward converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "push_pull") {
+            OpenMagnetics::PushPull converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "isolated_buck") {
+            OpenMagnetics::IsolatedBuck converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "isolated_buck_boost") {
+            OpenMagnetics::IsolatedBuckBoost converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "llc" || topologyName == "advanced_llc") {
+            OpenMagnetics::Llc converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else {
+            // Fall back to old approach for other topologies
+            json inputsJson = process_converter_internal(topologyName, converterJson, useNgspice);
+            if (inputsJson.contains("error")) return inputsJson;
+            
+            OpenMagnetics::Inputs inputs(inputsJson);
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic(inputs, maxResults)
+                : magneticAdviser.get_advised_magnetic(inputs, weights, maxResults);
         }
         
+        // Build results (same as before)
         auto scoringsPerFilter = magneticAdviser.get_scorings();
         
         json results = json();
@@ -504,7 +577,6 @@ json design_magnetics_from_converter(
         });
         
         OpenMagnetics::settings.reset();
-        
         return results;
     }
     catch (const std::exception& e) {
@@ -513,6 +585,7 @@ json design_magnetics_from_converter(
         return error;
     }
 }
+
 
 json process_flyback(json flybackJson) {
     return process_converter("flyback", flybackJson, true);
