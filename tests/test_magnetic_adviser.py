@@ -17,6 +17,19 @@ def parse_json_result(result):
     return result
 
 
+def extract_magnetics_list(result):
+    """
+    Extract list of magnetics from result.
+    
+    In version 1.1.2+, the function returns {"data": [{"mas": {...}, "scoring": ..., ...}, ...]}
+    In version 1.1.0, it returned a list directly.
+    """
+    parsed = parse_json_result(result)
+    if isinstance(parsed, dict) and "data" in parsed:
+        return parsed["data"]
+    return parsed
+
+
 class TestMagneticAdviserBasic:
     """
     Basic magnetic adviser tests.
@@ -32,7 +45,7 @@ class TestMagneticAdviserBasic:
         
         # API: calculate_advised_magnetics(inputs, max_results, core_mode)
         result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
-        results = parse_json_result(result_json)
+        results = extract_magnetics_list(result_json)
         
         assert isinstance(results, list)
         # Should return some results
@@ -45,15 +58,16 @@ class TestMagneticAdviserBasic:
         processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
         result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 3, "available cores")
-        results = parse_json_result(result_json)
+        results = extract_magnetics_list(result_json)
         
         if len(results) > 0:
             for result in results:
                 assert isinstance(result, dict)
-                # Each result should be a valid Mas with magnetic
-                # The Mas structure should contain magnetic, inputs, and optionally outputs
-                if "magnetic" in result:
-                    assert "core" in result["magnetic"] or "coil" in result["magnetic"]
+                # Each result should have "mas" containing the magnetic data (v1.1.2+ format)
+                # or "magnetic" directly (v1.1.0 format)
+                mas = result.get("mas", result)
+                if isinstance(mas, dict) and "magnetic" in mas:
+                    assert "core" in mas["magnetic"] or "coil" in mas["magnetic"]
 
 
 class TestMagneticAdviserCoreModes:
@@ -70,7 +84,7 @@ class TestMagneticAdviserCoreModes:
         processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
         result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
-        results = parse_json_result(result_json)
+        results = extract_magnetics_list(result_json)
         
         assert isinstance(results, list)
 
@@ -82,7 +96,7 @@ class TestMagneticAdviserCoreModes:
         processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
         result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "standard cores")
-        results = parse_json_result(result_json)
+        results = extract_magnetics_list(result_json)
         
         assert isinstance(results, list)
 
@@ -95,7 +109,7 @@ class TestMagneticAdviserInputTypes:
         processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
         result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
-        results = parse_json_result(result_json)
+        results = extract_magnetics_list(result_json)
         
         assert isinstance(results, list)
 
@@ -108,7 +122,7 @@ class TestMagneticAdviserInputTypes:
         processed_inputs = PyOpenMagnetics.process_inputs(transformer_inputs)
         
         result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
-        results = parse_json_result(result_json)
+        results = extract_magnetics_list(result_json)
         
         assert isinstance(results, list)
 
@@ -121,7 +135,7 @@ class TestMagneticAdviserInputTypes:
         processed_inputs = PyOpenMagnetics.process_inputs(high_frequency_inputs)
         
         result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
-        results = parse_json_result(result_json)
+        results = extract_magnetics_list(result_json)
         
         assert isinstance(results, list)
 
@@ -134,7 +148,7 @@ class TestMagneticAdviserInputTypes:
         processed_inputs = PyOpenMagnetics.process_inputs(flyback_inputs)
         
         result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
-        results = parse_json_result(result_json)
+        results = extract_magnetics_list(result_json)
         
         assert isinstance(results, list)
 
@@ -149,10 +163,10 @@ class TestMagneticAdviserFiltering:
         """
         processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
-        results_5 = parse_json_result(
+        results_5 = extract_magnetics_list(
             PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 5, "available cores")
         )
-        results_2 = parse_json_result(
+        results_2 = extract_magnetics_list(
             PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 2, "available cores")
         )
         
@@ -167,7 +181,7 @@ class TestMagneticAdviserFiltering:
         processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
         
         result_json = PyOpenMagnetics.calculate_advised_magnetics(processed_inputs, 1, "available cores")
-        results = parse_json_result(result_json)
+        results = extract_magnetics_list(result_json)
         
         assert len(results) <= 1
 

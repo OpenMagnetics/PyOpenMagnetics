@@ -32,8 +32,8 @@ else ()
 endif()
 
 SET(MAS_DIRECTORY "${CMAKE_BINARY_DIR}/MAS/")
-SET(MAS_DIR "${CMAKE_BINARY_DIR}/_deps/mas-src/")
-SET(MKF_DIR "${CMAKE_BINARY_DIR}/_deps/mkf-src/")
+SET(MAS_DIR "${CMAKE_BINARY_DIR}/_deps/mas-src")
+SET(MKF_DIR "${CMAKE_BINARY_DIR}/_deps/mkf-src")
 SET(FETCHCONTENT_QUIET FALSE)
 
 message(STATUS MAS_DIRECTORY)
@@ -107,33 +107,58 @@ FetchContent_Declare(rapidfuzz
 FetchContent_MakeAvailable(rapidfuzz)
 
 message(STATUS "Fetching MKF")
+# Force fresh clone by using a unique timestamp - update this when MKF changes
+set(MKF_FORCE_REFRESH "2025-02-26-01")
 FetchContent_Declare(MKF
         GIT_REPOSITORY https://github.com/OpenMagnetics/MKF.git
-        GIT_TAG main)
+        GIT_TAG main
+        GIT_PROGRESS TRUE
+        GIT_SHALLOW TRUE)
 
 message(STATUS "Fetching mas")
 # Skip Git LFS to avoid bandwidth quota issues - data files are optional for build
 set(ENV{GIT_LFS_SKIP_SMUDGE} "1")
+# Force fresh clone by using a unique timestamp - update this when MAS changes
+set(MAS_FORCE_REFRESH "2025-02-26-01")
 FetchContent_Declare(
        mas
        GIT_REPOSITORY https://github.com/OpenMagnetics/MAS.git
        GIT_TAG main
-)
+       GIT_SHALLOW TRUE)
 
 message(STATUS "Fetching Properties mas")
 FetchContent_GetProperties(mas)
 message(STATUS "Fetching Properties MKF")
 FetchContent_GetProperties(MKF)
-message(STATUS ${MAS_POPULATED})
-if(NOT MAS_POPULATED)
-    message(STATUS "Populating MKF")
-    FetchContent_Populate(mas)
+message(STATUS "MAS_POPULATED: ${MAS_POPULATED}")
+message(STATUS "MKF_POPULATED: ${MKF_POPULATED}")
+
+# Always delete and repopulate MAS to ensure we get the latest
+if(EXISTS ${CMAKE_BINARY_DIR}/_deps/mas-src)
+    message(STATUS "Removing old MAS source to force fresh clone")
+    file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/_deps/mas-src)
 endif()
-message(STATUS ${MKF_POPULATED})
+message(STATUS "Populating MAS")
+FetchContent_Populate(mas)
+# Show git log to verify version
+execute_process(
+    COMMAND git -C ${mas_SOURCE_DIR} log --oneline -1
+    OUTPUT_VARIABLE MAS_GIT_LOG
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_VARIABLE MAS_GIT_ERROR
+)
+message(STATUS "MAS version: ${MAS_GIT_LOG}")
+if(MAS_GIT_ERROR)
+    message(STATUS "MAS git error: ${MAS_GIT_ERROR}")
+endif()
+
 if(NOT MKF_POPULATED)
     message(STATUS "Populating MKF")
     FetchContent_Populate(MKF)
+else()
+    message(STATUS "MKF already populated at: ${MKF_SOURCE_DIR}")
 endif()
+
 message(STATUS ${MAS_SOURCE_DIR})
 
 message(STATUS "Compiling MAS")
@@ -141,6 +166,8 @@ message(STATUS "Compiling MAS")
 
 add_custom_command(
   OUTPUT "${MAS_DIRECTORY}/MAS.hpp"
+  # Force regeneration by removing output first
+  COMMAND ${CMAKE_COMMAND} -E remove -f ${MAS_DIRECTORY}/MAS.hpp
   COMMAND quicktype -l c++ -s schema ${MAS_DIR}/schemas/MAS.json 
     -S ${MAS_DIR}/schemas/magnetic.json
     -S ${MAS_DIR}/schemas/magnetic/core.json
@@ -181,6 +208,10 @@ add_custom_command(
     -S ${MAS_DIR}/schemas/inputs/topologies/isolatedBuck.json
     -S ${MAS_DIR}/schemas/inputs/topologies/isolatedBuckBoost.json
     -S ${MAS_DIR}/schemas/inputs/topologies/pushPull.json
+    -S ${MAS_DIR}/schemas/inputs/topologies/dualActiveBridge.json
+    -S ${MAS_DIR}/schemas/inputs/topologies/llcResonant.json
+    -S ${MAS_DIR}/schemas/inputs/topologies/cllcResonant.json
+    -S ${MAS_DIR}/schemas/inputs/topologies/phaseShiftFullBridge.json
     -o ${MAS_DIRECTORY}/MAS.hpp --namespace MAS --source-style single-source --type-style pascal-case --member-style underscore-case --enumerator-style upper-underscore-case --no-boost
   USES_TERMINAL)
 
@@ -229,6 +260,12 @@ include_directories("${CMAKE_BINARY_DIR}/_deps/svg-src/src")
 include_directories("${CMAKE_BINARY_DIR}/_deps/spline-src/src")
 include_directories("${CMAKE_BINARY_DIR}/_deps/json-src/include/")
 include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/")
+include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/advisers/")
+include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/constructive_models/")
+include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/converter_models/")
+include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/physical_models/")
+include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/processors/")
+include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/support/")
 include_directories("${CMAKE_BINARY_DIR}/_cmrc/include")
 include_directories("${MAS_DIRECTORY}")
 include_directories("src/")

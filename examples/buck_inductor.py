@@ -78,45 +78,128 @@ def design_buck_inductor():
 
     print(f"  Peak current: {I_peak:.1f} A")
     print(f"  Valley current: {I_valley:.1f} A")
-
-    # Design using the fluent API
-    design = (
-        Design.buck()
-        .vin(psu_spec.inputs[0].voltage.min, psu_spec.inputs[0].voltage.max)
-        .vout(Vout)
-        .iout(Iout)
-        .fsw(fsw)
-        .ripple_ratio(ripple_ratio)  # 30% current ripple
-        .prefer("efficiency")      # Optimize for lowest losses
-        .ambient_temperature(50)   # 50C ambient
-    )
-
-    # Get design recommendations
-    print(f"\nFinding optimal designs (max {DEFAULT_MAX_RESULTS})...")
-    results = design.solve(max_results=DEFAULT_MAX_RESULTS, verbose=True)
-
-    if not results:
-        print("No suitable designs found.")
-        return None
-
-    # Display results summary
-    print_results_summary(results)
-
-    # Generate visual reports
-    specs = {
-        "power_w": psu_spec.total_output_power,
-        "frequency_hz": topology.fsw_hz,
-        "topology": topology.name,
-        "inductance_uH": L * 1e6,
+    
+    # Define inputs for PyOpenMagnetics
+    inputs = {
+        "designRequirements": {
+            "magnetizingInductance": {
+                "nominal": L,
+                "minimum": L * 0.9,
+                "maximum": L * 1.1
+            }
+        },
+        "operatingPoints": [{
+            "name": "Full Load",
+            "conditions": {"ambientTemperature": 50},
+            "excitationsPerWinding": [{
+                "name": "Main",
+                "frequency": fsw,
+                # Triangular ripple current on DC bias
+                "current": {
+                    "waveform": {
+                        "data": [I_valley, I_peak, I_valley],
+                        "time": [0, D/fsw, 1/fsw]
+                    }
+                },
+                # Rectangular voltage
+                "voltage": {
+                    "waveform": {
+                        "data": [Vin - Vout, Vin - Vout, -Vout, -Vout],
+                        "time": [0, D/fsw, D/fsw, 1/fsw]
+                    }
+                }
+            }]
+        }]
     }
-    generate_example_report(
-        results,
-        "buck_inductor",
-        "Buck Inductor 33W - Design Report",
-        specs=specs
+    
+    # Process inputs
+    print("\n[1] Processing inputs...")
+    processed = PyOpenMagnetics.process_inputs(inputs)
+    
+    # Get inductor designs
+    print("\n[2] Finding suitable cores...")
+    
+    # For inductors, we want powder cores (low loss with DC bias)
+    materials = PyOpenMagnetics.get_core_material_names()
+    powder_materials = [m for m in materials if any(x in m for x in ["MPP", "High Flux", "Kool", "XFlux", "-26", "-52"])]
+    print(f"  Found {len(powder_materials)} powder core materials")
+    
+    # Get recommendations
+    weights = {
+        "EFFICIENCY": 1.0,
+        "DIMENSIONS": 0.8,
+        "COST": 0.3
+    }
+    
+    result = PyOpenMagnetics.calculate_advised_magnetics(
+        processed, 5, "STANDARD_CORES"
     )
-
-    return results
+    
+    # Extract magnetics list from result (v1.1.2+ format: {"data": [...]})
+    magnetics = result["data"] if isinstance(result, dict) and "data" in result else result
+    
+    print(f"  Found {len(magnetics)} suitable designs")
+    
+    # Analyze designs
+    print("\n[3] Analyzing designs:")
+    print("-" * 60)
+    
+    models = {
+        "coreLosses": "IGSE",
+        "reluctance": "ZHANG"
+    }
+    
+    for i, item in enumerate(magnetics[:3]):
+        # In v1.1.2+, each item has "mas" containing the magnetic data
+        mas = item.get("mas", item) if isinstance(item, dict) else item
+        if not isinstance(mas, dict) or "magnetic" not in mas:
+            continue
+            
+        magnetic = mas["magnetic"]
+        core = magnetic["core"]
+        coil = magnetic["coil"]
+        
+        shape = core["functionalDescription"]["shape"]["name"]
+        material = core["functionalDescription"]["material"]["name"]
+        
+        # Check for gapping
+        gapping = core["functionalDescription"].get("gapping", [])
+        total_gap = sum(g.get("length", 0) for g in gapping) * 1000  # mm
+        
+        # Calculate inductance to verify
+        actual_L = PyOpenMagnetics.calculate_inductance_from_number_turns_and_gapping(
+            core, coil, processed["operatingPoints"][0], models
+        )
+        
+        # Calculate losses
+        losses = PyOpenMagnetics.calculate_core_losses(core, coil, processed, models)
+        winding_losses = PyOpenMagnetics.calculate_winding_losses(
+            magnetic, processed["operatingPoints"][0], 85
+        )
+        
+        print(f"\nDesign #{i+1}: {shape} / {material}")
+        print(f"  Gap: {total_gap:.2f} mm total")
+        print(f"  Inductance: {actual_L*1e6:.2f} µH (target: {L*1e6:.2f} µH)")
+        print(f"  Core losses: {losses.get('coreLosses', 0):.3f} W")
+        print(f"  Winding losses: {winding_losses.get('windingLosses', 0):.3f} W")
+        print(f"  B_peak: {losses.get('magneticFluxDensityPeak', 0)*1000:.0f} mT")
+        
+        # Get turns
+        if "functionalDescription" in coil:
+            turns = coil["functionalDescription"][0]["numberTurns"]
+            print(f"  Turns: {turns}")
+    
+    # Saturation check
+    print("\n[4] Saturation margin:")
+    if magnetics:
+        best = magnetics[0]["magnetic"]
+        I_sat = PyOpenMagnetics.calculate_saturation_current(best, 85)
+        margin = (I_sat - I_peak) / I_peak * 100
+        print(f"  Saturation current: {I_sat:.1f} A")
+        print(f"  Margin above I_peak: {margin:.0f}%")
+    
+    print("\n" + "=" * 60)
+    return magnetics[0] if magnetics else None
 
 
 def compare_wire_options():

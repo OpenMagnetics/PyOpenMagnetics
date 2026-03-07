@@ -56,50 +56,160 @@ def design_flyback_transformer():
     print("FLYBACK TRANSFORMER DESIGN")
     print("Input: 85-265 VAC | Output: 24V @ 3A (72W)")
     print("=" * 60)
-
-    # Step 1: Define the converter using fluent API
-    design = (
-        Design.flyback()
-        .vin_ac(psu_spec.inputs[0].voltage.min, psu_spec.inputs[0].voltage.max)
-        .output(psu_spec.outputs[0].voltage.nominal, psu_spec.outputs[0].current.nominal)
-        .fsw(topology.fsw_hz)
-        .efficiency(psu_spec.efficiency)
-        .prefer("efficiency")      # Optimize for efficiency
-    )
-
-    # Step 2: Get calculated parameters
-    params = design.get_calculated_parameters()
-    print("\nCalculated Parameters:")
-    print(f"  Turns ratio (n):     {params['turns_ratio']:.2f}")
-    print(f"  Mag inductance (Lm): {params['magnetizing_inductance_uH']:.1f} uH")
-    print(f"  Duty cycle (D):      {params['duty_cycle_low_line']:.2%}")
-
-    # Step 3: Get design recommendations (50 Pareto-optimal solutions)
-    print(f"\nFinding optimal designs (max {DEFAULT_MAX_RESULTS})...")
-    results = design.solve(max_results=DEFAULT_MAX_RESULTS, verbose=True)
-
-    if not results:
-        print("No suitable designs found.")
-        return None
-
-    # Step 4: Display results summary
-    print_results_summary(results)
-
-    # Step 5: Generate visual reports (Pareto front, etc.)
-    specs = {
-        "power_w": psu_spec.total_output_power,
-        "frequency_hz": topology.fsw_hz,
-        "efficiency": psu_spec.efficiency,
-        "topology": topology.name,
+    
+    # Define design requirements
+    inputs = {
+        "designRequirements": {
+            "magnetizingInductance": {
+                "nominal": 200e-6,    # 200 µH magnetizing inductance
+                "minimum": 180e-6,
+                "maximum": 220e-6
+            },
+            "turnsRatios": [
+                {"nominal": 6.0}      # Npri/Nsec = 6:1
+            ],
+            "insulation": {
+                "insulationType": "Functional",
+                "pollutionDegree": "P2",
+                "overvoltageCategory": "OVC-II"
+            }
+        },
+        "operatingPoints": [
+            {
+                "name": "Low Line (85 VAC)",
+                "conditions": {"ambientTemperature": 40},
+                "excitationsPerWinding": [{
+                    "name": "Primary",
+                    "frequency": 100000,
+                    # Typical flyback triangular current waveform
+                    "current": {
+                        "waveform": {
+                            "data": [0.2, 1.8, 1.8, 0.2],
+                            "time": [0, 4.5e-6, 4.5e-6, 10e-6]
+                        }
+                    },
+                    # Square wave voltage during on-time
+                    "voltage": {
+                        "waveform": {
+                            "data": [120, 120, 0, 0],
+                            "time": [0, 4.5e-6, 4.5e-6, 10e-6]
+                        }
+                    }
+                }]
+            },
+            {
+                "name": "High Line (265 VAC)",
+                "conditions": {"ambientTemperature": 40},
+                "excitationsPerWinding": [{
+                    "name": "Primary",
+                    "frequency": 100000,
+                    "current": {
+                        "waveform": {
+                            "data": [0.1, 0.6, 0.6, 0.1],
+                            "time": [0, 2e-6, 2e-6, 10e-6]
+                        }
+                    },
+                    "voltage": {
+                        "waveform": {
+                            "data": [375, 375, 0, 0],
+                            "time": [0, 2e-6, 2e-6, 10e-6]
+                        }
+                    }
+                }]
+            }
+        ]
     }
-    generate_example_report(
-        results,
-        "flyback_design",
-        "Flyback Transformer 72W - Design Report",
-        specs=specs
+    
+    # Step 2: Process inputs (adds harmonics for accurate loss calculation)
+    print("\n[1] Processing inputs...")
+    processed_inputs = PyOpenMagnetics.process_inputs(inputs)
+    print("    ✓ Harmonics calculated")
+    
+    # Step 3: Get design recommendations
+    print("\n[2] Getting design recommendations...")
+    
+    weights = {
+        "EFFICIENCY": 1.0,    # Prioritize efficiency
+        "DIMENSIONS": 0.5,    # Secondary: small size
+        "COST": 0.3           # Tertiary: low cost
+    }
+    
+    result = PyOpenMagnetics.calculate_advised_magnetics(
+        processed_inputs, 3, "STANDARD_CORES"
     )
-
-    return results
+    
+    # Extract magnetics list from result (v1.1.2+ format: {"data": [...]})
+    # Note: If there's an error, data will be a string containing the exception message
+    data = result.get("data", result) if isinstance(result, dict) else result
+    if isinstance(data, str):
+        print(f"    ✗ Error: {data}")
+        return None
+    magnetics = data
+    
+    print(f"    ✓ Found {len(magnetics)} suitable designs")
+    
+    # Step 4: Analyze top recommendations
+    print("\n[3] Analyzing top designs:")
+    print("-" * 60)
+    
+    models = {
+        "coreLosses": "IGSE",
+        "reluctance": "ZHANG",
+        "coreTemperature": "MANIKTALA"
+    }
+    
+    for i, item in enumerate(magnetics):
+        # In v1.1.2+, each item has "mas" containing the magnetic data
+        mas = item.get("mas", item) if isinstance(item, dict) else item
+        if not isinstance(mas, dict) or "magnetic" not in mas:
+            continue
+            
+        magnetic = mas["magnetic"]
+        core = magnetic["core"]
+        coil = magnetic["coil"]
+        
+        # Get core info
+        shape_name = core["functionalDescription"]["shape"]["name"]
+        material_name = core["functionalDescription"]["material"]["name"]
+        
+        # Calculate losses for worst-case (low line)
+        losses = PyOpenMagnetics.calculate_core_losses(
+            core, coil, processed_inputs, models
+        )
+        
+        # Calculate winding losses
+        winding_losses = PyOpenMagnetics.calculate_winding_losses(
+            magnetic, 
+            processed_inputs["operatingPoints"][0],  # Low line
+            temperature=80  # Estimated operating temperature
+        )
+        
+        core_loss = losses.get("coreLosses", 0)
+        winding_loss = winding_losses.get("windingLosses", 0)
+        total_loss = core_loss + winding_loss
+        
+        print(f"\nDesign #{i+1}: {shape_name} / {material_name}")
+        # Show scoring if available (v1.1.2+)
+        if 'scoring' in item:
+            print(f"  Score:          {item['scoring']:.3f}")
+        print(f"  Core losses:    {core_loss:.3f} W")
+        print(f"  Winding losses: {winding_loss:.3f} W")
+        print(f"  Total losses:   {total_loss:.3f} W")
+        print(f"  B_peak:         {losses.get('magneticFluxDensityPeak', 0)*1000:.1f} mT")
+        
+        # Get winding info
+        if "functionalDescription" in coil:
+            for winding in coil["functionalDescription"]:
+                print(f"  {winding['name']}: {winding['numberTurns']} turns")
+    
+    print("\n" + "=" * 60)
+    print("Design complete! Best design is #1")
+    
+    # Return the first item's mas for backward compatibility
+    if magnetics:
+        first_item = magnetics[0]
+        return first_item.get("mas", first_item) if isinstance(first_item, dict) else first_item
+    return None
 
 
 def explore_core_database():

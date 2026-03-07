@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "PyOpenMagnetics"
-version = "1.1.1"
+version = "1.2.2"
 requires-python = ">=3.8"
 authors = [
   { name="Alfonso Martinez", email="Alfonso_VII@hotmail.com" },
@@ -50,17 +50,21 @@ build-verbosity = 1
 
 [tool.cibuildwheel.linux]
 before-all = [
+  "rm -rf /project/build /root/.cmake",
   "dnf -y module reset nodejs",
   "dnf -y module enable nodejs:20",
   "dnf -y install nodejs npm",
   "npm --version",
   "npm install -g quicktype@23.0.170"
 ]
+environment = { GIT_LFS_SKIP_SMUDGE=1, CMAKE_BUILD_PARALLEL_LEVEL="3" }
 
 [tool.cibuildwheel.macos]
 before-all = "npm --version && npm install -g quicktype@23.0.170"
-environment = { MACOSX_DEPLOYMENT_TARGET="14.0", GIT_LFS_SKIP_SMUDGE=1 }
+environment = { MACOSX_DEPLOYMENT_TARGET="14.0", GIT_LFS_SKIP_SMUDGE=1, CMAKE_BUILD_PARALLEL_LEVEL="3" }
 
 [tool.cibuildwheel.windows]
 before-all = "rmdir /S /Q build && npm --version && npm install -g quicktype@23.0.170"
 archs = ["AMD64"]
+
+environment = { GIT_LFS_SKIP_SMUDGE=1, CMAKE_BUILD_PARALLEL_LEVEL="2" }

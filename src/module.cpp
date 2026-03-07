@@ -62,11 +62,13 @@
 #include "bobbin.h"
 #include "winding.h"
 #include "advisers.h"
+#include "converter.h"
 #include "losses.h"
 #include "simulation.h"
 #include "plotting.h"
 #include "settings.h"
 #include "utils.h"
+#include "logging.h"
 
 /**
  * @brief PyOpenMagnetics Python module definition
@@ -101,16 +103,18 @@ PYBIND11_MODULE(PyOpenMagnetics, m) {
         IMPORTANT: Always call process_inputs() before using adviser functions!
     )pbdoc";
 
-    // Register all module bindings in dependency order
-    PyMKF::register_database_bindings(m);   // Database loading (no deps)
-    PyMKF::register_core_bindings(m);       // Core materials & shapes
-    PyMKF::register_wire_bindings(m);       // Wire database
-    PyMKF::register_bobbin_bindings(m);     // Bobbin management
-    PyMKF::register_winding_bindings(m);    // Coil winding engine
-    PyMKF::register_adviser_bindings(m);    // Design recommendation
-    PyMKF::register_losses_bindings(m);     // Loss calculations
-    PyMKF::register_simulation_bindings(m); // Full EM simulation
-    PyMKF::register_plotting_bindings(m);   // SVG visualization
-    PyMKF::register_settings_bindings(m);   // Configuration
-    PyMKF::register_utils_bindings(m);      // Utility functions
+    // Register all module bindings
+    PyMKF::register_database_bindings(m);
+    PyMKF::register_core_bindings(m);
+    PyMKF::register_wire_bindings(m);
+    PyMKF::register_bobbin_bindings(m);
+    PyMKF::register_winding_bindings(m);
+    PyMKF::register_adviser_bindings(m);
+    PyMKF::register_converter_bindings(m);
+    PyMKF::register_losses_bindings(m);
+    PyMKF::register_simulation_bindings(m);
+    PyMKF::register_plotting_bindings(m);
+    PyMKF::register_settings_bindings(m);
+    PyMKF::register_utils_bindings(m);
+    PyMKF::register_logging_bindings(m);
 }
