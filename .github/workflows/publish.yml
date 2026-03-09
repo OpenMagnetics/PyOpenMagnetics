@@ -50,7 +50,7 @@ jobs:
           # Install Node.js 18 and quicktype in the build container (Linux)
           # Also install gcc-toolset-13 for C++23 support
           CIBW_BEFORE_ALL_LINUX: |
-            dnf install -y gcc-toolset-13 && \
+            dnf install -y gcc-toolset-13 eigen3-devel && \
             source /opt/rh/gcc-toolset-13/enable && \
             curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && \
             dnf install -y nodejs && \
