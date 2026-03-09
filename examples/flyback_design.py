@@ -2,32 +2,59 @@
 PyOpenMagnetics Examples - Flyback Transformer Design
 
 This example demonstrates a complete flyback transformer design workflow:
-1. Define converter specifications
-2. Get design recommendations
+1. Define converter specifications using the fluent API
+2. Get design recommendations (50 Pareto-optimal solutions)
 3. Analyze losses and performance
-4. Visualize the result
+4. Generate visual reports
 
 For more examples, see llms.txt in the PyOpenMagnetics directory.
 """
 
-import PyOpenMagnetics
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from api.design import Design
+from api.models import (
+    VoltageSpec, CurrentSpec, FlybackTopology, PowerSupplySpec, PortSpec
+)
+from examples.common import (
+    DEFAULT_MAX_RESULTS, generate_example_report, print_results_summary
+)
+
+# Define specifications using datamodels
+psu_spec = PowerSupplySpec(
+    name="Flyback Transformer 72W",
+    inputs=[PortSpec(
+        name="AC Input",
+        voltage=VoltageSpec.ac(230, v_min_rms=85, v_max_rms=265),
+        current=CurrentSpec.dc(0.6)
+    )],
+    outputs=[PortSpec(
+        name="DC Output",
+        voltage=VoltageSpec.dc(24, tolerance_pct=5),
+        current=CurrentSpec.dc(3)
+    )],
+    efficiency=0.85,
+    isolation_v=3000
+)
+
+topology = FlybackTopology(fsw_hz=100e3, max_duty=0.45)
 
 
 def design_flyback_transformer():
     """
     Design a flyback transformer for a 24V/3A output from universal AC input.
-    
+
     Specifications:
     - Input: 85-265 VAC (rectified to ~120-375 VDC)
     - Output: 24V @ 3A (72W)
     - Switching frequency: 100 kHz
     - Efficiency target: 85%
     """
-    
-    # Step 1: Define the converter operating conditions
     print("=" * 60)
     print("FLYBACK TRANSFORMER DESIGN")
-    print("Output: 24V @ 3A (72W)")
+    print("Input: 85-265 VAC | Output: 24V @ 3A (72W)")
     print("=" * 60)
     
     # Define design requirements
@@ -187,57 +214,59 @@ def design_flyback_transformer():
 
 def explore_core_database():
     """Demonstrate database access functions."""
-    
+    import PyOpenMagnetics
+
     print("\n" + "=" * 60)
     print("CORE DATABASE EXPLORATION")
     print("=" * 60)
-    
+
     # Get available shape families
     families = PyOpenMagnetics.get_core_shape_families()
     print(f"\nShape families: {', '.join(families[:10])}...")
-    
+
     # Get materials by manufacturer
     ferroxcube = PyOpenMagnetics.get_core_material_names_by_manufacturer("Ferroxcube")
     print(f"Ferroxcube materials: {', '.join(ferroxcube[:5])}...")
-    
+
     tdk = PyOpenMagnetics.get_core_material_names_by_manufacturer("TDK")
     print(f"TDK materials: {', '.join(tdk[:5])}...")
-    
+
     # Get material properties
-    print("\n3C95 Properties at 25°C:")
+    print("\n3C95 Properties at 25C:")
     mu = PyOpenMagnetics.get_material_permeability("3C95", 25, 0, 100000)
     print(f"  Permeability (100 kHz): {mu:.0f}")
-    
+
     rho = PyOpenMagnetics.get_material_resistivity("3C95", 25)
-    print(f"  Resistivity: {rho:.2f} Ω·m")
-    
+    print(f"  Resistivity: {rho:.2f} Ohm*m")
+
     material = PyOpenMagnetics.find_core_material_by_name("3C95")
     steinmetz = PyOpenMagnetics.get_core_material_steinmetz_coefficients(material, 100000)
-    print(f"  Steinmetz k={steinmetz['k']:.2e}, α={steinmetz['alpha']:.2f}, β={steinmetz['beta']:.2f}")
+    print(f"  Steinmetz k={steinmetz['k']:.2e}, a={steinmetz['alpha']:.2f}, b={steinmetz['beta']:.2f}")
 
 
 def wire_selection_example():
     """Demonstrate wire selection and loss calculation."""
-    
+    import PyOpenMagnetics
+
     print("\n" + "=" * 60)
     print("WIRE SELECTION")
     print("=" * 60)
-    
+
     # Find available wire types
     wire_types = PyOpenMagnetics.get_available_wire_types()
     print(f"\nAvailable wire types: {wire_types}")
-    
+
     # Find wire by dimension
     round_wire = PyOpenMagnetics.find_wire_by_dimension(0.0005, "round", "IEC 60317")
     print(f"\n0.5mm round wire: {round_wire.get('name', 'N/A')}")
-    
+
     # Calculate DC resistance
     R_dc = PyOpenMagnetics.calculate_dc_resistance_per_meter(round_wire, 25)
-    print(f"  DC resistance: {R_dc*1000:.2f} mΩ/m at 25°C")
-    
+    print(f"  DC resistance: {R_dc*1000:.2f} mOhm/m at 25C")
+
     R_dc_hot = PyOpenMagnetics.calculate_dc_resistance_per_meter(round_wire, 100)
-    print(f"  DC resistance: {R_dc_hot*1000:.2f} mΩ/m at 100°C")
-    
+    print(f"  DC resistance: {R_dc_hot*1000:.2f} mOhm/m at 100C")
+
     # Litz wire for high frequency
     print("\nFor high-frequency applications, consider litz wire:")
     litz_wires = [w for w in PyOpenMagnetics.get_wire_names() if "litz" in w.lower()]
@@ -246,12 +275,16 @@ def wire_selection_example():
 
 if __name__ == "__main__":
     # Run the flyback design example
-    best_design = design_flyback_transformer()
-    
+    results = design_flyback_transformer()
+
+    if results:
+        best = results[0]
+        print(f"\nRecommended: {best.core} with {best.material}")
+
     # Explore the database
     explore_core_database()
-    
+
     # Wire selection
     wire_selection_example()
-    
-    print("\n✓ All examples completed successfully!")
+
+    print("\n[OK] All examples completed successfully!")

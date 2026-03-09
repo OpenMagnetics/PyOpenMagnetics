@@ -1,0 +1,42 @@
+site_name: PyOpenMagnetics
+site_description: Python library for magnetic component design
+repo_url: https://github.com/OpenMagnetics/PyMKF
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: installation.md
+    - Introduction: intro.md
+  - Examples: examples.md
+  - Contributing: contributing.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - tables
+  - attr_list
+  - md_in_html
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/OpenMagnetics/PyMKF

@@ -311,3 +311,125 @@ def reset_settings():
     PyOpenMagnetics.reset_settings()
     yield
     PyOpenMagnetics.reset_settings()
+
+
+# ============================================================================
+# Processed Inputs Fixtures
+# ============================================================================
+
+@pytest.fixture
+def processed_inductor_inputs(inductor_inputs):
+    """Processed inductor inputs with harmonics data added."""
+    return PyOpenMagnetics.process_inputs(inductor_inputs)
+
+
+@pytest.fixture
+def simple_magnetic(computed_core, wound_inductor_coil):
+    """Simple magnetic assembly with core and coil."""
+    return {
+        "core": computed_core,
+        "coil": wound_inductor_coil
+    }
+
+
+# ============================================================================
+# Wire Test Fixtures
+# ============================================================================
+
+@pytest.fixture
+def sample_round_wire():
+    """Sample round wire for testing."""
+    return PyOpenMagnetics.find_wire_by_name("Round 0.5 - Grade 1")
+
+
+@pytest.fixture
+def current_excitation_with_harmonics():
+    """Current excitation with harmonics data for loss calculations."""
+    return {
+        "frequency": 100000,
+        "current": {
+            "processed": {
+                "dutyCycle": 0.5,
+                "label": "Triangular",
+                "offset": 0,
+                "peakToPeak": 10,
+                "rms": 2.89,
+                "effectiveFrequency": 100000
+            },
+            "harmonics": {
+                "amplitudes": [0, 4.05, 0, 0.45, 0, 0.16],
+                "frequencies": [0, 100000, 200000, 300000, 400000, 500000]
+            }
+        }
+    }
+
+
+# ============================================================================
+# Bobbin Test Fixtures
+# ============================================================================
+
+@pytest.fixture
+def computed_core(sample_core_data):
+    """Computed core data from sample ETD 49 core."""
+    return PyOpenMagnetics.calculate_core_data(sample_core_data, False)
+
+
+@pytest.fixture
+def basic_bobbin(computed_core):
+    """Basic bobbin created from computed core."""
+    return PyOpenMagnetics.create_basic_bobbin(computed_core, 0.001)
+
+
+@pytest.fixture
+def inductor_coil(basic_bobbin):
+    """Inductor coil data (before winding) with 20 turns."""
+    return {
+        "bobbin": basic_bobbin,
+        "functionalDescription": [
+            {
+                "name": "Primary",
+                "numberTurns": 20,
+                "numberParallels": 1,
+                "isolationSide": "primary",
+                "wire": "Round 0.5 - Grade 1"
+            }
+        ]
+    }
+
+
+@pytest.fixture
+def transformer_coil(basic_bobbin):
+    """Transformer coil data (before winding) with primary and secondary."""
+    return {
+        "bobbin": basic_bobbin,
+        "functionalDescription": [
+            {
+                "name": "Primary",
+                "numberTurns": 20,
+                "numberParallels": 1,
+                "isolationSide": "primary",
+                "wire": "Round 0.5 - Grade 1"
+            },
+            {
+                "name": "Secondary",
+                "numberTurns": 40,
+                "numberParallels": 1,
+                "isolationSide": "secondary",
+                "wire": "Round 0.3 - Grade 1"
+            }
+        ]
+    }
+
+
+@pytest.fixture
+def wound_inductor_coil(inductor_coil):
+    """A wound inductor coil with 20 turns."""
+    # wind(coil_json, repetitions, proportion_per_winding, pattern, margin_pairs)
+    return PyOpenMagnetics.wind(inductor_coil, 1, [1.0], [0], [])
+
+
+@pytest.fixture
+def wound_transformer_coil(transformer_coil):
+    """A wound transformer coil with primary and secondary."""
+    # wind(coil_json, repetitions, proportion_per_winding, pattern, margin_pairs)
+    return PyOpenMagnetics.wind(transformer_coil, 1, [0.5, 0.5], [0, 1], [])

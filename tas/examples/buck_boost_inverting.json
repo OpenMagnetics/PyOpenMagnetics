@@ -1,0 +1,95 @@
+{
+  "metadata": {
+    "name": "Buck-Boost Inverting 12V to -5V @ 0.5A",
+    "version": "0.1.0",
+    "description": "Inverting buck-boost converter for negative rail generation",
+    "author": "TAS Generator"
+  },
+  "inputs": {
+    "requirements": {
+      "v_in_min": 10.0,
+      "v_in_max": 14.0,
+      "v_out": -5.0,
+      "i_out_max": 0.5,
+      "efficiency_target": 0.85
+    },
+    "operating_points": [
+      {
+        "name": "full_load",
+        "frequency": 250000,
+        "duty_cycle": 0.294,
+        "mode": "ccm",
+        "ambient_temperature": 25.0,
+        "modulation": {
+          "type": "pwm",
+          "control_mode": "voltage_mode",
+          "frequency_fixed": true,
+          "max_duty": 0.8
+        },
+        "waveforms": {
+          "inductor_current": {
+            "data": [0.35, 0.65, 0.35],
+            "time": [0.0, 1.176e-6, 4.0e-6],
+            "shape": "triangular",
+            "unit": "A"
+          }
+        }
+      }
+    ]
+  },
+  "components": {
+    "inductors": [
+      {
+        "name": "L1",
+        "type": "inductor",
+        "inductance": 100e-6,
+        "dcr": 0.05,
+        "saturation_current": 2.0,
+        "description": "Main inductor"
+      }
+    ],
+    "capacitors": [
+      {
+        "name": "C_out",
+        "type": "capacitor",
+        "capacitance": 22e-6,
+        "esr": 0.03,
+        "voltage_rating": 10.0,
+        "description": "Output capacitor"
+      }
+    ],
+    "switches": [
+      {
+        "name": "Q1",
+        "type": "switch",
+        "rds_on": 0.03,
+        "v_ds_max": 25.0,
+        "i_d_max": 3.0,
+        "description": "Main switch"
+      }
+    ],
+    "diodes": [
+      {
+        "name": "D1",
+        "type": "diode",
+        "vf": 0.5,
+        "v_rrm": 25.0,
+        "description": "Output diode"
+      }
+    ]
+  },
+  "outputs": {
+    "losses": {
+      "core_loss": 0.03,
+      "winding_loss": 0.05,
+      "switch_conduction": 0.04,
+      "switch_switching": 0.08,
+      "diode_conduction": 0.15,
+      "capacitor_esr": 0.01,
+      "total": 0.36
+    },
+    "kpis": {
+      "efficiency": 0.874
+    }
+  }
+}
