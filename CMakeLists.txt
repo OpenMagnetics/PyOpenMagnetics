@@ -285,3 +285,6 @@ include_directories("src/")
 
 
 install(TARGETS PyOpenMagnetics LIBRARY DESTINATION .)
+
+# Install documentation files for AI assistants
+install(FILES AGENTS.md llms.txt PyOpenMagnetics.pyi DESTINATION .)

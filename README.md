@@ -3,6 +3,15 @@
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+> **🤖 For AI Assistants:** If you're an AI assistant helping with this library, please read [**AGENTS.md**](AGENTS.md) **FIRST** before continuing with this README. It contains essential information about:
+> - Correct import procedures (this package requires special handling)
+> - **⚠️ Using API methods instead of manual calculations (CRITICAL)**
+> - Required field specifications for converter topologies
+> - Troubleshooting common API errors
+> - Complete working examples
+>
+> **⚠️ AVOID MANUAL MODE:** Always use `process_flyback()`, `calculate_advised_magnetics()`, and other API methods rather than doing manual calculations. The MKF engine handles complex magnetic effects that manual calculations cannot.
+
 **PyOpenMagnetics** is a Python wrapper for [MKF (Magnetics Knowledge Foundation)](https://github.com/OpenMagnetics/MKF), the simulation engine of [OpenMagnetics](https://github.com/OpenMagnetics), providing a comprehensive toolkit for designing and analyzing magnetic components such as transformers and inductors.
 
 ## Features
@@ -30,6 +39,29 @@ git clone https://github.com/OpenMagnetics/PyOpenMagnetics.git
 cd PyOpenMagnetics
 pip install .
 ```
+
+### ⚠️ Import Instructions
+
+**Important:** The compiled extension module may require special import handling:
+
+```python
+import importlib.util
+
+# Option 1: Direct loading (recommended)
+so_path = '/path/to/PyOpenMagnetics.cpython-311-x86_64-linux-gnu.so'
+spec = importlib.util.spec_from_file_location('PyOpenMagnetics', so_path)
+PyOpenMagnetics = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(PyOpenMagnetics)
+
+# Option 2: Create __init__.py (see AGENTS.md for details)
+
+# Verify installation
+PyOpenMagnetics.load_databases({})
+print(f"✓ Loaded {len(PyOpenMagnetics.get_core_materials())} materials")
+print(f"✓ Loaded {len(PyOpenMagnetics.get_core_shapes())} shapes")
+```
+
+See [AGENTS.md](AGENTS.md) for complete import instructions and troubleshooting.
 
 ## Quick Start
 

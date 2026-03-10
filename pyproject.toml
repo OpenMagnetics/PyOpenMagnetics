@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "PyOpenMagnetics"
-version = "1.2.2"
+version = "1.3.0"
 requires-python = ">=3.8"
 authors = [
   { name="Alfonso Martinez", email="Alfonso_VII@hotmail.com" },
@@ -29,6 +29,11 @@ Contact = "https://www.linkedin.com/in/alfonso-martinez-de-la-torre/"
 build-dir = "build/{wheel_tag}"
 cmake.verbose = true
 sdist.exclude = [".venv*", ".venv*/**", "build", "build/**", "dist", "dist/**", "*.egg-info", "__pycache__", "*.pyc"]
+# Include additional files in the wheel
+wheel.packages = ["."]
+wheel.install-dir = "PyOpenMagnetics"
+# Ensure AGENTS.md and llms.txt are included in sdist and wheel
+sdist.include = ["AGENTS.md", "llms.txt", "PyOpenMagnetics.pyi"]
 
 [[tool.scikit-build.overrides]]
 if.platform-system = "^linux"
