@@ -22,6 +22,17 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Cache cibuildwheel
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/cibuildwheel
+            ~/Library/Caches/cibuildwheel
+            C:\Users\runner\AppData\Local\cibuildwheel
+          key: cibuildwheel-${{ runner.os }}-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            cibuildwheel-${{ runner.os }}-
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
