@@ -106,6 +106,15 @@ FetchContent_Declare(rapidfuzz
   GIT_TAG main)
 FetchContent_MakeAvailable(rapidfuzz)
 
+message(STATUS "Fetching Eigen")
+FetchContent_Declare(eigen
+  GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+  GIT_TAG 3.4.0
+  GIT_PROGRESS TRUE
+  GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(eigen)
+include_directories("${CMAKE_BINARY_DIR}/_deps/eigen-src")
+
 message(STATUS "Fetching MKF")
 # Force fresh clone by using a unique timestamp - update this when MKF changes
 set(MKF_FORCE_REFRESH "2025-02-26-01")
@@ -266,6 +275,7 @@ include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/converter_models/")
 include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/physical_models/")
 include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/processors/")
 include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/support/")
+include_directories("${CMAKE_BINARY_DIR}/_deps/eigen-src")
 include_directories("${CMAKE_BINARY_DIR}/_cmrc/include")
 include_directories("${MAS_DIRECTORY}")
 include_directories("src/")
