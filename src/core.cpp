@@ -491,7 +491,17 @@ double calculate_saturation_current(json magneticJson, double temperature) {
 
 double calculate_temperature_from_core_thermal_resistance(json coreJson, double totalLosses) {
     OpenMagnetics::Core core(coreJson);
-    return OpenMagnetics::Temperature::calculate_temperature_from_core_thermal_resistance(core, totalLosses);
+    
+    // Use the Maniktala model to calculate thermal resistance
+    OpenMagnetics::CoreThermalResistanceManiktalaModel thermalModel;
+    double thermalResistance = thermalModel.get_core_thermal_resistance_reluctance(core);
+    
+    // Calculate temperature rise: ΔT = P * R_th
+    // Assuming ambient temperature of 25°C
+    double ambientTemperature = 25.0;
+    double temperatureRise = totalLosses * thermalResistance;
+    
+    return ambientTemperature + temperatureRise;
 }
 
 void register_core_bindings(py::module& m) {

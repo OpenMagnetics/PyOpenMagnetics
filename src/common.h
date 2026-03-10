@@ -20,6 +20,7 @@
 #include "physical_models/MagneticEnergy.h"
 #include "physical_models/Reluctance.h"
 #include "physical_models/Temperature.h"
+#include "physical_models/ThermalResistance.h"
 #include "physical_models/MagnetizingInductance.h"
 #include "physical_models/CoreLosses.h"
 #include "physical_models/Resistivity.h"

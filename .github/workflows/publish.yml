@@ -35,10 +35,18 @@ jobs:
           path: |
             ~/.cache/cibuildwheel
             ~/Library/Caches/cibuildwheel
-            C:\Users\runner\AppData\Local\cibuildwheel
+            C:\Users\runneradmin\AppData\Local\pypa\cibuildwheel\Cache
           key: cibuildwheel-${{ runner.os }}-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             cibuildwheel-${{ runner.os }}-
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -56,13 +64,45 @@ jobs:
           for i in {1..5}; do
             npm install -g quicktype && break
             if [ $i -lt 5 ]; then
-              echo "Retry $i failed, waiting 30s..."
-              sleep 30
+              echo "Retry $i failed, waiting 60s..."
+              sleep 60
             fi
           done
 
       - name: Install cibuildwheel
         run: python -m pip install cibuildwheel==2.21.3
+
+      - name: Pre-download virtualenv
+        shell: bash
+        run: |
+          # Create cache directory
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            CACHE_DIR="$LOCALAPPDATA/pypa/cibuildwheel/Cache"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            CACHE_DIR="$HOME/Library/Caches/cibuildwheel"
+          else
+            CACHE_DIR="$HOME/.cache/cibuildwheel"
+          fi
+          mkdir -p "$CACHE_DIR"
+          
+          # Download virtualenv.pyz with retry
+          VENV_VERSION="20.26.6"
+          VENV_FILE="$CACHE_DIR/virtualenv-$VENV_VERSION.pyz"
+          VENV_URL="https://github.com/pypa/get-virtualenv/blob/$VENV_VERSION/public/virtualenv.pyz?raw=true"
+          
+          if [[ ! -f "$VENV_FILE" ]]; then
+            echo "Downloading virtualenv.pyz..."
+            for i in {1..10}; do
+              if curl -fsSL --max-time 30 "$VENV_URL" -o "$VENV_FILE"; then
+                echo "Downloaded successfully"
+                break
+              fi
+              echo "Download attempt $i failed, waiting 60s..."
+              sleep 60
+            done
+          else
+            echo "virtualenv.pyz already cached"
+          fi
 
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
@@ -87,9 +127,9 @@ jobs:
           CIBW_BEFORE_ALL_MACOS: |
             for i in {1..5}; do
               npm install -g quicktype && break
-              if [ $i -lt 5 ]; then sleep 30; fi
+              if [ $i -lt 5 ]; then sleep 60; fi
             done
-          CIBW_BEFORE_ALL_WINDOWS: choco install nodejs -y --timeout=60000 && npm install -g quicktype
+          CIBW_BEFORE_ALL_WINDOWS: npm install -g quicktype
           # Set macOS deployment target to 15.0 for arm64 (Homebrew libraries require it)
           CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=15.0
           # Enable gcc-toolset-13 before build for C++23
@@ -112,6 +152,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -128,8 +176,8 @@ jobs:
           for i in {1..5}; do
             npm install -g quicktype && break
             if [ $i -lt 5 ]; then
-              echo "Retry $i failed, waiting 30s..."
-              sleep 30
+              echo "Retry $i failed, waiting 60s..."
+              sleep 60
             fi
           done
 
