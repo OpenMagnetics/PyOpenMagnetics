@@ -22,13 +22,18 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 else ()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-deprecated-declarations -Wno-unused-parameter -Wno-switch")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
     # set(CMAKE_BUILD_TYPE RelWithDebInfo)
     # set(CMAKE_BUILD_TYPE MinSizeRel)
     set(CMAKE_BUILD_TYPE Release)
+    
+    # Enable Link Time Optimization to reduce binary size
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    
+    # Strip symbols and use size optimization
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s -Os")
+    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -Wl,--strip-all")
 endif()
 
 SET(MAS_DIRECTORY "${CMAKE_BINARY_DIR}/MAS/")
@@ -91,16 +96,6 @@ FetchContent_Declare(magic-enum
 FetchContent_MakeAvailable(magic-enum)
 include_directories("${CMAKE_BINARY_DIR}/_deps/magic-enum-src/include/magic_enum")
 
-message(STATUS "Fetching matplotplusplus")
-FetchContent_Declare(matplotplusplus
-    GIT_REPOSITORY https://github.com/alandefreitas/matplotplusplus.git
-    GIT_TAG tags/v1.2.1)
-FetchContent_GetProperties(matplotplusplus)
-if(NOT matplotplusplus_POPULATED)
-    FetchContent_Populate(matplotplusplus)
-    add_subdirectory(${matplotplusplus_SOURCE_DIR} ${matplotplusplus_BINARY_DIR} EXCLUDE_FROM_ALL)
-endif()
-
 FetchContent_Declare(rapidfuzz
   GIT_REPOSITORY https://github.com/rapidfuzz/rapidfuzz-cpp.git
   GIT_TAG main)
@@ -118,6 +113,8 @@ include_directories("${CMAKE_BINARY_DIR}/_deps/eigen-src")
 message(STATUS "Fetching MKF")
 # Force fresh clone by using a unique timestamp - update this when MKF changes
 set(MKF_FORCE_REFRESH "2025-02-26-01")
+# Tell MKF to disable matplotplusplus and use SVG-based Painter instead
+set(INCLUDE_PYMKF ON CACHE BOOL "Build Python interface" FORCE)
 FetchContent_Declare(MKF
         GIT_REPOSITORY https://github.com/OpenMagnetics/MKF.git
         GIT_TAG main
@@ -244,7 +241,7 @@ pybind11_add_module(PyOpenMagnetics ${SOURCES})
 
 add_dependencies(PyOpenMagnetics PyMASGeneration)
 
-target_link_libraries(PyOpenMagnetics PUBLIC nlohmann_json::nlohmann_json matplot levmar rapidfuzz::rapidfuzz)
+target_link_libraries(PyOpenMagnetics PUBLIC nlohmann_json::nlohmann_json levmar rapidfuzz::rapidfuzz)
 
 file(DOWNLOAD "https://raw.githubusercontent.com/vector-of-bool/cmrc/master/CMakeRC.cmake"
                  "${CMAKE_BINARY_DIR}/CMakeRC.cmake")
@@ -256,9 +253,17 @@ cmrc_add_resource_library(insulation_standards ALIAS data::insulation_standards 
 target_link_libraries(PyOpenMagnetics PUBLIC data::insulation_standards)
 
 
-cmrc_add_resource_library(data ALIAS data::data NAMESPACE data WHENCE ${MAS_DIR} PREFIX MAS ${MAS_DIR}/data/core_materials.ndjson ${MAS_DIR}/data/core_shapes.ndjson ${MAS_DIR}/data/cores.ndjson ${MAS_DIR}/data/bobbins.ndjson ${MAS_DIR}/data/insulation_materials.ndjson ${MAS_DIR}/data/wire_materials.ndjson ${MAS_DIR}/data/wires.ndjson)
+# Only embed essential data files to reduce binary size
+# Skip large optional datasets like cores_stock.ndjson
+cmrc_add_resource_library(data ALIAS data::data NAMESPACE data WHENCE ${MAS_DIR} PREFIX MAS 
+    ${MAS_DIR}/data/core_materials.ndjson 
+    ${MAS_DIR}/data/core_shapes.ndjson 
+    ${MAS_DIR}/data/cores.ndjson 
+    ${MAS_DIR}/data/bobbins.ndjson 
+    ${MAS_DIR}/data/insulation_materials.ndjson 
+    ${MAS_DIR}/data/wire_materials.ndjson 
+    ${MAS_DIR}/data/wires.ndjson)
 target_link_libraries(PyOpenMagnetics PUBLIC data::data)
-
 
 include_directories("${CMAKE_BINARY_DIR}/_deps/json-src/include/nlohmann/")
 include_directories("${CMAKE_BINARY_DIR}/_deps/pybind11-src/include/")

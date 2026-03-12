@@ -10,7 +10,24 @@
 > When this document contradicts the `.pyi` stubs or bundled examples,
 > **trust this document**.
 
+
 ---
+
+## 🚨 STOP! READ THIS FIRST — COMMON AGENT MISTAKES
+
+**Before writing ANY code, check these three things:**
+
+1. **NEVER use `json.dumps()`** — Pass Python dicts directly to all functions.
+   `json.dumps()` converts your dict to a string, causing schema errors.
+
+2. **NEVER invent your own JSON structure** — Copy the EXACT schemas from Section 5.
+   Fields like `"inputs"`, `"outputs"`, `"voltage"` are WRONG. Use `"inputVoltage"`, `"operatingPoints"`, etc.
+
+3. **NEVER abandon Method A after an error** — If you get `"Input JSON does not conform to schema!"`,
+   the fix is to correct your JSON, NOT to fall back to manual calculations.
+
+**See Section 13.1 for wrong vs correct code examples.**
+
 
 ## â›” THE #1 RULE â€” DO NOT USE MANUAL CALCULATIONS
 
@@ -25,6 +42,33 @@ When a user asks you to design a magnetic component for a power converter:
 The MKF engine handles complex magnetic field distributions, temperature-dependent
 material properties, geometrical fringing effects, and real commercial core database
 constraints that manual formulas cannot replicate.
+
+### â±ï¸ TIMEOUT IS NOT A FAILURE â€" DO NOT ABANDON METHOD A!
+
+**If Method A times out, this is NOT a reason to switch to Method B.**
+
+The design computation is CPU-intensive:
+- `"available cores"` searches 1301+ shapes and can take **60â€"180+ seconds**
+- `"standard cores"` is faster (10â€"30 seconds) but has fewer options
+
+**If your environment has a short timeout (e.g., 2â€"3 minutes):**
+1. **First try:** Use `"standard cores"` instead of `"available cores"` â€" this is much faster
+2. **If still timing out:** Increase your timeout to 5+ minutes, NOT switch to Method B
+3. **Only use Method B** if Method A returns an actual error (schema error, ngspice failure, etc.)
+
+```python
+# âœ… CORRECT â€" use "standard cores" for faster execution
+result = PyOM.design_magnetics_from_converter(
+    "flyback", flyback, 3, "standard cores", True, None  # faster!
+)
+
+# âŒ WRONG â€" abandoning Method A just because "available cores" is slow
+# Don't do this: "it timed out, so I'll use Method B instead"
+```
+
+**Why this matters:** Method A computes the optimal inductance, turns ratio, and
+operating waveforms automatically from the converter specification. Method B requires
+you to pre-calculate these values, which can introduce errors.
 
 ---
 
@@ -644,6 +688,120 @@ ops = mas_obj["inputs"]["operatingPoints"]
 | Empty namespace (0 functions) | Bare `import PyOpenMagnetics` | Use `importlib` (Section 2) |
 | `get_core_shape_names()` TypeError | Missing bool arg | Use `get_core_shape_names(True)` |
 
+### 13.1 Common Wrong Patterns vs Correct Patterns
+
+**❌ WRONG: Using json.dumps()**
+```python
+# This WILL FAIL with "Input JSON does not conform to schema!"
+result = PyOM.design_magnetics_from_converter(
+    "flyback",
+    json.dumps(converter_spec),  # ❌ WRONG - json.dumps() converts dict to string!
+    3
+)
+```
+
+**✅ CORRECT: Pass Python dict directly**
+```python
+# This works - pass the dict directly, no json.dumps()
+result = PyOM.design_magnetics_from_converter(
+    "flyback",
+    converter_spec,  # ✅ CORRECT - Python dict, not string
+    3,
+    "standard cores",
+    True,
+    None
+)
+```
+
+---
+
+**❌ WRONG: Inventing your own JSON structure**
+```python
+# This WILL FAIL - this is NOT the correct schema!
+converter_spec = {
+    "inputs": [{
+        "name": "Primary",
+        "voltage": {"nominal": 310.0}
+    }],
+    "outputs": [{
+        "name": "Secondary",
+        "voltage": 12.0,
+        "current": 2.0
+    }],
+    "switchingFrequency": 100000.0
+}
+```
+
+**✅ CORRECT: Use the exact schema from Section 5.1**
+```python
+# This is the CORRECT Flyback schema for Method A
+flyback = {
+    "currentRippleRatio": 0.4,          # REQUIRED
+    "diodeVoltageDrop": 0.5,            # REQUIRED
+    "efficiency": 0.88,                 # REQUIRED
+    "inputVoltage": {                   # REQUIRED - not "inputs"!
+        "minimum": 185.0,
+        "nominal": 220.0,
+        "maximum": 265.0
+    },
+    "operatingPoints": [{               # REQUIRED - not "outputs"!
+        "ambientTemperature": 25.0,
+        "outputVoltages": [12.0],       # PLURAL - list!
+        "outputCurrents": [2.0],        # PLURAL - list!
+        "switchingFrequency": 100000.0
+    }],
+    "maximumDutyCycle": 0.45
+}
+```
+
+---
+
+**❌ WRONG: Using keyword arguments from .pyi stubs**
+```python
+# This WILL FAIL - .pyi has wrong keyword names!
+result = PyOM.design_magnetics_from_converter(
+    topology="flyback",      # ❌ Wrong keyword
+    converter=flyback,       # ❌ Wrong keyword
+    max_results=3
+)
+```
+
+**✅ CORRECT: Use positional arguments**
+```python
+# Use positional arguments - they always work
+result = PyOM.design_magnetics_from_converter(
+    "flyback",           # topology_name (positional)
+    flyback,             # converter_json (positional)
+    3,                   # max_results (positional)
+    "standard cores",    # core_mode_json (positional)
+    True,                # use_ngspice (positional, ignored internally)
+    None                 # weights_json (positional)
+)
+```
+
+---
+
+**❌ WRONG: Abandoning Method A after schema error**
+```python
+# DON'T DO THIS!
+try:
+    result = PyOM.design_magnetics_from_converter(...)
+except:
+    print("Method A failed, doing manual calculations instead...")
+    # ❌ WRONG - Never fall back to manual calculations!
+    L = V * D / (f * delta_I)  # ❌ NO!
+```
+
+**✅ CORRECT: Fix the JSON and retry**
+```python
+# If you get a schema error, FIX THE JSON, don't abandon Method A
+# Check:
+# 1. Did you use json.dumps()? Remove it.
+# 2. Did you use the correct field names? Check Section 5.
+# 3. Did you use "available cores" (lowercase with space)?
+# 4. Did you include all REQUIRED fields?
+```
+
 ---
 
 ## 14. Quick-Reference Checklists
@@ -685,8 +843,9 @@ ops = mas_obj["inputs"]["operatingPoints"]
 
 4. **`get_core_shape_names()`** requires boolean arg: `True`=include toroidal.
 
-5. **Design computation is CPU-intensive** â€” `"available cores"` searches 1301+
-   shapes (60â€“120+ sec). Use `"standard cores"` for speed.
+5. **Design computation is CPU-intensive** — `"available cores"` searches 1301+
+   shapes (60–180+ sec). Use `"standard cores"` for speed (10–30 sec).
+   **A timeout is NOT a failure — use "standard cores" or increase timeout, do NOT switch to Method B.**
 
 6. **All enum string values are lowercase** â€” `"available cores"`, `"standard cores"`,
    `"efficiency"`, `"cost"`, `"dimensions"`, etc. The only exception is

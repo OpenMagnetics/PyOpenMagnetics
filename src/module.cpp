@@ -13,6 +13,16 @@
 #include "utils.h"
 #include "logging.h"
 
+namespace PyMKF {
+
+// Get the directory containing the PyOpenMagnetics module
+std::string get_module_path() {
+    auto module = py::module::import("PyOpenMagnetics");
+    return module.attr("__file__").cast<std::string>();
+}
+
+} // namespace PyMKF
+
 PYBIND11_MODULE(PyOpenMagnetics, m) {
     m.doc() = "OpenMagnetics Python bindings for magnetic component design";
 

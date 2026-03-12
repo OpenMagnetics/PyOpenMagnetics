@@ -52,4 +52,7 @@ namespace PyMKF {
 // Global database declaration - defined in module.cpp
 extern std::map<std::string, OpenMagnetics::Mas> masDatabase;
 
+// Get the directory containing the PyOpenMagnetics module
+std::string get_module_path();
+
 } // namespace PyMKF

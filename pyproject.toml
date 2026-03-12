@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "PyOpenMagnetics"
-version = "1.3.0"
+version = "1.3.1"
 requires-python = ">=3.8"
 authors = [
   { name="Alfonso Martinez", email="Alfonso_VII@hotmail.com" },
@@ -37,7 +37,7 @@ sdist.include = ["AGENTS.md", "llms.txt", "PyOpenMagnetics.pyi"]
 
 [[tool.scikit-build.overrides]]
 if.platform-system = "^linux"
-# build.tool-args = ["-j8"]
+build.tool-args = ["-j2"]
 [[tool.scikit-build.overrides]]
 if.platform-system = "^win32"
 # build.tool-args = ["-maxcpucount:8"]

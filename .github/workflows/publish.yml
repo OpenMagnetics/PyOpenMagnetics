@@ -15,15 +15,17 @@ env:
   GIT_LFS_SKIP_SMUDGE: 1  # Skip LFS to avoid bandwidth quota issues
 
 jobs:
-  build_wheels:
-    name: Build wheels on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.os == 'macos-15' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_macos && fromJson('["ubuntu-22.04", "windows-2022"]') || fromJson('["ubuntu-22.04", "windows-2022", "macos-15"]') }}
-
+  # Build and publish Linux wheels independently
+  build_and_publish_linux:
+    name: Build and Publish Linux wheels
+    runs-on: ubuntu-22.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pyopenmagnetics
+    permissions:
+      id-token: write  # Required for trusted publishing
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,21 +34,18 @@ jobs:
       - name: Cache cibuildwheel
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cache/cibuildwheel
-            ~/Library/Caches/cibuildwheel
-            C:\Users\runneradmin\AppData\Local\pypa\cibuildwheel\Cache
-          key: cibuildwheel-${{ runner.os }}-${{ hashFiles('**/pyproject.toml') }}
+          path: ~/.cache/cibuildwheel
+          key: cibuildwheel-linux-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
-            cibuildwheel-${{ runner.os }}-
+            cibuildwheel-linux-
 
       - name: Cache npm
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          key: linux-npm-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-npm-
+            linux-npm-
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -75,17 +74,9 @@ jobs:
       - name: Pre-download virtualenv
         shell: bash
         run: |
-          # Create cache directory
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            CACHE_DIR="$LOCALAPPDATA/pypa/cibuildwheel/Cache"
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            CACHE_DIR="$HOME/Library/Caches/cibuildwheel"
-          else
-            CACHE_DIR="$HOME/.cache/cibuildwheel"
-          fi
+          CACHE_DIR="$HOME/.cache/cibuildwheel"
           mkdir -p "$CACHE_DIR"
           
-          # Download virtualenv.pyz with retry
           VENV_VERSION="20.26.6"
           VENV_FILE="$CACHE_DIR/virtualenv-$VENV_VERSION.pyz"
           VENV_URL="https://github.com/pypa/get-virtualenv/blob/$VENV_VERSION/public/virtualenv.pyz?raw=true"
@@ -100,21 +91,14 @@ jobs:
               echo "Download attempt $i failed, waiting 60s..."
               sleep 60
             done
-          else
-            echo "virtualenv.pyz already cached"
           fi
 
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
-          # Build for Python 3.10, 3.11, 3.12, 3.13
           CIBW_BUILD: cp310-* cp311-* cp312-* cp313-*
-          # Skip 32-bit builds, musllinux, and PyPy
           CIBW_SKIP: "*-win32 *-manylinux_i686 *musllinux* pp*"
-          # Use manylinux_2_28 (AlmaLinux 8) for C++23 support (GCC 12+ via gcc-toolset)
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-          # Install Node.js 18 and quicktype in the build container (Linux)
-          # Also install gcc-toolset-13 for C++23 support
           CIBW_BEFORE_ALL_LINUX: |
             for i in {1..3}; do
               (dnf install -y gcc-toolset-13 eigen3-devel && \
@@ -124,29 +108,191 @@ jobs:
               npm install -g quicktype) && break
               if [ $i -lt 3 ]; then sleep 60; fi
             done
+          CIBW_ENVIRONMENT_LINUX: PATH=/opt/rh/gcc-toolset-13/root/usr/bin:$PATH LD_LIBRARY_PATH=/opt/rh/gcc-toolset-13/root/usr/lib64:$LD_LIBRARY_PATH
+          CIBW_BEFORE_BUILD: pip install --default-timeout=60 --retries 5 scikit-build-core cmake ninja pybind11
+          CIBW_TEST_COMMAND: python -c "import PyOpenMagnetics; print(f'PyOpenMagnetics loaded successfully with {len(dir(PyOpenMagnetics))} functions')"
+
+      - name: Publish Linux wheels to PyPI
+        if: github.event_name == 'release'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: wheelhouse/
+
+      - name: Publish Linux wheels to TestPyPI
+        if: github.event_name == 'workflow_dispatch'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          packages-dir: wheelhouse/
+
+  # Build and publish Windows wheels independently
+  build_and_publish_windows:
+    name: Build and Publish Windows wheels
+    runs-on: windows-2022
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pyopenmagnetics
+    permissions:
+      id-token: write  # Required for trusted publishing
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache cibuildwheel
+        uses: actions/cache@v4
+        with:
+          path: C:\Users\runneradmin\AppData\Local\pypa\cibuildwheel\Cache
+          key: cibuildwheel-windows-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            cibuildwheel-windows-
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: windows-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            windows-npm-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install quicktype
+        run: npm install -g quicktype
+
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==2.21.3
+
+      - name: Build wheels
+        run: python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_BUILD: cp310-* cp311-* cp312-* cp313-*
+          CIBW_SKIP: "*-win32 *-manylinux_i686 *musllinux* pp*"
+          CIBW_BEFORE_ALL_WINDOWS: npm install -g quicktype
+          CIBW_BEFORE_BUILD: pip install --default-timeout=60 --retries 5 scikit-build-core cmake ninja pybind11
+          CIBW_TEST_COMMAND: python -c "import PyOpenMagnetics; print(f'PyOpenMagnetics loaded successfully with {len(dir(PyOpenMagnetics))} functions')"
+
+      - name: Publish Windows wheels to PyPI
+        if: github.event_name == 'release'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: wheelhouse/
+
+      - name: Publish Windows wheels to TestPyPI
+        if: github.event_name == 'workflow_dispatch'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          packages-dir: wheelhouse/
+
+  # Build and publish macOS wheels independently
+  build_and_publish_macos:
+    name: Build and Publish macOS wheels
+    runs-on: macos-15
+    continue-on-error: true  # Allow macOS to fail without blocking
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pyopenmagnetics
+    permissions:
+      id-token: write  # Required for trusted publishing
+    if: (github.event_name == 'release' || github.event_name == 'workflow_dispatch') && (github.event_name != 'workflow_dispatch' || !inputs.skip_macos)
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache cibuildwheel
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/cibuildwheel
+          key: cibuildwheel-macos-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            cibuildwheel-macos-
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: macos-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            macos-npm-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install quicktype
+        shell: bash
+        run: |
+          for i in {1..5}; do
+            npm install -g quicktype && break
+            if [ $i -lt 5 ]; then sleep 60; fi
+          done
+
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==2.21.3
+
+      - name: Build wheels
+        run: python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_BUILD: cp310-* cp311-* cp312-* cp313-*
+          CIBW_SKIP: "*-win32 *-manylinux_i686 *musllinux* pp*"
           CIBW_BEFORE_ALL_MACOS: |
             for i in {1..5}; do
               npm install -g quicktype && break
               if [ $i -lt 5 ]; then sleep 60; fi
             done
-          CIBW_BEFORE_ALL_WINDOWS: npm install -g quicktype
-          # Set macOS deployment target to 15.0 for arm64 (Homebrew libraries require it)
           CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=15.0
-          # Enable gcc-toolset-13 before build for C++23
-          CIBW_ENVIRONMENT_LINUX: PATH=/opt/rh/gcc-toolset-13/root/usr/bin:$PATH LD_LIBRARY_PATH=/opt/rh/gcc-toolset-13/root/usr/lib64:$LD_LIBRARY_PATH
-          # Install build dependencies with retry
           CIBW_BEFORE_BUILD: pip install --default-timeout=60 --retries 5 scikit-build-core cmake ninja pybind11
-          # Test the wheel
           CIBW_TEST_COMMAND: python -c "import PyOpenMagnetics; print(f'PyOpenMagnetics loaded successfully with {len(dir(PyOpenMagnetics))} functions')"
 
-      - uses: actions/upload-artifact@v4
+      - name: Publish macOS wheels to PyPI
+        if: github.event_name == 'release'
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          name: wheels-${{ matrix.os }}
-          path: ./wheelhouse/*.whl
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: wheelhouse/
 
-  build_sdist:
-    name: Build source distribution
+      - name: Publish macOS wheels to TestPyPI
+        if: github.event_name == 'workflow_dispatch'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          packages-dir: wheelhouse/
+
+  # Build and publish source distribution independently
+  build_and_publish_sdist:
+    name: Build and Publish source distribution
     runs-on: ubuntu-22.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pyopenmagnetics
+    permissions:
+      id-token: write  # Required for trusted publishing
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -156,9 +302,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          key: linux-npm-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-npm-
+            linux-npm-
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -187,63 +333,17 @@ jobs:
       - name: Build sdist
         run: python -m build --sdist
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sdist
-          path: dist/*.tar.gz
-
-  publish:
-    name: Publish to PyPI
-    needs: [build_wheels, build_sdist]
-    runs-on: ubuntu-22.04
-    # Only publish on release
-    if: github.event_name == 'release'
-    environment:
-      name: pypi
-      url: https://pypi.org/p/pyopenmagnetics
-    permissions:
-      id-token: write  # Required for trusted publishing
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-        continue-on-error: true
-
-      - name: List distribution files
-        run: ls -la dist/ 2>/dev/null || echo "No distribution files found"
-
-      - name: Publish to PyPI
+      - name: Publish sdist to PyPI
+        if: github.event_name == 'release'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          # Option 1: Use API token (set PYPI_API_TOKEN in repository secrets)
           password: ${{ secrets.PYPI_API_TOKEN }}
-          # Option 2: Use trusted publishing (no token needed, configure on PyPI)
-          # Uncomment the line below and remove password above to use trusted publishing
-          # trusted-publishing: true
+          packages-dir: dist/
 
-  # Optional: Publish to TestPyPI first for testing
-  publish_test:
-    name: Publish to TestPyPI
-    needs: [build_wheels, build_sdist]
-    runs-on: ubuntu-22.04
-    if: github.event_name == 'workflow_dispatch'
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/p/pyopenmagnetics
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-        continue-on-error: true
-
-      - name: Publish to TestPyPI
+      - name: Publish sdist to TestPyPI
+        if: github.event_name == 'workflow_dispatch'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          packages-dir: dist/

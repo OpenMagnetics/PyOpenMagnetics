@@ -1,4 +1,5 @@
 #include "core.h"
+#include <filesystem>
 
 namespace PyMKF {
 

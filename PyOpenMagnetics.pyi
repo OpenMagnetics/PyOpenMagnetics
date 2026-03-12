@@ -1,10 +1,87 @@
 """
-PyOpenMagnetics Type Stubs
+╔══════════════════════════════════════════════════════════════════════════════╗
+║               ⛔  STOP — READ AGENTS.md BEFORE WRITING ANY CODE  ⛔         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 
-This file provides type hints for the PyOpenMagnetics C++ extension module.
-It enables IDE autocompletion and type checking for PyOpenMagnetics.
+This file is a TYPE STUB only. It shows function signatures for autocomplete.
+It is NOT a usage guide. The schemas, examples, and argument values shown
+here are INCOMPLETE or WRONG in several critical ways.
 
-See llms.txt for comprehensive API documentation and examples.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ MANDATORY FIRST STEP — before writing a single line of code:
+
+  1. Locate AGENTS.md in the same directory as this file.
+  2. Read it in full.
+  3. Use ONLY the schemas, function calls, and examples from AGENTS.md.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Why AGENTS.md is mandatory (not optional reading):
+
+  ❌ THIS STUB IS WRONG ABOUT:          ✅ AGENTS.md HAS THE TRUTH:
+  ─────────────────────────────────     ──────────────────────────────────────
+  Keyword argument names                Positional args only (kwargs → TypeError)
+  core_mode enum values                 Must be "available cores" (not enum name)
+  Flyback JSON field names              Verified field names from C++ source
+  Which schema to use when              BASE vs Advanced decision rules
+  inputVoltage units                    DC bus voltage, NOT AC RMS
+  Method A vs Method B differences      Method A wraps Method B (same schemas)
+
+IF YOU DO NOT READ AGENTS.md AND FOLLOW IT, YOUR CODE WILL FAIL WITH:
+  - TypeError: incompatible function arguments
+  - RuntimeError: Input JSON does not conform to schema!
+  - result["data"] == []  (empty — no designs found)
+
+COMMON MISTAKES THAT CAUSE "Input JSON does not conform to schema!":
+  ❌ Using json.dumps() on the converter dict
+  ❌ Inventing your own JSON structure (e.g., "inputs"/"outputs" instead of "inputVoltage"/"operatingPoints")
+  ❌ Using keyword arguments instead of positional arguments
+  → See AGENTS.md Section 13.1 for wrong vs correct code examples
+
+These are the three most common failure modes. All are 100% preventable
+by reading AGENTS.md before starting.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ QUICK REMINDER OF THE MOST CRITICAL RULES (full detail in AGENTS.md):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. IMPORT — use importlib, NOT bare import:
+       import importlib.util, os, glob
+       so = glob.glob(os.path.join(<pkg_dir>, 'PyOpenMagnetics.cpython-*'))[0]
+       spec = importlib.util.spec_from_file_location('PyOpenMagnetics', so)
+       PyOM = importlib.util.module_from_spec(spec)
+       spec.loader.exec_module(PyOM)
+       PyOM.load_databases({})   # ← ALWAYS call this after loading
+
+  2. CORE MODE — always lowercase with space:
+       ✅ "available cores"   ❌ "AVAILABLE_CORES"   ❌ "Available Cores"
+       ✅ "standard cores"    ❌ "STANDARD_CORES"    ❌ "Standard Cores"
+
+  3. POSITIONAL ARGS — never keyword args for design functions:
+       ✅ PyOM.design_magnetics_from_converter("flyback", conv, 3, "available cores", True, None)
+       ❌ PyOM.design_magnetics_from_converter(topology="flyback", ...)
+
+  3b. PASS PYTHON DICTS — NEVER json.dumps()!!! (most common mistake):
+       ✅ PyOM.design_magnetics_from_converter("flyback", converter_dict, ...)
+       ❌ PyOM.design_magnetics_from_converter("flyback", json.dumps(converter_dict), ...)
+       json.dumps() turns your dict into a string → C++ gets a string → schema error.
+       See AGENTS.md Section 13.1 for more wrong vs correct examples.
+
+  4. DC BUS VOLTAGE — not AC RMS:
+       ✅ inputVoltage minimum = 185 × √2 × 0.9 ≈ 235V
+       ❌ inputVoltage minimum = 185  (AC RMS — wrong!)
+
+  5. OFFLINE FLYBACK ≤50W — use Advanced schema with desiredInductance:
+       ✅ {"desiredInductance": 600e-6, "desiredTurnsRatios": [13.5], ...}
+       ❌ {"currentRippleRatio": 0.4, ...}  (auto-computes L ≈ 10 mH → no results)
+       Both Method A and Method B accept the Advanced schema.
+
+  6. operatingPoints[].mode — always set explicitly for flyback:
+       ✅ "mode": "Discontinuous Conduction Mode"
+       ✅ "mode": "Continuous Conduction Mode"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ READ AGENTS.md NOW. Then use this stub only for autocomplete.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
 from typing import Dict, List, Any, Optional, Union, Literal
@@ -57,7 +134,9 @@ def get_core_shape_names(include_toroidal: bool = True) -> List[str]:
 
 def get_core_shape_families() -> List[str]:
     """Get all core shape family names.
-    
+
+    ⚠️ Takes NO arguments — get_core_shape_families(True) raises TypeError.
+
     Returns:
         List of family names (e.g., "E", "ETD", "PQ", "RM", "T").
     """
@@ -382,7 +461,6 @@ def calculate_magnetic_field_strength_field(operating_point: OperatingPoint, mag
     """Calculate magnetic field distribution in winding window."""
     ...
 
-# Wire-level loss calculations
 def calculate_dc_resistance_per_meter(wire: Wire, temperature: float) -> float:
     """DC resistance per meter in Ohm/m."""
     ...
@@ -496,15 +574,19 @@ def calculate_advised_cores(
     inputs: Inputs,
     weights: Dict[str, float],
     max_results: int = 10,
-    core_mode: str = "STANDARD_CORES"
+    core_mode: str = "available cores"
 ) -> List[JsonDict]:
     """Get recommended cores for design requirements.
+    
+    ⚠️ core_mode MUST be lowercase with space: "available cores" or "standard cores"
+       Passing "AVAILABLE_CORES" or "STANDARD_CORES" throws RuntimeError.
+    ⚠️ Use POSITIONAL arguments — keyword names in this stub may be wrong.
     
     Args:
         inputs: Processed inputs (from process_inputs).
         weights: {"EFFICIENCY": 1.0, "DIMENSIONS": 0.5, "COST": 0.3}.
         max_results: Maximum number of recommendations.
-        core_mode: "STANDARD_CORES" or "AVAILABLE_CORES" (stock only).
+        core_mode: "available cores" or "standard cores" (lowercase with space!).
         
     Returns:
         JSON object with "data" array containing ranked results.
@@ -518,14 +600,18 @@ def calculate_advised_cores(
 def calculate_advised_magnetics(
     inputs: Inputs,
     max_results: int = 5,
-    core_mode: str = "STANDARD_CORES"
+    core_mode: str = "available cores"
 ) -> JsonDict:
     """Get complete magnetic designs (core + winding).
     
+    ⚠️ core_mode MUST be lowercase with space: "available cores" or "standard cores"
+       Passing "AVAILABLE_CORES" or "STANDARD_CORES" throws RuntimeError.
+    ⚠️ Use POSITIONAL arguments — keyword names in this stub may be wrong.
+    
     Args:
-        inputs: Processed inputs (from process_inputs).
+        inputs: Processed inputs dict with "designRequirements" and "operatingPoints".
         max_results: Maximum number of recommendations.
-        core_mode: "STANDARD_CORES" or "AVAILABLE_CORES" (stock only).
+        core_mode: "available cores" or "standard cores" (lowercase with space!).
     
     Returns:
         JSON object with "data" array containing ranked results.
@@ -533,13 +619,16 @@ def calculate_advised_magnetics(
         - "mas": Mas object with magnetic, inputs, and optionally outputs
         - "scoring": Overall float score
         - "scoringPerFilter": Object with individual scores per filter
-          (e.g., {"COST": 0.8, "LOSSES": 0.9, "DIMENSIONS": 0.7})
-    
-    Example:
-        >>> result = PyOpenMagnetics.calculate_advised_magnetics(inputs, 5, "STANDARD_CORES")
+
+    Example (CORRECT — positional args, lowercase core_mode):
+        >>> result = PyOM.calculate_advised_magnetics(mas_inputs, 3, "available cores")
         >>> for item in result["data"]:
         ...     mag = item["mas"]["magnetic"]
-        ...     print(f"Score: {item['scoring']}, Core: {mag['core']['functionalDescription']['shape']['name']}")
+        ...     print(mag["core"]["functionalDescription"]["shape"]["name"])
+
+    Example (WRONG — do not do this):
+        >>> result = PyOM.calculate_advised_magnetics(inputs, 5, "STANDARD_CORES")  # throws!
+        >>> result = PyOM.calculate_advised_magnetics(inputs=inputs, core_mode="available cores")  # wrong kwargs
     """
     ...
 
@@ -690,56 +779,150 @@ def get_default_models() -> JsonDict:
 # =============================================================================
 
 def process_converter(topology: str, converter: JsonDict, use_ngspice: bool = True) -> JsonDict:
-    """Process a converter topology specification to Inputs.
+    """Process a converter topology specification to designRequirements + operatingPoints.
     
     Generic endpoint that dispatches to the appropriate topology processor.
+    Accepts BOTH the BASE Flyback schema and the Advanced Flyback schema
+    (with desiredInductance, desiredTurnsRatios, desiredDutyCycle).
+    
+    ⚠️ inputVoltage values MUST be DC bus voltage, NOT AC RMS.
+       Convert: Vdc_min = Vac_min × √2 × holdup,  Vdc_max = Vac_max × √2
     
     Args:
-        topology: Topology name ("flyback", "buck", "boost", "single_switch_forward",
-                 "two_switch_forward", "active_clamp_forward", "push_pull", "llc",
-                 "cllc", "dab", "phase_shifted_full_bridge", "phase_shifted_half_bridge",
-                 "isolated_buck", "isolated_buck_boost", "current_transformer")
-        converter: JSON object with converter specification per MAS schema
-        use_ngspice: If True, uses ngspice simulation for waveform extraction
+        topology: Topology name — use LOWERCASE:
+                  "flyback", "buck", "boost", "single_switch_forward",
+                  "two_switch_forward", "active_clamp_forward", "push_pull",
+                  "llc", "cllc", "dab", "phase_shifted_full_bridge",
+                  "phase_shifted_half_bridge", "isolated_buck",
+                  "isolated_buck_boost", "current_transformer"
+        converter: JSON object — see AGENTS.md Section 5 for verified schemas.
+                   DO NOT invent fields. Use exactly the schemas in AGENTS.md.
+        use_ngspice: If True, uses ngspice simulation (bundled in wheel).
     
     Returns:
-        JSON object with "designRequirements" and "operatingPoints"
-        On error, returns {"error": "..."}
+        {"designRequirements": {...}, "operatingPoints": [...]}
+        On error: {"error": "..."}
+
+    Example (Advanced Flyback — offline ≤50W):
+        >>> processed = PyOM.process_converter("flyback", {
+        ...     "inputVoltage": {"minimum": 235.0, "maximum": 375.0},  # DC bus!
+        ...     "desiredInductance": 600e-6,
+        ...     "desiredTurnsRatios": [13.5],
+        ...     "desiredDutyCycle": [[0.45, 0.45]],
+        ...     "maximumDutyCycle": 0.45,
+        ...     "efficiency": 0.88,
+        ...     "diodeVoltageDrop": 0.5,
+        ...     "currentRippleRatio": 0.4,
+        ...     "operatingPoints": [{
+        ...         "outputVoltages": [12.0],
+        ...         "outputCurrents": [2.0],
+        ...         "switchingFrequency": 100000.0,
+        ...         "ambientTemperature": 25.0,
+        ...         "mode": "Discontinuous Conduction Mode"
+        ...     }]
+        ... }, use_ngspice=False)
+        >>> processed["designRequirements"]["magnetizingInductance"]["nominal"]
+        0.0006   # exactly matches desiredInductance
     """
     ...
+
 
 def design_magnetics_from_converter(
     topology: str,
     converter: JsonDict,
     max_results: int = 1,
-    core_mode: str = "AVAILABLE_CORES",
+    core_mode: str = "available cores",
     use_ngspice: bool = True,
     weights: Optional[Dict[str, float]] = None
 ) -> JsonDict:
     """Design magnetic components from a converter specification.
     
-    High-level endpoint that combines converter processing with magnetic adviser
-    to go from converter specification directly to ranked magnetic designs.
+    High-level endpoint: converter spec → ranked magnetic designs.
+    Wraps process_converter() + calculate_advised_magnetics() internally.
+    Accepts BOTH BASE and Advanced Flyback schemas (same as process_converter).
+    
+    ⚠️⚠️ USE POSITIONAL ARGUMENTS ONLY ⚠️⚠️
+       The keyword names shown here DO NOT match the actual C++ pybind11 bindings.
+       Calling with kwargs will raise:
+         TypeError: design_magnetics_from_converter(): incompatible function arguments
+    
+    ⚠️ core_mode MUST be lowercase with space.
+       "AVAILABLE_CORES" → RuntimeError. "available cores" → works.
+    
+    ⚠️ inputVoltage in converter MUST be DC bus voltage, NOT AC RMS.
+    
+    ✅ CORRECT call:
+        result = PyOM.design_magnetics_from_converter(
+            "flyback",        # positional 1: topology (lowercase)
+            converter_dict,   # positional 2: converter JSON (see AGENTS.md §5)
+            3,                # positional 3: max_results (int!)
+            "available cores",# positional 4: core_mode (lowercase with space!)
+            True,             # positional 5: use_ngspice
+            None              # positional 6: weights (None or dict)
+        )
+    
+    ❌ WRONG calls:
+        PyOM.design_magnetics_from_converter(topology="flyback", ...)  # wrong kwargs → TypeError
+        PyOM.design_magnetics_from_converter("flyback", c, 3, "AVAILABLE_CORES", ...)  # wrong mode → RuntimeError
+        PyOM.design_magnetics_from_converter("flyback", c, 3.0, ...)   # float not int → TypeError
+        PyOM.design_magnetics_from_converter("flyback", json.dumps(c), ...)  # json.dumps → schema error!
+        PyOM.design_magnetics_from_converter("flyback", c, 3, json.dumps("standard cores"), ...)  # also wrong
     
     Args:
-        topology: Topology name (see process_converter for list)
-        converter: JSON object with converter specification per MAS schema
-        max_results: Maximum number of magnetic designs to return
-        core_mode: Core selection mode - "AVAILABLE_CORES" or "STANDARD_CORES"
-        use_ngspice: If True, uses ngspice simulation for waveform extraction
-        weights: Optional filter weights (e.g., {"COST": 1.0, "LOSSES": 2.0})
+        topology: Topology name (lowercase). See process_converter for full list.
+        converter: JSON object with converter specification. See AGENTS.md Section 5.
+                   DO NOT invent fields — use only the schemas in AGENTS.md.
+        max_results: Maximum number of magnetic designs to return (must be int).
+        core_mode: "available cores" or "standard cores" (lowercase with space).
+                   "available cores" searches 1300+ shapes (slower, ~60-120s).
+                   "standard cores" searches generic shapes (faster).
+        use_ngspice: ngspice is bundled in the wheel — no system install needed.
+        weights: Optional scoring weights. None = defaults.
+                 Keys: "maximizeEfficiency", "minimizeCost", "minimizeDimensions", etc.
+                 See AGENTS.md Section 7 for verified weight key names.
     
     Returns:
-        JSON object with "data" array containing ranked results.
-        Each result has:
-        - "mas": Mas object with magnetic design
-        - "scoring": Overall float score
-        - "scoringPerFilter": Object with individual filter scores
+        {"data": [{"mas": {...}, "scoring": float, "scoringPerFilter": {...}}, ...]}
+        Access pattern: result["data"][0]["mas"]["magnetic"]["core"]["functionalDescription"]
+    
+    Example (≤50W offline flyback — Advanced schema):
+        >>> import math
+        >>> Vdc_min = round(185 * math.sqrt(2) * 0.9, 1)   # 235V DC bus
+        >>> Vdc_max = round(265 * math.sqrt(2), 1)          # 375V DC bus
+        >>> result = PyOM.design_magnetics_from_converter(
+        ...     "flyback",
+        ...     {
+        ...         "inputVoltage": {"minimum": Vdc_min, "maximum": Vdc_max},
+        ...         "desiredInductance": 600e-6,
+        ...         "desiredTurnsRatios": [13.5],
+        ...         "desiredDutyCycle": [[0.45, 0.45]],
+        ...         "maximumDutyCycle": 0.45,
+        ...         "efficiency": 0.88,
+        ...         "diodeVoltageDrop": 0.5,
+        ...         "currentRippleRatio": 0.4,
+        ...         "operatingPoints": [{
+        ...             "outputVoltages": [12.0],
+        ...             "outputCurrents": [2.0],
+        ...             "switchingFrequency": 100000.0,
+        ...             "ambientTemperature": 25.0,
+        ...             "mode": "Discontinuous Conduction Mode"
+        ...         }]
+        ...     },
+        ...     3,                 # max_results — int!
+        ...     "available cores", # lowercase with space!
+        ...     True,
+        ...     None
+        ... )
+        >>> designs = result["data"]
+        >>> print(f"Found {len(designs)} designs")
     """
     ...
 
+
 def process_flyback(flyback: JsonDict) -> Inputs:
-    """Process Flyback converter specification to Inputs."""
+    """Process Flyback converter specification to Inputs.
+    ⚠️ See AGENTS.md Section 5 for the correct JSON schema.
+    """
     ...
 
 def process_buck(buck: JsonDict) -> Inputs:
