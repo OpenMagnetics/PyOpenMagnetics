@@ -637,7 +637,7 @@ void register_converter_bindings(py::module& m) {
     m.def("design_magnetics_from_converter", &design_magnetics_from_converter,
         "Design magnetic components from a converter specification.",
         py::arg("topology_name"), py::arg("converter_json"), 
-        py::arg("max_results") = 1, py::arg("core_mode_json") = "AVAILABLE_CORES",
+        py::arg("max_results") = 1, py::arg("core_mode_json") = "available cores",
         py::arg("use_ngspice") = true, py::arg("weights_json") = nullptr);
     
     m.def("process_flyback", &process_flyback, "Process Flyback converter.", py::arg("flyback"));
