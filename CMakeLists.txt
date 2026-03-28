@@ -265,6 +265,9 @@ cmrc_add_resource_library(data ALIAS data::data NAMESPACE data WHENCE ${MAS_DIR}
     ${MAS_DIR}/data/wires.ndjson)
 target_link_libraries(PyOpenMagnetics PUBLIC data::data)
 
+cmrc_add_resource_library(core_losses_data ALIAS data::core_losses_data NAMESPACE coreLossesData ${MKF_DIR}/src/data/core_losses/ciGSE_coefficients.json)
+target_link_libraries(PyOpenMagnetics PUBLIC data::core_losses_data)
+
 include_directories("${CMAKE_BINARY_DIR}/_deps/json-src/include/nlohmann/")
 include_directories("${CMAKE_BINARY_DIR}/_deps/pybind11-src/include/")
 include_directories("${CMAKE_BINARY_DIR}/_deps/pybind11_json-src/include/pybind11_json/")
