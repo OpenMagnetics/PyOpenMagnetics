@@ -104,6 +104,37 @@ json calculate_advised_magnetics(json inputsJson, int maximumNumberResults, json
     }
 }
 
+json calculate_advised_magnetics_fast(json inputsJson, int maximumNumberResults, json coreModeJson) {
+    try {
+        OpenMagnetics::Inputs inputs(inputsJson);
+        OpenMagnetics::CoreAdviser::CoreAdviserModes coreMode;
+        from_json(coreModeJson, coreMode);
+
+        OpenMagnetics::MagneticAdviser magneticAdviser;
+        magneticAdviser.set_core_mode(coreMode);
+        auto masMagnetics = magneticAdviser.get_advised_magnetic_fast(inputs, maximumNumberResults);
+
+        json results = json();
+        results["data"] = json::array();
+        for (auto& [masMagnetic, scoring] : masMagnetics) {
+            std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+            json result;
+            json masJson;
+            to_json(masJson, masMagnetic);
+            result["mas"] = masJson;
+            result["scoring"] = scoring;
+            results["data"].push_back(result);
+        }
+
+        return results;
+    }
+    catch (const std::exception &exc) {
+        json exception;
+        exception["data"] = "Exception: " + std::string{exc.what()};
+        return exception;
+    }
+}
+
 json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson, int maximumNumberResults) {
     try {
         OpenMagnetics::settings.set_coil_delimit_and_compact(true);
@@ -269,6 +300,38 @@ void register_adviser_bindings(py::module& m) {
         )pbdoc",
         py::arg("inputs_json"), py::arg("max_results"), py::arg("core_mode_json"));
     
+    m.def("calculate_advised_magnetics_fast", &calculate_advised_magnetics_fast,
+        R"pbdoc(
+        Get recommended complete magnetic designs using fast analytical mode.
+
+        Performs rapid magnetic design exploration using analytical turn/gap
+        calculation and simplified loss evaluation (DC ohmic + core losses only).
+        Bypasses CoilAdviser optimization and full MagneticSimulator for speed.
+        Results are sorted by ascending total losses (lower losses = better rank).
+
+        Suitable for design space exploration and Pareto front generation.
+        For production designs use calculate_advised_magnetics() instead.
+
+        Args:
+            inputs_json: JSON object containing design requirements and operating points.
+                         Should be processed using process_inputs() first.
+            max_results: Maximum number of magnetic recommendations to return.
+            core_mode_json: Core selection mode - "AVAILABLE_CORES" or "STANDARD_CORES".
+
+        Returns:
+            JSON object with "data" array containing results sorted by total losses.
+            Each result has:
+            - "mas": Mas object with magnetic, inputs, and outputs (losses data)
+            - "scoring": Total losses value in watts (lower is better)
+
+        Example:
+            >>> inputs = PyMKF.process_inputs(raw_inputs)
+            >>> result = PyMKF.calculate_advised_magnetics_fast(inputs, 5, "STANDARD_CORES")
+            >>> for item in result["data"]:
+            ...     print(f"Total losses: {item['scoring']} W")
+        )pbdoc",
+        py::arg("inputs_json"), py::arg("max_results"), py::arg("core_mode_json"));
+
     m.def("calculate_advised_magnetics_from_catalog", &calculate_advised_magnetics_from_catalog,
         R"pbdoc(
         Get recommended magnetics from a custom component catalog.
