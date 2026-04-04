@@ -287,7 +287,7 @@ void set_settings(json settingsJson) {
 
         // Effective parameter standard
         if (settingsJson.contains("effectiveParameterStandard")) {
-            OpenMagnetics::EffectiveParameterStandard standard;
+            EffectiveParameterStandard standard;
             from_json(settingsJson["effectiveParameterStandard"], standard);
             OpenMagnetics::settings.set_effective_parameter_standard(standard);
         }
@@ -349,7 +349,7 @@ void set_settings(json settingsJson) {
         if (settingsJson.contains("coreAdviserEnableIntermediatePruning")) OpenMagnetics::settings.set_core_adviser_enable_intermediate_pruning(settingsJson["coreAdviserEnableIntermediatePruning"]);
         if (settingsJson.contains("coreAdviserMaximumMagneticsAfterFiltering")) OpenMagnetics::settings.set_core_adviser_maximum_magnetics_after_filtering(settingsJson["coreAdviserMaximumMagneticsAfterFiltering"]);
         if (settingsJson.contains("gappingStrategy")) {
-            OpenMagnetics::GappingOptimizationStrategy strategy;
+            GappingOptimizationStrategy strategy;
             from_json(settingsJson["gappingStrategy"], strategy);
             OpenMagnetics::settings.set_gapping_strategy(strategy);
         }
