@@ -184,20 +184,22 @@ jobs:
           CIBW_BEFORE_BUILD: pip install --default-timeout=60 --retries 5 scikit-build-core cmake ninja pybind11
           CIBW_TEST_COMMAND: python -c "import PyOpenMagnetics; print(f'PyOpenMagnetics loaded successfully with {len(dir(PyOpenMagnetics))} functions')"
 
+      - name: Install twine
+        run: python -m pip install twine
+
       - name: Publish Windows wheels to PyPI
         if: github.event_name == 'release'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          packages-dir: wheelhouse/
+        run: python -m twine upload wheelhouse/*.whl
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Publish Windows wheels to TestPyPI
         if: github.event_name == 'workflow_dispatch'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          packages-dir: wheelhouse/
+        run: python -m twine upload --repository-url https://test.pypi.org/legacy/ wheelhouse/*.whl
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
 
   # Build and publish macOS wheels independently
   build_and_publish_macos:
@@ -267,20 +269,22 @@ jobs:
           CIBW_BEFORE_BUILD: pip install --default-timeout=60 --retries 5 scikit-build-core cmake ninja pybind11
           CIBW_TEST_COMMAND: python -c "import PyOpenMagnetics; print(f'PyOpenMagnetics loaded successfully with {len(dir(PyOpenMagnetics))} functions')"
 
+      - name: Install twine
+        run: python -m pip install twine
+
       - name: Publish macOS wheels to PyPI
         if: github.event_name == 'release'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          packages-dir: wheelhouse/
+        run: python -m twine upload wheelhouse/*.whl
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Publish macOS wheels to TestPyPI
         if: github.event_name == 'workflow_dispatch'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          packages-dir: wheelhouse/
+        run: python -m twine upload --repository-url https://test.pypi.org/legacy/ wheelhouse/*.whl
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
 
   # Build and publish source distribution independently
   build_and_publish_sdist:
