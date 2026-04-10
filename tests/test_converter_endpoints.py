@@ -36,8 +36,8 @@ def test_process_buck():
         "desiredInductance": 10e-6,
         "diodeVoltageDrop": 0.7,
         "operatingPoints": [{
-            "outputVoltage": 5.0,
-            "outputCurrent": 2.0,
+            "outputVoltages": [5.0],
+            "outputCurrents": [2.0],
             "switchingFrequency": 100000,
             "ambientTemperature": 25
         }]
@@ -57,8 +57,8 @@ def test_process_boost():
         "desiredInductance": 10e-6,
         "diodeVoltageDrop": 0.7,
         "operatingPoints": [{
-            "outputVoltage": 12.0,
-            "outputCurrent": 1.0,
+            "outputVoltages": [12.0],
+            "outputCurrents": [1.0],
             "switchingFrequency": 100000,
             "ambientTemperature": 25
         }]
@@ -126,8 +126,8 @@ def test_per_topology_wrappers():
         "diodeVoltageDrop": 0.7,
         "currentRippleRatio": 0.3,
         "operatingPoints": [{
-            "outputVoltage": 5.0,
-            "outputCurrent": 2.0,
+            "outputVoltages": [5.0],
+            "outputCurrents": [2.0],
             "switchingFrequency": 100000,
             "ambientTemperature": 25
         }]

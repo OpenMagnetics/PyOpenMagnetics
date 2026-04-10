@@ -169,8 +169,8 @@ def design_buck_with_converter_method():
         "desiredInductance": 4.7e-6,  # 4.7 µH
         "currentRippleRatio": 0.3,
         "operatingPoints": [{
-            "outputVoltage": 3.3,
-            "outputCurrent": 5.0,
+            "outputVoltages": [3.3],
+            "outputCurrents": [5.0],
             "switchingFrequency": 500000,  # 500 kHz
             "ambientTemperature": 25
         }]
