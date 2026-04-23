@@ -29,7 +29,7 @@ else ()
     set(CMAKE_BUILD_TYPE Release)
     
     # Enable Link Time Optimization to reduce binary size
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION FALSE)  # TEMP: disable LTO (OOM)
     
     # Strip symbols and use size optimization
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s -Os")
@@ -37,8 +37,15 @@ else ()
 endif()
 
 SET(MAS_DIRECTORY "${CMAKE_BINARY_DIR}/MAS/")
-SET(MAS_DIR "${CMAKE_BINARY_DIR}/_deps/mas-src")
-SET(MKF_DIR "${CMAKE_BINARY_DIR}/_deps/mkf-src")
+if(DEFINED ENV{LOCAL_MKF_DIR})
+    SET(LOCAL_MKF_MAS TRUE)
+    SET(MAS_DIR "${PROJECT_SOURCE_DIR}/_mas_local")
+    SET(MKF_DIR "${PROJECT_SOURCE_DIR}/_mkf_local")
+else()
+    SET(LOCAL_MKF_MAS FALSE)
+    SET(MAS_DIR "${CMAKE_BINARY_DIR}/_deps/mas-src")
+    SET(MKF_DIR "${CMAKE_BINARY_DIR}/_deps/mkf-src")
+endif()
 SET(FETCHCONTENT_QUIET FALSE)
 
 message(STATUS MAS_DIRECTORY)
@@ -110,62 +117,67 @@ FetchContent_Declare(eigen
 FetchContent_MakeAvailable(eigen)
 include_directories("${CMAKE_BINARY_DIR}/_deps/eigen-src")
 
-message(STATUS "Fetching MKF")
-# Force fresh clone by using a unique timestamp - update this when MKF changes
-set(MKF_FORCE_REFRESH "2025-02-26-01")
-# Tell MKF to disable matplotplusplus and use SVG-based Painter instead
-set(INCLUDE_PYMKF ON CACHE BOOL "Build Python interface" FORCE)
-FetchContent_Declare(MKF
-        GIT_REPOSITORY https://github.com/OpenMagnetics/MKF.git
-        GIT_TAG main
-        GIT_PROGRESS TRUE
-        GIT_SHALLOW TRUE)
+if(NOT LOCAL_MKF_MAS)
+    message(STATUS "Fetching MKF")
+    # Force fresh clone by using a unique timestamp - update this when MKF changes
+    set(MKF_FORCE_REFRESH "2025-02-26-01")
+    # Tell MKF to disable matplotplusplus and use SVG-based Painter instead
+    set(INCLUDE_PYMKF ON CACHE BOOL "Build Python interface" FORCE)
+    FetchContent_Declare(MKF
+            GIT_REPOSITORY https://github.com/OpenMagnetics/MKF.git
+            GIT_TAG main
+            GIT_PROGRESS TRUE
+            GIT_SHALLOW TRUE)
 
-message(STATUS "Fetching mas")
-# Skip Git LFS to avoid bandwidth quota issues - data files are optional for build
-set(ENV{GIT_LFS_SKIP_SMUDGE} "1")
-# Force fresh clone by using a unique timestamp - update this when MAS changes
-set(MAS_FORCE_REFRESH "2025-02-26-01")
-FetchContent_Declare(
-       mas
-       GIT_REPOSITORY https://github.com/OpenMagnetics/MAS.git
-       GIT_TAG main
-       GIT_SHALLOW TRUE)
+    message(STATUS "Fetching mas")
+    # Skip Git LFS to avoid bandwidth quota issues - data files are optional for build
+    set(ENV{GIT_LFS_SKIP_SMUDGE} "1")
+    # Force fresh clone by using a unique timestamp - update this when MAS changes
+    set(MAS_FORCE_REFRESH "2025-02-26-01")
+    FetchContent_Declare(
+           mas
+           GIT_REPOSITORY https://github.com/OpenMagnetics/MAS.git
+           GIT_TAG main
+           GIT_SHALLOW TRUE)
 
-message(STATUS "Fetching Properties mas")
-FetchContent_GetProperties(mas)
-message(STATUS "Fetching Properties MKF")
-FetchContent_GetProperties(MKF)
-message(STATUS "MAS_POPULATED: ${MAS_POPULATED}")
-message(STATUS "MKF_POPULATED: ${MKF_POPULATED}")
+    message(STATUS "Fetching Properties mas")
+    FetchContent_GetProperties(mas)
+    message(STATUS "Fetching Properties MKF")
+    FetchContent_GetProperties(MKF)
+    message(STATUS "MAS_POPULATED: ${MAS_POPULATED}")
+    message(STATUS "MKF_POPULATED: ${MKF_POPULATED}")
 
-# Always delete and repopulate MAS to ensure we get the latest
-if(EXISTS ${CMAKE_BINARY_DIR}/_deps/mas-src)
-    message(STATUS "Removing old MAS source to force fresh clone")
-    file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/_deps/mas-src)
-endif()
-message(STATUS "Populating MAS")
-FetchContent_Populate(mas)
-# Show git log to verify version
-execute_process(
-    COMMAND git -C ${mas_SOURCE_DIR} log --oneline -1
-    OUTPUT_VARIABLE MAS_GIT_LOG
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_VARIABLE MAS_GIT_ERROR
-)
-message(STATUS "MAS version: ${MAS_GIT_LOG}")
-if(MAS_GIT_ERROR)
-    message(STATUS "MAS git error: ${MAS_GIT_ERROR}")
-endif()
+    # Always delete and repopulate MAS to ensure we get the latest
+    if(EXISTS ${CMAKE_BINARY_DIR}/_deps/mas-src)
+        message(STATUS "Removing old MAS source to force fresh clone")
+        file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/_deps/mas-src)
+    endif()
+    message(STATUS "Populating MAS")
+    FetchContent_Populate(mas)
+    # Show git log to verify version
+    execute_process(
+        COMMAND git -C ${mas_SOURCE_DIR} log --oneline -1
+        OUTPUT_VARIABLE MAS_GIT_LOG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_VARIABLE MAS_GIT_ERROR
+    )
+    message(STATUS "MAS version: ${MAS_GIT_LOG}")
+    if(MAS_GIT_ERROR)
+        message(STATUS "MAS git error: ${MAS_GIT_ERROR}")
+    endif()
 
-if(NOT MKF_POPULATED)
-    message(STATUS "Populating MKF")
-    FetchContent_Populate(MKF)
+    if(NOT MKF_POPULATED)
+        message(STATUS "Populating MKF")
+        FetchContent_Populate(MKF)
+    else()
+        message(STATUS "MKF already populated at: ${MKF_SOURCE_DIR}")
+    endif()
+
+    message(STATUS ${MAS_SOURCE_DIR})
 else()
-    message(STATUS "MKF already populated at: ${MKF_SOURCE_DIR}")
+    message(STATUS "Using local MKF at ${MKF_DIR}")
+    message(STATUS "Using local MAS at ${MAS_DIR}")
 endif()
-
-message(STATUS ${MAS_SOURCE_DIR})
 
 message(STATUS "Compiling MAS")
 
@@ -226,14 +238,14 @@ add_custom_target(PyMASGeneration
                   DEPENDS "${MAS_DIRECTORY}/MAS.hpp")
 
 message(STATUS "Compiling PyOpenMagnetics with modular structure")
-file(GLOB SOURCES src/*.cpp 
-    ${CMAKE_BINARY_DIR}/_deps/mkf-src/src/*.cpp
-    ${CMAKE_BINARY_DIR}/_deps/mkf-src/src/advisers/*.cpp
-    ${CMAKE_BINARY_DIR}/_deps/mkf-src/src/constructive_models/*.cpp
-    ${CMAKE_BINARY_DIR}/_deps/mkf-src/src/converter_models/*.cpp
-    ${CMAKE_BINARY_DIR}/_deps/mkf-src/src/physical_models/*.cpp
-    ${CMAKE_BINARY_DIR}/_deps/mkf-src/src/processors/*.cpp
-    ${CMAKE_BINARY_DIR}/_deps/mkf-src/src/support/*.cpp
+file(GLOB SOURCES src/*.cpp
+    ${MKF_DIR}/src/*.cpp
+    ${MKF_DIR}/src/advisers/*.cpp
+    ${MKF_DIR}/src/constructive_models/*.cpp
+    ${MKF_DIR}/src/converter_models/*.cpp
+    ${MKF_DIR}/src/physical_models/*.cpp
+    ${MKF_DIR}/src/processors/*.cpp
+    ${MKF_DIR}/src/support/*.cpp
     )
 message(STATUS SOURCES)
 message(STATUS ${SOURCES})
@@ -247,7 +259,7 @@ file(DOWNLOAD "https://raw.githubusercontent.com/vector-of-bool/cmrc/master/CMak
                  "${CMAKE_BINARY_DIR}/CMakeRC.cmake")
 include("${CMAKE_BINARY_DIR}/CMakeRC.cmake")
 
-include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/")
+include_directories("${MKF_DIR}/")
 
 cmrc_add_resource_library(insulation_standards ALIAS data::insulation_standards NAMESPACE insulationData WHENCE ${MKF_DIR}/ ${MKF_DIR}/src/data/insulation_standards/IEC_60664-1.json ${MKF_DIR}/src/data/insulation_standards/IEC_60664-4.json ${MKF_DIR}/src/data/insulation_standards/IEC_60664-5.json ${MKF_DIR}/src/data/insulation_standards/IEC_62368-1.json ${MKF_DIR}/src/data/insulation_standards/IEC_61558-1.json ${MKF_DIR}/src/data/insulation_standards/IEC_61558-2-16.json ${MKF_DIR}/src/data/insulation_standards/IEC_60335-1.json)
 target_link_libraries(PyOpenMagnetics PUBLIC data::insulation_standards)
@@ -276,13 +288,13 @@ include_directories("${CMAKE_BINARY_DIR}/_deps/magic-enum-src/include")
 include_directories("${CMAKE_BINARY_DIR}/_deps/svg-src/src")
 include_directories("${CMAKE_BINARY_DIR}/_deps/spline-src/src")
 include_directories("${CMAKE_BINARY_DIR}/_deps/json-src/include/")
-include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/")
-include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/advisers/")
-include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/constructive_models/")
-include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/converter_models/")
-include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/physical_models/")
-include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/processors/")
-include_directories("${CMAKE_BINARY_DIR}/_deps/mkf-src/src/support/")
+include_directories("${MKF_DIR}/src/")
+include_directories("${MKF_DIR}/src/advisers/")
+include_directories("${MKF_DIR}/src/constructive_models/")
+include_directories("${MKF_DIR}/src/converter_models/")
+include_directories("${MKF_DIR}/src/physical_models/")
+include_directories("${MKF_DIR}/src/processors/")
+include_directories("${MKF_DIR}/src/support/")
 include_directories("${CMAKE_BINARY_DIR}/_deps/eigen-src")
 include_directories("${CMAKE_BINARY_DIR}/_cmrc/include")
 include_directories("${MAS_DIRECTORY}")

@@ -64,9 +64,8 @@ py::dict get_defaults() {
 }
 
 json get_settings() {
+    json settingsJson;
     try {
-        json settingsJson;
-
         // General
         settingsJson["verbose"] = OpenMagnetics::settings.get_verbose();
         settingsJson["useToroidalCores"] = OpenMagnetics::settings.get_use_toroidal_cores();

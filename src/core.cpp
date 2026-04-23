@@ -4,21 +4,14 @@
 namespace PyMKF {
 
 json get_core_materials() {
-    try {
-        auto materials = OpenMagnetics::get_materials(std::nullopt);
-        json result = json::array();
-        for (auto elem: materials) {
-            json aux;
-            to_json(aux, elem);
-            result.push_back(aux);
-        }
-        return result;
+    auto materials = OpenMagnetics::get_materials(std::nullopt);
+    json result = json::array();
+    for (auto elem: materials) {
+        json aux;
+        to_json(aux, elem);
+        result.push_back(aux);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 double get_material_permeability(json materialName, double temperature, double magneticFieldDcBias, double frequency) {
@@ -44,188 +37,111 @@ double get_material_resistivity(json materialName, double temperature) {
 }
 
 json get_core_material_steinmetz_coefficients(json materialName, double frequency) {
-    try {
-        auto steinmetzCoreLossesMethodRangeDatum = OpenMagnetics::CoreLossesModel::get_steinmetz_coefficients(materialName, frequency);
-        json result;
-        to_json(result, steinmetzCoreLossesMethodRangeDatum);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    auto steinmetzCoreLossesMethodRangeDatum = OpenMagnetics::CoreLossesModel::get_steinmetz_coefficients(materialName, frequency);
+    json result;
+    to_json(result, steinmetzCoreLossesMethodRangeDatum);
+    return result;
 }
 
 json get_core_shapes() {
-    try {
-        auto shapes = OpenMagnetics::get_shapes(true);
-        json result = json::array();
-        for (auto elem : shapes) {
-            json aux;
-            to_json(aux, elem);
-            result.push_back(aux);
-        }
-        return result;
+    auto shapes = OpenMagnetics::get_shapes(true);
+    json result = json::array();
+    for (auto elem : shapes) {
+        json aux;
+        to_json(aux, elem);
+        result.push_back(aux);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json get_core_shape_families() {
-    try {
-        auto shapes = OpenMagnetics::get_shapes(false);
-        std::vector<CoreShapeFamily> families;
-        json result = json::array();
-        for (auto elem : shapes) {
-            auto family = elem.get_family();
-            if (std::find(families.begin(), families.end(), family) == families.end()) {
-                families.push_back(family);
-                json aux;
-                to_json(aux, family);
-                result.push_back(aux);
-            }
+    auto shapes = OpenMagnetics::get_shapes(false);
+    std::vector<CoreShapeFamily> families;
+    json result = json::array();
+    for (auto elem : shapes) {
+        auto family = elem.get_family();
+        if (std::find(families.begin(), families.end(), family) == families.end()) {
+            families.push_back(family);
+            json aux;
+            to_json(aux, family);
+            result.push_back(aux);
         }
-        return result;
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json get_core_material_names() {
-    try {
-        auto materialNames = OpenMagnetics::get_core_material_names(std::nullopt);
-        json result = json::array();
-        for (auto elem : materialNames) {
-            result.push_back(elem);
-        }
-        return result;
+    auto materialNames = OpenMagnetics::get_core_material_names(std::nullopt);
+    json result = json::array();
+    for (auto elem : materialNames) {
+        result.push_back(elem);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json get_core_material_names_by_manufacturer(std::string manufacturerName) {
-    try {
-        auto materialNames = OpenMagnetics::get_core_material_names(manufacturerName);
-        json result = json::array();
-        for (auto elem : materialNames) {
-            result.push_back(elem);
-        }
-        return result;
+    auto materialNames = OpenMagnetics::get_core_material_names(manufacturerName);
+    json result = json::array();
+    for (auto elem : materialNames) {
+        result.push_back(elem);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json get_core_shape_names(bool includeToroidal) {
-    try {
-        OpenMagnetics::settings.set_use_toroidal_cores(includeToroidal);
-        auto shapeNames = OpenMagnetics::get_core_shape_names();
-        json result = json::array();
-        for (auto elem : shapeNames) {
-            result.push_back(elem);
-        }
-        return result;
+    OpenMagnetics::settings.set_use_toroidal_cores(includeToroidal);
+    auto shapeNames = OpenMagnetics::get_core_shape_names();
+    json result = json::array();
+    for (auto elem : shapeNames) {
+        result.push_back(elem);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json find_core_material_by_name(json materialName) {
-    try {
-        auto materialData = OpenMagnetics::find_core_material_by_name(materialName);
-        json result;
-        to_json(result, materialData);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    auto materialData = OpenMagnetics::find_core_material_by_name(materialName);
+    json result;
+    to_json(result, materialData);
+    return result;
 }
 
 json find_core_shape_by_name(json shapeName) {
-    try {
-        auto shapeData = OpenMagnetics::find_core_shape_by_name(shapeName);
-        json result;
-        to_json(result, shapeData);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    auto shapeData = OpenMagnetics::find_core_shape_by_name(shapeName);
+    json result;
+    to_json(result, shapeData);
+    return result;
 }
 
 json calculate_core_processed_description(json coreDataJson) {
-    try {
-        OpenMagnetics::Core core(coreDataJson, false, false, false);
-        core.process_data();
-        json result;
-        to_json(result, core.get_processed_description().value());
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Core core(coreDataJson, false, false, false);
+    core.process_data();
+    json result;
+    to_json(result, core.get_processed_description().value());
+    return result;
 }
 
 json calculate_core_geometrical_description(json coreDataJson) {
-    try {
-        OpenMagnetics::Core core(coreDataJson, false, false, false);
-        auto geometricalDescription = core.create_geometrical_description().value();
-        json result = json::array();
-        for (auto& elem : geometricalDescription) {
-            json aux;
-            to_json(aux, elem);
-            result.push_back(aux);
-        }
-        return result;
+    OpenMagnetics::Core core(coreDataJson, false, false, false);
+    auto geometricalDescription = core.create_geometrical_description().value();
+    json result = json::array();
+    for (auto& elem : geometricalDescription) {
+        json aux;
+        to_json(aux, elem);
+        result.push_back(aux);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json calculate_core_gapping(json coreDataJson) {
-    try {
-        OpenMagnetics::Core core(coreDataJson, false, false, false);
-        core.process_gap();
-        json result = json::array();
-        for (auto& gap : core.get_functional_description().get_gapping()) {
-            json aux;
-            to_json(aux, gap);
-            result.push_back(aux);
-        }
-        return result;
+    OpenMagnetics::Core core(coreDataJson, false, false, false);
+    core.process_gap();
+    json result = json::array();
+    for (auto& gap : core.get_functional_description().get_gapping()) {
+        json aux;
+        to_json(aux, gap);
+        result.push_back(aux);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json calculate_shape_data(json shapeJson) {
@@ -355,20 +271,13 @@ json get_available_cores() {
         OpenMagnetics::load_cores();
     }
 
-    try {
-        json result = json::array();
-        for (auto elem : OpenMagnetics::coreDatabase) {
-            json aux;
-            to_json(aux, elem);
-            result.push_back(aux);
-        }
-        return result;
+    json result = json::array();
+    for (auto elem : OpenMagnetics::coreDatabase) {
+        json aux;
+        to_json(aux, elem);
+        result.push_back(aux);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json calculate_gap_reluctance(json coreGapData, std::string modelNameString) {

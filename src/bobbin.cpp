@@ -3,83 +3,48 @@
 namespace PyMKF {
 
 json get_bobbins() {
-    try {
-        auto bobbins = OpenMagnetics::get_bobbins();
-        json result = json::array();
-        for (auto elem : bobbins) {
-            json aux;
-            to_json(aux, elem);
-            result.push_back(aux);
-        }
-        return result;
+    auto bobbins = OpenMagnetics::get_bobbins();
+    json result = json::array();
+    for (auto elem : bobbins) {
+        json aux;
+        to_json(aux, elem);
+        result.push_back(aux);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json get_bobbin_names() {
-    try {
-        auto bobbinNames = OpenMagnetics::get_bobbin_names();
-        json result = json::array();
-        for (auto elem : bobbinNames) {
-            result.push_back(elem);
-        }
-        return result;
+    auto bobbinNames = OpenMagnetics::get_bobbin_names();
+    json result = json::array();
+    for (auto elem : bobbinNames) {
+        result.push_back(elem);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json find_bobbin_by_name(json bobbinName) {
-    try {
-        auto bobbinData = OpenMagnetics::find_bobbin_by_name(bobbinName);
-        json result;
-        to_json(result, bobbinData);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    auto bobbinData = OpenMagnetics::find_bobbin_by_name(bobbinName);
+    json result;
+    to_json(result, bobbinData);
+    return result;
 }
 
 json create_basic_bobbin(json coreDataJson, bool nullDimensions) {
-    try {
-        OpenMagnetics::Core core(coreDataJson, false, false, false);
-        auto bobbin = OpenMagnetics::Bobbin::create_quick_bobbin(core, nullDimensions);
+    OpenMagnetics::Core core(coreDataJson, false, false, false);
+    auto bobbin = OpenMagnetics::Bobbin::create_quick_bobbin(core, nullDimensions);
 
-        json result;
-        to_json(result, bobbin);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    to_json(result, bobbin);
+    return result;
 }
 
 json create_basic_bobbin_by_thickness(json coreDataJson, double thickness) {
-    try {
-        OpenMagnetics::Core core(coreDataJson, false, false, false);
-        auto bobbin = OpenMagnetics::Bobbin::create_quick_bobbin(core, thickness);
+    OpenMagnetics::Core core(coreDataJson, false, false, false);
+    auto bobbin = OpenMagnetics::Bobbin::create_quick_bobbin(core, thickness);
 
-        json result;
-        to_json(result, bobbin);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    to_json(result, bobbin);
+    return result;
 }
 
 json calculate_bobbin_data(json magneticJson) {
