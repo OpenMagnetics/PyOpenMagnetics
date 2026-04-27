@@ -247,11 +247,26 @@ file(GLOB SOURCES src/*.cpp
     ${MKF_DIR}/src/processors/*.cpp
     ${MKF_DIR}/src/support/*.cpp
     )
+
+set(CCI_GENERATED_CPP "${CMAKE_BINARY_DIR}/generated/CciCoordinatesData.cpp")
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_custom_command(
+    OUTPUT "${CCI_GENERATED_CPP}"
+    COMMAND "${Python3_EXECUTABLE}"
+            "${MKF_DIR}/scripts/generate_cci_data.py"
+            "${MKF_DIR}/cci_coords"
+            "${CCI_GENERATED_CPP}"
+    DEPENDS "${MKF_DIR}/scripts/generate_cci_data.py"
+    COMMENT "Generating embedded CCI coordinates"
+    VERBATIM)
+add_custom_target(cci_data_gen DEPENDS "${CCI_GENERATED_CPP}")
+list(APPEND SOURCES "${CCI_GENERATED_CPP}")
+
 message(STATUS SOURCES)
 message(STATUS ${SOURCES})
 pybind11_add_module(PyOpenMagnetics ${SOURCES})
 
-add_dependencies(PyOpenMagnetics PyMASGeneration)
+add_dependencies(PyOpenMagnetics PyMASGeneration cci_data_gen)
 
 target_link_libraries(PyOpenMagnetics PUBLIC nlohmann_json::nlohmann_json levmar rapidfuzz::rapidfuzz)
 
