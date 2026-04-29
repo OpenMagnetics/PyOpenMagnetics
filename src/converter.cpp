@@ -629,6 +629,220 @@ json process_current_transformer(json ctJson, double turnsRatio, double secondar
     return process_converter("current_transformer", ctJson, true);
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// get_extra_components_inputs (MKF 2026-04-29 API)
+//
+// Returns a JSON list describing the design requirements / operating
+// points of any extra components a topology brings along besides its
+// main magnetic — resonant tank caps for LLC, snubber nets, auxiliary
+// inductors, etc. The downstream caller can pipe each entry into a
+// component-search (TAS) or a fresh PyOM design call.
+//
+// Each list entry is one of:
+//   { "kind": "magnetic",  "inputs": { ...MAS::Inputs JSON... } }
+//   { "kind": "capacitor", "inputs": { ...CAS::Inputs JSON... } }
+//
+// Arguments:
+//   topology_name      — same key set as dispatch_converter (e.g. "llc",
+//                        "psfb", "active_clamp_forward").
+//   converter_json     — the converter spec used to construct the simple
+//                        topology class (NOT the AdvancedXxx version).
+//   mode               — "IDEAL" or "REAL". IDEAL returns archetypal
+//                        requirements without parasitics; REAL refines
+//                        with the main magnetic's actual leakage,
+//                        winding resistance, etc.
+//   magnetic_json      — optional MAS::Magnetic JSON, required by some
+//                        topologies in REAL mode. Pass null in IDEAL.
+// ─────────────────────────────────────────────────────────────────────
+
+namespace {
+
+// Construct the simple topology subclass (NOT AdvancedXxx), run the
+// design pipeline (process() / process_design_requirements()) so the
+// internal resonant-tank / extra-component values are populated, and
+// then invoke get_extra_components_inputs on it. The simple classes
+// own the design physics, so they're what the new API was designed
+// against. Some topologies require process() to have run first; we
+// invoke it via the SFINAE-detected member that exists on each.
+template <typename TopologyT>
+std::vector<std::variant<OpenMagnetics::Inputs, CAS::Inputs>>
+collect_extra_components(const json& converterJson,
+                         OpenMagnetics::ExtraComponentsMode mode,
+                         std::optional<OpenMagnetics::Magnetic> magnetic) {
+    TopologyT topology(converterJson);
+    topology._assertErrors = true;
+    // Run process() — the Topology base class entry point that wires
+    // process_design_requirements() + process_operating_points() and
+    // populates the internal Lr / Cr / inductance ratio that
+    // get_extra_components_inputs() reads. The Inputs return value is
+    // discarded; we only care about the side effects on `topology`.
+    topology.process();
+    return topology.get_extra_components_inputs(mode, magnetic);
+}
+
+std::vector<std::variant<OpenMagnetics::Inputs, CAS::Inputs>>
+dispatch_extra_components(const std::string& topologyName,
+                          const json& converterJson,
+                          OpenMagnetics::ExtraComponentsMode mode,
+                          std::optional<OpenMagnetics::Magnetic> magnetic) {
+    if (topologyName == "flyback")
+        return collect_extra_components<OpenMagnetics::Flyback>(converterJson, mode, magnetic);
+    if (topologyName == "buck")
+        return collect_extra_components<OpenMagnetics::Buck>(converterJson, mode, magnetic);
+    if (topologyName == "boost")
+        return collect_extra_components<OpenMagnetics::Boost>(converterJson, mode, magnetic);
+    if (topologyName == "single_switch_forward")
+        return collect_extra_components<OpenMagnetics::SingleSwitchForward>(converterJson, mode, magnetic);
+    if (topologyName == "two_switch_forward")
+        return collect_extra_components<OpenMagnetics::TwoSwitchForward>(converterJson, mode, magnetic);
+    if (topologyName == "active_clamp_forward")
+        return collect_extra_components<OpenMagnetics::ActiveClampForward>(converterJson, mode, magnetic);
+    if (topologyName == "push_pull")
+        return collect_extra_components<OpenMagnetics::PushPull>(converterJson, mode, magnetic);
+    if (topologyName == "llc")
+        return collect_extra_components<OpenMagnetics::Llc>(converterJson, mode, magnetic);
+    if (topologyName == "dab")
+        return collect_extra_components<OpenMagnetics::Dab>(converterJson, mode, magnetic);
+    if (topologyName == "phase_shifted_full_bridge" || topologyName == "psfb")
+        return collect_extra_components<OpenMagnetics::Psfb>(converterJson, mode, magnetic);
+    if (topologyName == "phase_shifted_half_bridge" || topologyName == "pshb")
+        return collect_extra_components<OpenMagnetics::Pshb>(converterJson, mode, magnetic);
+    if (topologyName == "cllc")
+        return collect_extra_components<OpenMagnetics::CllcConverter>(converterJson, mode, magnetic);
+    if (topologyName == "isolated_buck")
+        return collect_extra_components<OpenMagnetics::IsolatedBuck>(converterJson, mode, magnetic);
+    if (topologyName == "isolated_buck_boost")
+        return collect_extra_components<OpenMagnetics::IsolatedBuckBoost>(converterJson, mode, magnetic);
+    throw std::invalid_argument(
+        "get_extra_components_inputs: topology '" + topologyName +
+        "' has no extra-components dispatch (or hasn't been wired in PyMKF)."
+    );
+}
+
+}  // namespace
+
+// ─────────────────────────────────────────────────────────────────────
+// generate_ngspice_circuit (MKF native SPICE generator)
+//
+// Returns the canonical ngspice deck for a converter at a given operating
+// point, sized from the magnetic that was designed in Phase 3. This
+// replaces hand-rolled netlist templates on the Proteus side: MKF owns
+// the topology wiring (rectifier polarity, gate-drive timing, dead-time,
+// snubbers, K-coupling) so the simulation always validates the actual
+// designed magnetic.
+//
+// Args mirror the C++ method: turns_ratios (Np:Ns vector), magnetizing
+// inductance, optional vin / operating-point indices. The simple
+// topology class is constructed and process()'d first so internal state
+// (Lr / Cr for LLC, etc.) is populated before deck generation.
+// ─────────────────────────────────────────────────────────────────────
+namespace {
+// Isolated topologies (transformer): pass turns ratios + magnetizing inductance.
+template <typename TopologyT>
+std::string generate_spice_isolated(const json& converterJson,
+                                     const std::vector<double>& turnsRatios,
+                                     double magnetizingInductance,
+                                     size_t vinIdx, size_t opIdx) {
+    TopologyT topology(converterJson);
+    topology._assertErrors = true;
+    topology.process();
+    return topology.generate_ngspice_circuit(turnsRatios, magnetizingInductance, vinIdx, opIdx);
+}
+
+// Non-isolated topologies (single inductor): just pass the inductance.
+template <typename TopologyT>
+std::string generate_spice_inductor(const json& converterJson,
+                                     double inductance,
+                                     size_t vinIdx, size_t opIdx) {
+    TopologyT topology(converterJson);
+    topology._assertErrors = true;
+    topology.process();
+    return topology.generate_ngspice_circuit(inductance, vinIdx, opIdx);
+}
+
+}  // namespace
+
+json generate_ngspice_circuit(const std::string& topologyName,
+                              json converterJson,
+                              std::vector<double> turnsRatios,
+                              double magnetizingInductance,
+                              size_t vinIdx,
+                              size_t opIdx) {
+    try {
+        std::string spice;
+        // Non-isolated single-inductor topologies — magnetizingInductance
+        // arg is interpreted as the main inductor value.
+        if (topologyName == "buck")
+            spice = generate_spice_inductor<OpenMagnetics::Buck>(converterJson, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "boost")
+            spice = generate_spice_inductor<OpenMagnetics::Boost>(converterJson, magnetizingInductance, vinIdx, opIdx);
+        // Isolated topologies — turnsRatios + magnetizing inductance.
+        else if (topologyName == "flyback") spice = generate_spice_isolated<OpenMagnetics::Flyback>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "single_switch_forward") spice = generate_spice_isolated<OpenMagnetics::SingleSwitchForward>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "two_switch_forward")    spice = generate_spice_isolated<OpenMagnetics::TwoSwitchForward>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "active_clamp_forward")  spice = generate_spice_isolated<OpenMagnetics::ActiveClampForward>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "push_pull") spice = generate_spice_isolated<OpenMagnetics::PushPull>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "llc")       spice = generate_spice_isolated<OpenMagnetics::Llc>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        // CLLC is intentionally not wired here yet — its
+        // generate_ngspice_circuit signature takes (double turnsRatio,
+        // CllcResonantParameters&, ...), which doesn't fit the uniform
+        // (vector<double> turnsRatios, double Lm, ...) shape used by every
+        // other topology. Add a separate dispatch path when we need it.
+        else if (topologyName == "dab")       spice = generate_spice_isolated<OpenMagnetics::Dab>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "phase_shifted_full_bridge" || topologyName == "psfb") spice = generate_spice_isolated<OpenMagnetics::Psfb>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "phase_shifted_half_bridge" || topologyName == "pshb") spice = generate_spice_isolated<OpenMagnetics::Pshb>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "isolated_buck")       spice = generate_spice_isolated<OpenMagnetics::IsolatedBuck>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "isolated_buck_boost") spice = generate_spice_isolated<OpenMagnetics::IsolatedBuckBoost>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else return json{{"error", "generate_ngspice_circuit: unknown topology '" + topologyName + "'"}};
+        return json{{"netlist", spice}};
+    } catch (const std::exception& exc) {
+        return json{{"error", std::string("generate_ngspice_circuit: ") + exc.what()}};
+    }
+}
+
+json get_extra_components_inputs(const std::string& topologyName,
+                                 json converterJson,
+                                 const std::string& modeStr,
+                                 json magneticJson) {
+    try {
+        OpenMagnetics::ExtraComponentsMode mode;
+        if (modeStr == "IDEAL" || modeStr == "ideal")
+            mode = OpenMagnetics::ExtraComponentsMode::IDEAL;
+        else if (modeStr == "REAL" || modeStr == "real")
+            mode = OpenMagnetics::ExtraComponentsMode::REAL;
+        else
+            return json{{"error", "mode must be 'IDEAL' or 'REAL', got: " + modeStr}};
+
+        std::optional<OpenMagnetics::Magnetic> magnetic;
+        if (!magneticJson.is_null()) {
+            magnetic = OpenMagnetics::Magnetic(magneticJson);
+        }
+
+        auto components = dispatch_extra_components(topologyName, converterJson, mode, magnetic);
+
+        json out = json::array();
+        for (const auto& comp : components) {
+            json entry;
+            std::visit([&entry](const auto& inputs) {
+                using T = std::decay_t<decltype(inputs)>;
+                json inputsJson;
+                to_json(inputsJson, inputs);
+                if constexpr (std::is_same_v<T, OpenMagnetics::Inputs>) {
+                    entry["kind"] = "magnetic";
+                } else {
+                    // CAS::Inputs
+                    entry["kind"] = "capacitor";
+                }
+                entry["inputs"] = inputsJson;
+            }, comp);
+            out.push_back(entry);
+        }
+        return out;
+    } catch (const std::exception& exc) {
+        return json{{"error", std::string("get_extra_components_inputs: ") + exc.what()}};
+    }
+}
+
 void register_converter_bindings(py::module& m) {
     m.def("process_converter", &process_converter,
         "Process a converter topology specification to Inputs.",
@@ -651,6 +865,27 @@ void register_converter_bindings(py::module& m) {
     m.def("process_isolated_buck_boost", &process_isolated_buck_boost, "Process Isolated Buck-Boost.", py::arg("isolated_buck_boost"));
     m.def("process_current_transformer", &process_current_transformer, "Process Current Transformer.",
         py::arg("ct"), py::arg("turns_ratio"), py::arg("secondary_resistance") = 0.0);
+
+    m.def("generate_ngspice_circuit", &generate_ngspice_circuit,
+        "Return the canonical ngspice SPICE deck for the topology at a "
+        "given operating point, sized from the magnetic design (turns "
+        "ratios + magnetizing inductance). Wrapper around each Topology "
+        "subclass's generate_ngspice_circuit method; processes the "
+        "topology first so internal state (Lr/Cr for LLC, etc.) is "
+        "populated. Returns {'netlist': '<spice>'} or {'error': '...'}.",
+        py::arg("topology_name"), py::arg("converter_json"),
+        py::arg("turns_ratios"), py::arg("magnetizing_inductance"),
+        py::arg("vin_index") = 0, py::arg("op_index") = 0);
+
+    m.def("get_extra_components_inputs", &get_extra_components_inputs,
+        "Return the design requirements for extra components a topology brings "
+        "alongside its main magnetic — resonant tank Lr/Cr for LLC, snubber "
+        "components for PSFB, etc. Each entry is {kind: 'magnetic'|'capacitor', "
+        "inputs: <MAS or CAS Inputs JSON>}. Mode 'IDEAL' returns archetypal "
+        "requirements; 'REAL' refines using the supplied main magnetic's "
+        "leakage / DCR / etc.",
+        py::arg("topology_name"), py::arg("converter_json"),
+        py::arg("mode") = "IDEAL", py::arg("magnetic_json") = nullptr);
 }
 
 } // namespace PyMKF

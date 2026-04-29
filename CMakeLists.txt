@@ -120,14 +120,25 @@ include_directories("${CMAKE_BINARY_DIR}/_deps/eigen-src")
 if(NOT LOCAL_MKF_MAS)
     message(STATUS "Fetching MKF")
     # Force fresh clone by using a unique timestamp - update this when MKF changes
-    set(MKF_FORCE_REFRESH "2025-02-26-01")
+    set(MKF_FORCE_REFRESH "2026-04-29-extra-components")
     # Tell MKF to disable matplotplusplus and use SVG-based Painter instead
     set(INCLUDE_PYMKF ON CACHE BOOL "Build Python interface" FORCE)
+    # GIT_SUBMODULES_RECURSE pulls in CAS/EAS (added 2026-04 alongside the
+    # ExtraComponentsMode API). MAS is also a submodule of MKF but PyMKF
+    # fetches it independently below for fast-update reasons; CAS/EAS only
+    # exist as MKF submodules, so we need them populated under MKF/.
+    # NOTE: we cannot use GIT_SHALLOW with GIT_SUBMODULES — shallow clone
+    # skips submodule init. Drop the shallow flag for MKF so CAS/EAS/
+    # cci_coords are actually checked out. cci_coords MUST stay in this
+    # list — the CCI generator reads from MKF/cci_coords/coordinates/.
+    # MAS is fetched separately below (not a sub-fetch of MKF here) so
+    # leave it out, otherwise FetchContent doubles the clone.
     FetchContent_Declare(MKF
             GIT_REPOSITORY https://github.com/OpenMagnetics/MKF.git
             GIT_TAG main
             GIT_PROGRESS TRUE
-            GIT_SHALLOW TRUE)
+            GIT_SUBMODULES "CAS" "EAS" "cci_coords"
+            GIT_SUBMODULES_RECURSE TRUE)
 
     message(STATUS "Fetching mas")
     # Skip Git LFS to avoid bandwidth quota issues - data files are optional for build
@@ -237,6 +248,42 @@ add_custom_target(PyMASGeneration
                   /bin/echo "RUNNING PyMASGeneration"
                   DEPENDS "${MAS_DIRECTORY}/MAS.hpp")
 
+# ──────────────────────────────────────────────────────────────────
+# CAS.hpp generation (mirrors MKF/CMakeLists.txt:419-451)
+# CAS = Capacitor Adviser Schema. EAS = Element Adviser Schema.
+# Both are submodules of MKF (added 2026-04). MKF/Topology.h #includes
+# <CAS.hpp> for the get_extra_components_inputs API; we must generate
+# the header here so PyOpenMagnetics's TU sees it.
+# ──────────────────────────────────────────────────────────────────
+set(CAS_DIRECTORY "${CMAKE_BINARY_DIR}/CAS/")
+set(CAS_DIR "${MKF_DIR}/CAS")
+set(EAS_DIR "${MKF_DIR}/EAS")
+file(MAKE_DIRECTORY "${CAS_DIRECTORY}")
+
+add_custom_command(
+  OUTPUT "${CAS_DIRECTORY}/CAS.hpp"
+  COMMAND ${CMAKE_COMMAND} -E remove -f "${CAS_DIRECTORY}/CAS.hpp"
+  COMMAND quicktype -l c++ -s schema ${CAS_DIR}/schemas/inputs.json
+    -S ${CAS_DIR}/schemas/inputs/designRequirements.json
+    -S ${EAS_DIR}/schemas/utils.json
+    -S ${EAS_DIR}/schemas/inputs/twoTerminalOperatingPoint.json
+    -o ${CAS_DIRECTORY}/CAS.hpp --namespace CAS --source-style single-source
+    --type-style pascal-case --member-style underscore-case
+    --enumerator-style upper-underscore-case --no-boost
+    --top-level Inputs
+  DEPENDS
+    "${CAS_DIR}/schemas/inputs.json"
+    "${CAS_DIR}/schemas/inputs/designRequirements.json"
+    "${EAS_DIR}/schemas/utils.json"
+    "${EAS_DIR}/schemas/inputs/twoTerminalOperatingPoint.json"
+  USES_TERMINAL)
+
+add_custom_target(PyCASGeneration
+                  /bin/echo "RUNNING PyCASGeneration"
+                  DEPENDS "${CAS_DIRECTORY}/CAS.hpp")
+add_dependencies(PyCASGeneration PyMASGeneration)
+include_directories("${CAS_DIRECTORY}")
+
 message(STATUS "Compiling PyOpenMagnetics with modular structure")
 file(GLOB SOURCES src/*.cpp
     ${MKF_DIR}/src/*.cpp
@@ -266,7 +313,7 @@ message(STATUS SOURCES)
 message(STATUS ${SOURCES})
 pybind11_add_module(PyOpenMagnetics ${SOURCES})
 
-add_dependencies(PyOpenMagnetics PyMASGeneration cci_data_gen)
+add_dependencies(PyOpenMagnetics PyMASGeneration PyCASGeneration cci_data_gen)
 
 target_link_libraries(PyOpenMagnetics PUBLIC nlohmann_json::nlohmann_json levmar rapidfuzz::rapidfuzz)
 
