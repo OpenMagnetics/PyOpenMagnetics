@@ -28,6 +28,17 @@ json process_isolated_buck(json isolatedBuckJson);
 json process_isolated_buck_boost(json isolatedBuckBoostJson);
 json process_current_transformer(json ctJson, double turnsRatio, double secondaryResistance = 0.0);
 
+// 2026-05 additions: full coverage of MKF's 24 converter topologies.
+json process_cuk(json cukJson);
+json process_sepic(json sepicJson);
+json process_zeta(json zetaJson);
+json process_four_switch_buck_boost(json converterJson);
+json process_asymmetric_half_bridge(json converterJson);
+json process_weinberg(json converterJson);
+json process_vienna(json converterJson);
+json process_clllc(json converterJson);
+json process_src(json converterJson);
+
 void register_converter_bindings(py::module& m);
 
 } // namespace PyMKF

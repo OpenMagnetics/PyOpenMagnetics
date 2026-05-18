@@ -17,6 +17,15 @@
 #include "converter_models/IsolatedBuckBoost.h"
 #include "converter_models/CurrentTransformer.h"
 #include "converter_models/PowerFactorCorrection.h"
+#include "converter_models/Cuk.h"
+#include "converter_models/Sepic.h"
+#include "converter_models/Zeta.h"
+#include "converter_models/FourSwitchBuckBoost.h"
+#include "converter_models/AsymmetricHalfBridge.h"
+#include "converter_models/Weinberg.h"
+#include "converter_models/Vienna.h"
+#include "converter_models/Clllc.h"
+#include "converter_models/Src.h"
 #include "constructive_models/MasMigration.h"
 
 #include <set>
@@ -53,7 +62,16 @@ static std::string normalize_topology_name(const std::string& s) {
         "isolated_buck",
         "isolated_buck_boost",
         "current_transformer",
-        "power_factor_correction", "pfc"
+        "power_factor_correction", "pfc",
+        "cuk", "advanced_cuk",
+        "sepic", "advanced_sepic",
+        "zeta", "advanced_zeta",
+        "four_switch_buck_boost", "advanced_four_switch_buck_boost",
+        "asymmetric_half_bridge", "advanced_asymmetric_half_bridge",
+        "weinberg", "advanced_weinberg",
+        "vienna", "advanced_vienna",
+        "clllc", "advanced_clllc",
+        "src", "advanced_src"
     };
     if (short_forms.count(s)) return s;
 
@@ -77,6 +95,15 @@ static std::string normalize_topology_name(const std::string& s) {
         {"isolatedBuckBoostConverter",       "isolated_buck_boost"},
         {"currentTransformer",               "current_transformer"},
         {"powerFactorCorrection",            "power_factor_correction"},
+        {"cukConverter",                      "cuk"},
+        {"sepicConverter",                    "sepic"},
+        {"zetaConverter",                     "zeta"},
+        {"fourSwitchBuckBoostConverter",      "four_switch_buck_boost"},
+        {"asymmetricHalfBridgeConverter",     "asymmetric_half_bridge"},
+        {"weinbergConverter",                 "weinberg"},
+        {"viennaRectifierConverter",          "vienna"},
+        {"clllcResonantConverter",            "clllc"},
+        {"seriesResonantConverter",           "src"},
 
         // Pre-1.0 Title Case labels
         {"Flyback Converter",                 "flyback"},
@@ -95,7 +122,19 @@ static std::string normalize_topology_name(const std::string& s) {
         {"Isolated Buck Converter",           "isolated_buck"},
         {"Isolated Buck-Boost Converter",     "isolated_buck_boost"},
         {"Current Transformer",               "current_transformer"},
-        {"Power Factor Correction",           "power_factor_correction"}
+        {"Power Factor Correction",           "power_factor_correction"},
+        {"Cuk Converter",                     "cuk"},
+        {"SEPIC Converter",                   "sepic"},
+        {"Sepic Converter",                   "sepic"},
+        {"Zeta Converter",                    "zeta"},
+        {"Four-Switch Buck-Boost Converter",  "four_switch_buck_boost"},
+        {"Asymmetric Half-Bridge Converter",  "asymmetric_half_bridge"},
+        {"Weinberg Converter",                "weinberg"},
+        {"Vienna Rectifier Converter",        "vienna"},
+        {"Vienna Rectifier",                  "vienna"},
+        {"CLLLC Resonant Converter",          "clllc"},
+        {"Series Resonant Converter",         "src"},
+        {"SRC",                               "src"}
     };
 
     auto it = aliases.find(s);
@@ -449,6 +488,195 @@ OpenMagnetics::Inputs process_pfc_internal(const json& converterJson) {
     return converter.process();
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// 9 new topology bindings (2026-05): Cuk, Sepic, Zeta,
+// FourSwitchBuckBoost, AsymmetricHalfBridge, Weinberg, Vienna, Clllc,
+// Src. All have first-class implementations in MKF's converter_models/
+// — they were just not wired through PyMKF until now.
+//
+// Pattern groups:
+//   * Single-inductor non-isolated (Cuk, Sepic, Zeta, FSBB) follow the
+//     Buck/Boost pattern: AdvancedXxx::process() + simulate via inductance.
+//   * Isolated with vector turns ratios (AsymHB, Clllc) follow the LLC
+//     pattern.
+//   * Weinberg has scalar turns ratio (single-secondary topology) — its
+//     ngspice dispatch lives separately below.
+//   * Vienna and Src have AdvancedXxx classes that only override
+//     process_design_requirements(); the inherited Topology::process()
+//     handles them. They follow the PFC pattern (no useNgspice branch).
+// ─────────────────────────────────────────────────────────────────────
+
+OpenMagnetics::Inputs process_cuk_internal(const json& converterJson, bool useNgspice) {
+    OpenMagnetics::AdvancedCuk converter(converterJson);
+    converter._assertErrors = true;
+    if (useNgspice) {
+        auto designReqs = converter.process_design_requirements();
+        double inductance = OpenMagnetics::resolve_dimensional_values(designReqs.get_magnetizing_inductance());
+        auto operatingPoints = converter.simulate_and_extract_operating_points(inductance);
+        OpenMagnetics::Inputs result;
+        result.set_design_requirements(designReqs);
+        result.set_operating_points(operatingPoints);
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::CUK_CONVERTER);
+        return result;
+    } else {
+        OpenMagnetics::Inputs result = converter.process();
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::CUK_CONVERTER);
+        return result;
+    }
+}
+
+OpenMagnetics::Inputs process_sepic_internal(const json& converterJson, bool useNgspice) {
+    OpenMagnetics::AdvancedSepic converter(converterJson);
+    converter._assertErrors = true;
+    if (useNgspice) {
+        auto designReqs = converter.process_design_requirements();
+        double inductance = OpenMagnetics::resolve_dimensional_values(designReqs.get_magnetizing_inductance());
+        auto operatingPoints = converter.simulate_and_extract_operating_points(inductance);
+        OpenMagnetics::Inputs result;
+        result.set_design_requirements(designReqs);
+        result.set_operating_points(operatingPoints);
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::SEPIC_CONVERTER);
+        return result;
+    } else {
+        OpenMagnetics::Inputs result = converter.process();
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::SEPIC_CONVERTER);
+        return result;
+    }
+}
+
+OpenMagnetics::Inputs process_zeta_internal(const json& converterJson, bool useNgspice) {
+    OpenMagnetics::AdvancedZeta converter(converterJson);
+    converter._assertErrors = true;
+    if (useNgspice) {
+        auto designReqs = converter.process_design_requirements();
+        double inductance = OpenMagnetics::resolve_dimensional_values(designReqs.get_magnetizing_inductance());
+        auto operatingPoints = converter.simulate_and_extract_operating_points(inductance);
+        OpenMagnetics::Inputs result;
+        result.set_design_requirements(designReqs);
+        result.set_operating_points(operatingPoints);
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::ZETA_CONVERTER);
+        return result;
+    } else {
+        OpenMagnetics::Inputs result = converter.process();
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::ZETA_CONVERTER);
+        return result;
+    }
+}
+
+OpenMagnetics::Inputs process_four_switch_buck_boost_internal(const json& converterJson, bool useNgspice) {
+    OpenMagnetics::AdvancedFourSwitchBuckBoost converter(converterJson);
+    converter._assertErrors = true;
+    if (useNgspice) {
+        auto designReqs = converter.process_design_requirements();
+        double inductance = OpenMagnetics::resolve_dimensional_values(designReqs.get_magnetizing_inductance());
+        auto operatingPoints = converter.simulate_and_extract_operating_points(inductance);
+        OpenMagnetics::Inputs result;
+        result.set_design_requirements(designReqs);
+        result.set_operating_points(operatingPoints);
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::FOUR_SWITCH_BUCK_BOOST_CONVERTER);
+        return result;
+    } else {
+        OpenMagnetics::Inputs result = converter.process();
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::FOUR_SWITCH_BUCK_BOOST_CONVERTER);
+        return result;
+    }
+}
+
+OpenMagnetics::Inputs process_asymmetric_half_bridge_internal(const json& converterJson, bool useNgspice) {
+    OpenMagnetics::AdvancedAsymmetricHalfBridge converter(converterJson);
+    converter._assertErrors = true;
+    if (useNgspice) {
+        auto designReqs = converter.process_design_requirements();
+        std::vector<double> turnsRatios;
+        for (const auto& tr : designReqs.get_turns_ratios()) {
+            turnsRatios.push_back(OpenMagnetics::resolve_dimensional_values(tr));
+        }
+        double inductance = OpenMagnetics::resolve_dimensional_values(designReqs.get_magnetizing_inductance());
+        auto operatingPoints = converter.simulate_and_extract_operating_points(turnsRatios, inductance);
+        OpenMagnetics::Inputs result;
+        result.set_design_requirements(designReqs);
+        result.set_operating_points(operatingPoints);
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::ASYMMETRIC_HALF_BRIDGE_CONVERTER);
+        return result;
+    } else {
+        OpenMagnetics::Inputs result = converter.process();
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::ASYMMETRIC_HALF_BRIDGE_CONVERTER);
+        return result;
+    }
+}
+
+OpenMagnetics::Inputs process_weinberg_internal(const json& converterJson, bool useNgspice) {
+    OpenMagnetics::AdvancedWeinberg converter(converterJson);
+    converter._assertErrors = true;
+    if (useNgspice) {
+        auto designReqs = converter.process_design_requirements();
+        std::vector<double> turnsRatios;
+        for (const auto& tr : designReqs.get_turns_ratios()) {
+            turnsRatios.push_back(OpenMagnetics::resolve_dimensional_values(tr));
+        }
+        if (turnsRatios.empty()) {
+            throw std::runtime_error("Weinberg converter requires at least one turns ratio");
+        }
+        double inductance = OpenMagnetics::resolve_dimensional_values(designReqs.get_magnetizing_inductance());
+        auto operatingPoints = converter.simulate_and_extract_operating_points(turnsRatios[0], inductance);
+        OpenMagnetics::Inputs result;
+        result.set_design_requirements(designReqs);
+        result.set_operating_points(operatingPoints);
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::WEINBERG_CONVERTER);
+        return result;
+    } else {
+        OpenMagnetics::Inputs result = converter.process();
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::WEINBERG_CONVERTER);
+        return result;
+    }
+}
+
+OpenMagnetics::Inputs process_clllc_internal(const json& converterJson, bool useNgspice) {
+    OpenMagnetics::AdvancedClllc converter(converterJson);
+    converter._assertErrors = true;
+    if (useNgspice) {
+        auto designReqs = converter.process_design_requirements();
+        std::vector<double> turnsRatios;
+        for (const auto& tr : designReqs.get_turns_ratios()) {
+            turnsRatios.push_back(OpenMagnetics::resolve_dimensional_values(tr));
+        }
+        double inductance = OpenMagnetics::resolve_dimensional_values(designReqs.get_magnetizing_inductance());
+        auto operatingPoints = converter.simulate_and_extract_operating_points(turnsRatios, inductance);
+        OpenMagnetics::Inputs result;
+        result.set_design_requirements(designReqs);
+        result.set_operating_points(operatingPoints);
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::CLLLC_RESONANT_CONVERTER);
+        return result;
+    } else {
+        OpenMagnetics::Inputs result = converter.process();
+        result.get_mutable_design_requirements().set_topology(MAS::Topologies::CLLLC_RESONANT_CONVERTER);
+        return result;
+    }
+}
+
+// Vienna and Src follow the PFC pattern: AdvancedXxx overrides only
+// process_design_requirements(); we invoke the inherited Topology::process()
+// via the simple base class on the AdvancedXxx instance. useNgspice has
+// no separate path here — process() already handles operating-point
+// simulation through the topology pipeline.
+OpenMagnetics::Inputs process_vienna_internal(const json& converterJson, bool useNgspice) {
+    (void)useNgspice;
+    OpenMagnetics::AdvancedVienna converter(converterJson);
+    converter._assertErrors = true;
+    OpenMagnetics::Inputs result = converter.process();
+    result.get_mutable_design_requirements().set_topology(MAS::Topologies::VIENNA_RECTIFIER_CONVERTER);
+    return result;
+}
+
+OpenMagnetics::Inputs process_src_internal(const json& converterJson, bool useNgspice) {
+    (void)useNgspice;
+    OpenMagnetics::AdvancedSrc converter(converterJson);
+    converter._assertErrors = true;
+    OpenMagnetics::Inputs result = converter.process();
+    result.get_mutable_design_requirements().set_topology(MAS::Topologies::SERIES_RESONANT_CONVERTER);
+    return result;
+}
+
 OpenMagnetics::Inputs dispatch_converter(const std::string& topologyName, const json& converterJson, bool useNgspice) {
     if (topologyName == "flyback" || topologyName == "advanced_flyback") {
         return process_flyback_internal(converterJson, useNgspice);
@@ -497,6 +725,33 @@ OpenMagnetics::Inputs dispatch_converter(const std::string& topologyName, const 
     }
     else if (topologyName == "power_factor_correction" || topologyName == "pfc") {
         return process_pfc_internal(converterJson);
+    }
+    else if (topologyName == "cuk" || topologyName == "advanced_cuk") {
+        return process_cuk_internal(converterJson, useNgspice);
+    }
+    else if (topologyName == "sepic" || topologyName == "advanced_sepic") {
+        return process_sepic_internal(converterJson, useNgspice);
+    }
+    else if (topologyName == "zeta" || topologyName == "advanced_zeta") {
+        return process_zeta_internal(converterJson, useNgspice);
+    }
+    else if (topologyName == "four_switch_buck_boost" || topologyName == "advanced_four_switch_buck_boost") {
+        return process_four_switch_buck_boost_internal(converterJson, useNgspice);
+    }
+    else if (topologyName == "asymmetric_half_bridge" || topologyName == "advanced_asymmetric_half_bridge") {
+        return process_asymmetric_half_bridge_internal(converterJson, useNgspice);
+    }
+    else if (topologyName == "weinberg" || topologyName == "advanced_weinberg") {
+        return process_weinberg_internal(converterJson, useNgspice);
+    }
+    else if (topologyName == "vienna" || topologyName == "advanced_vienna") {
+        return process_vienna_internal(converterJson, useNgspice);
+    }
+    else if (topologyName == "clllc" || topologyName == "advanced_clllc") {
+        return process_clllc_internal(converterJson, useNgspice);
+    }
+    else if (topologyName == "src" || topologyName == "advanced_src") {
+        return process_src_internal(converterJson, useNgspice);
     }
     else {
         throw std::invalid_argument("Unknown topology: " + topologyName);
@@ -631,6 +886,69 @@ json design_magnetics_from_converter(
                 ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
                 : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
         }
+        else if (topologyName == "cuk" || topologyName == "advanced_cuk") {
+            OpenMagnetics::Cuk converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "sepic" || topologyName == "advanced_sepic") {
+            OpenMagnetics::Sepic converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "zeta" || topologyName == "advanced_zeta") {
+            OpenMagnetics::Zeta converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "four_switch_buck_boost" || topologyName == "advanced_four_switch_buck_boost") {
+            OpenMagnetics::FourSwitchBuckBoost converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "asymmetric_half_bridge" || topologyName == "advanced_asymmetric_half_bridge") {
+            OpenMagnetics::AsymmetricHalfBridge converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "weinberg" || topologyName == "advanced_weinberg") {
+            OpenMagnetics::Weinberg converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "vienna" || topologyName == "advanced_vienna") {
+            OpenMagnetics::Vienna converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "clllc" || topologyName == "advanced_clllc") {
+            OpenMagnetics::Clllc converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
+        else if (topologyName == "src" || topologyName == "advanced_src") {
+            OpenMagnetics::Src converter(converterJson);
+            converter._assertErrors = true;
+            masMagnetics = weights.empty()
+                ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
+                : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
+        }
         else {
             // Fall back to old approach for other topologies
             json inputsJson = process_converter_internal(topologyName, converterJson, useNgspice);
@@ -725,6 +1043,16 @@ json process_current_transformer(json ctJson, double turnsRatio, double secondar
     return process_converter("current_transformer", ctJson, true);
 }
 
+json process_cuk(json cukJson) { return process_converter("cuk", cukJson, true); }
+json process_sepic(json sepicJson) { return process_converter("sepic", sepicJson, true); }
+json process_zeta(json zetaJson) { return process_converter("zeta", zetaJson, true); }
+json process_four_switch_buck_boost(json j) { return process_converter("four_switch_buck_boost", j, true); }
+json process_asymmetric_half_bridge(json j) { return process_converter("asymmetric_half_bridge", j, true); }
+json process_weinberg(json j) { return process_converter("weinberg", j, true); }
+json process_vienna(json j) { return process_converter("vienna", j, true); }
+json process_clllc(json j) { return process_converter("clllc", j, true); }
+json process_src(json j) { return process_converter("src", j, true); }
+
 // ─────────────────────────────────────────────────────────────────────
 // get_extra_components_inputs (MKF 2026-04-29 API)
 //
@@ -809,6 +1137,25 @@ dispatch_extra_components(const std::string& topologyName,
         return collect_extra_components<OpenMagnetics::IsolatedBuck>(converterJson, mode, magnetic);
     if (topologyName == "isolated_buck_boost")
         return collect_extra_components<OpenMagnetics::IsolatedBuckBoost>(converterJson, mode, magnetic);
+    if (topologyName == "cuk" || topologyName == "advanced_cuk")
+        return collect_extra_components<OpenMagnetics::Cuk>(converterJson, mode, magnetic);
+    if (topologyName == "sepic" || topologyName == "advanced_sepic")
+        return collect_extra_components<OpenMagnetics::Sepic>(converterJson, mode, magnetic);
+    if (topologyName == "zeta" || topologyName == "advanced_zeta")
+        return collect_extra_components<OpenMagnetics::Zeta>(converterJson, mode, magnetic);
+    if (topologyName == "four_switch_buck_boost" || topologyName == "advanced_four_switch_buck_boost")
+        return collect_extra_components<OpenMagnetics::FourSwitchBuckBoost>(converterJson, mode, magnetic);
+    if (topologyName == "asymmetric_half_bridge" || topologyName == "advanced_asymmetric_half_bridge")
+        return collect_extra_components<OpenMagnetics::AsymmetricHalfBridge>(converterJson, mode, magnetic);
+    if (topologyName == "weinberg" || topologyName == "advanced_weinberg")
+        return collect_extra_components<OpenMagnetics::Weinberg>(converterJson, mode, magnetic);
+    if (topologyName == "clllc" || topologyName == "advanced_clllc")
+        return collect_extra_components<OpenMagnetics::Clllc>(converterJson, mode, magnetic);
+    if (topologyName == "src" || topologyName == "advanced_src")
+        return collect_extra_components<OpenMagnetics::Src>(converterJson, mode, magnetic);
+    // Vienna intentionally omitted: AdvancedVienna's MKF class does not
+    // expose get_extra_components_inputs() — the rectifier brings no
+    // detached design-requirement components beyond the boost inductor.
     throw std::invalid_argument(
         "get_extra_components_inputs: topology '" + topologyName +
         "' has no extra-components dispatch (or hasn't been wired in PyMKF)."
@@ -856,6 +1203,21 @@ std::string generate_spice_inductor(const json& converterJson,
     return topology.generate_ngspice_circuit(inductance, vinIdx, opIdx);
 }
 
+// Isolated topologies with a single secondary winding (Weinberg): the
+// generate_ngspice_circuit signature takes a scalar turns ratio rather
+// than a vector. We pass turnsRatios[0] if available, otherwise 1.0.
+template <typename TopologyT>
+std::string generate_spice_isolated_scalar(const json& converterJson,
+                                            const std::vector<double>& turnsRatios,
+                                            double magnetizingInductance,
+                                            size_t vinIdx, size_t opIdx) {
+    TopologyT topology(converterJson);
+    topology._assertErrors = true;
+    topology.process();
+    double turnsRatio = turnsRatios.empty() ? 1.0 : turnsRatios[0];
+    return topology.generate_ngspice_circuit(turnsRatio, magnetizingInductance, vinIdx, opIdx);
+}
+
 }  // namespace
 
 json generate_ngspice_circuit(const std::string& topologyName,
@@ -889,6 +1251,27 @@ json generate_ngspice_circuit(const std::string& topologyName,
         else if (topologyName == "phase_shifted_half_bridge" || topologyName == "pshb") spice = generate_spice_isolated<OpenMagnetics::Pshb>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
         else if (topologyName == "isolated_buck")       spice = generate_spice_isolated<OpenMagnetics::IsolatedBuck>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
         else if (topologyName == "isolated_buck_boost") spice = generate_spice_isolated<OpenMagnetics::IsolatedBuckBoost>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        // Single-inductor non-isolated (2026-05): Cuk, Sepic, Zeta, FSBB.
+        else if (topologyName == "cuk" || topologyName == "advanced_cuk")
+            spice = generate_spice_inductor<OpenMagnetics::Cuk>(converterJson, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "sepic" || topologyName == "advanced_sepic")
+            spice = generate_spice_inductor<OpenMagnetics::Sepic>(converterJson, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "zeta" || topologyName == "advanced_zeta")
+            spice = generate_spice_inductor<OpenMagnetics::Zeta>(converterJson, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "four_switch_buck_boost" || topologyName == "advanced_four_switch_buck_boost")
+            spice = generate_spice_inductor<OpenMagnetics::FourSwitchBuckBoost>(converterJson, magnetizingInductance, vinIdx, opIdx);
+        // Isolated with vector turns ratios (2026-05): AsymHB, Clllc, Src, Vienna.
+        else if (topologyName == "asymmetric_half_bridge" || topologyName == "advanced_asymmetric_half_bridge")
+            spice = generate_spice_isolated<OpenMagnetics::AsymmetricHalfBridge>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "clllc" || topologyName == "advanced_clllc")
+            spice = generate_spice_isolated<OpenMagnetics::Clllc>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "src" || topologyName == "advanced_src")
+            spice = generate_spice_isolated<OpenMagnetics::Src>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        else if (topologyName == "vienna" || topologyName == "advanced_vienna")
+            spice = generate_spice_isolated<OpenMagnetics::Vienna>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
+        // Isolated with scalar turns ratio (single secondary): Weinberg.
+        else if (topologyName == "weinberg" || topologyName == "advanced_weinberg")
+            spice = generate_spice_isolated_scalar<OpenMagnetics::Weinberg>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx);
         else return json{{"error", "generate_ngspice_circuit: unknown topology '" + topologyName + "'"}};
         return json{{"netlist", spice}};
     } catch (const std::exception& exc) {
@@ -961,6 +1344,19 @@ void register_converter_bindings(py::module& m) {
     m.def("process_isolated_buck_boost", &process_isolated_buck_boost, "Process Isolated Buck-Boost.", py::arg("isolated_buck_boost"));
     m.def("process_current_transformer", &process_current_transformer, "Process Current Transformer.",
         py::arg("ct"), py::arg("turns_ratio"), py::arg("secondary_resistance") = 0.0);
+
+    // 2026-05 additions: full coverage of MKF's 24 converter topologies.
+    m.def("process_cuk", &process_cuk, "Process Cuk converter.", py::arg("cuk"));
+    m.def("process_sepic", &process_sepic, "Process SEPIC converter.", py::arg("sepic"));
+    m.def("process_zeta", &process_zeta, "Process Zeta converter.", py::arg("zeta"));
+    m.def("process_four_switch_buck_boost", &process_four_switch_buck_boost,
+        "Process Four-Switch Buck-Boost converter.", py::arg("converter"));
+    m.def("process_asymmetric_half_bridge", &process_asymmetric_half_bridge,
+        "Process Asymmetric Half-Bridge converter.", py::arg("converter"));
+    m.def("process_weinberg", &process_weinberg, "Process Weinberg converter.", py::arg("converter"));
+    m.def("process_vienna", &process_vienna, "Process Vienna Rectifier converter.", py::arg("converter"));
+    m.def("process_clllc", &process_clllc, "Process CLLLC Resonant converter.", py::arg("converter"));
+    m.def("process_src", &process_src, "Process Series Resonant converter (SRC).", py::arg("converter"));
 
     m.def("generate_ngspice_circuit", &generate_ngspice_circuit,
         "Return the canonical ngspice SPICE deck for the topology at a "

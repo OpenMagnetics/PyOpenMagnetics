@@ -960,3 +960,39 @@ def process_isolated_buck_boost(isolated_buck_boost: JsonDict) -> Inputs:
 def process_current_transformer(ct: JsonDict, turns_ratio: float, secondary_resistance: float = 0.0) -> Inputs:
     """Process Current Transformer specification to Inputs."""
     ...
+
+def process_cuk(cuk: JsonDict) -> Inputs:
+    """Process Cuk converter specification to Inputs."""
+    ...
+
+def process_sepic(sepic: JsonDict) -> Inputs:
+    """Process SEPIC converter specification to Inputs."""
+    ...
+
+def process_zeta(zeta: JsonDict) -> Inputs:
+    """Process Zeta converter specification to Inputs."""
+    ...
+
+def process_four_switch_buck_boost(converter: JsonDict) -> Inputs:
+    """Process Four-Switch Buck-Boost converter specification to Inputs."""
+    ...
+
+def process_asymmetric_half_bridge(converter: JsonDict) -> Inputs:
+    """Process Asymmetric Half-Bridge converter specification to Inputs."""
+    ...
+
+def process_weinberg(converter: JsonDict) -> Inputs:
+    """Process Weinberg converter specification to Inputs."""
+    ...
+
+def process_vienna(converter: JsonDict) -> Inputs:
+    """Process Vienna Rectifier converter specification to Inputs."""
+    ...
+
+def process_clllc(converter: JsonDict) -> Inputs:
+    """Process CLLLC Resonant converter specification to Inputs."""
+    ...
+
+def process_src(converter: JsonDict) -> Inputs:
+    """Process Series Resonant Converter (SRC) specification to Inputs."""
+    ...
