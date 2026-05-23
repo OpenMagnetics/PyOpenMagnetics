@@ -1208,13 +1208,69 @@ bool apply_bridge_simulation_mode(TopologyT& topology, const std::string& modeSt
     return false;
 }
 
+// Apply a partial SpiceSimulationConfig override from a JSON dict. Missing
+// keys keep the per-topology default. Unknown keys are silently ignored so
+// that callers built against an older binding still work after new fields
+// are added.
+//
+// Must be called BEFORE topology.process() because the config is read by
+// the netlist emitters in generate_ngspice_circuit (which runs after
+// process()).
+template <typename TopologyT>
+void apply_spice_simulation_config(TopologyT& topology, const json& cfgJson) {
+    if (cfgJson.is_null()) return;
+    if (!cfgJson.is_object()) {
+        throw std::runtime_error(
+            "generate_ngspice_circuit: spice_config must be a JSON object");
+    }
+    if (cfgJson.empty()) return;
+
+    OpenMagnetics::SpiceSimulationConfig cfg = topology.spice_config();
+    auto take_d = [&](const char* k, double& dst) {
+        auto it = cfgJson.find(k);
+        if (it != cfgJson.end() && it->is_number()) dst = it->get<double>();
+    };
+    auto take_i = [&](const char* k, int& dst) {
+        auto it = cfgJson.find(k);
+        if (it != cfgJson.end() && it->is_number_integer()) dst = it->get<int>();
+    };
+    auto take_s = [&](const char* k, std::string& dst) {
+        auto it = cfgJson.find(k);
+        if (it != cfgJson.end() && it->is_string()) dst = it->get<std::string>();
+    };
+    take_d("pwmHigh",                        cfg.pwmHigh);
+    take_d("pwmRise",                        cfg.pwmRise);
+    take_d("pwmFall",                        cfg.pwmFall);
+    take_d("swModelVT",                      cfg.swModelVT);
+    take_d("swModelVH",                      cfg.swModelVH);
+    take_d("swModelRON",                     cfg.swModelRON);
+    take_d("swModelROFF",                    cfg.swModelROFF);
+    take_d("snubR",                          cfg.snubR);
+    take_d("snubC",                          cfg.snubC);
+    take_d("snubRReal",                      cfg.snubRReal);
+    take_d("diodeIS",                        cfg.diodeIS);
+    take_d("diodeRS",                        cfg.diodeRS);
+    take_d("outputCapacitance",              cfg.outputCapacitance);
+    take_d("outputCapInitialChargeFraction", cfg.outputCapInitialChargeFraction);
+    take_i("samplesPerPeriod",               cfg.samplesPerPeriod);
+    take_d("relTol",                         cfg.relTol);
+    take_d("absTol",                         cfg.absTol);
+    take_d("vnTol",                          cfg.vnTol);
+    take_i("itl1",                           cfg.itl1);
+    take_i("itl4",                           cfg.itl4);
+    take_s("method",                         cfg.method);
+    take_d("trTol",                          cfg.trTol);
+    topology.set_spice_config(std::move(cfg));
+}
+
 // Isolated topologies (transformer): pass turns ratios + magnetizing inductance.
 template <typename TopologyT>
 std::string generate_spice_isolated(const json& converterJson,
                                      const std::vector<double>& turnsRatios,
                                      double magnetizingInductance,
                                      size_t vinIdx, size_t opIdx,
-                                     const std::string& bridgeMode) {
+                                     const std::string& bridgeMode,
+                                     const json& spiceConfig) {
     TopologyT topology(converterJson);
     topology._assertErrors = true;
     if (!apply_bridge_simulation_mode(topology, bridgeMode)) {
@@ -1222,6 +1278,7 @@ std::string generate_spice_isolated(const json& converterJson,
             "generate_ngspice_circuit: unknown bridge_simulation_mode '" +
             bridgeMode + "' — expected '', 'pulse', or 'switch'");
     }
+    apply_spice_simulation_config(topology, spiceConfig);
     topology.process();
     return topology.generate_ngspice_circuit(turnsRatios, magnetizingInductance, vinIdx, opIdx);
 }
@@ -1231,7 +1288,8 @@ template <typename TopologyT>
 std::string generate_spice_inductor(const json& converterJson,
                                      double inductance,
                                      size_t vinIdx, size_t opIdx,
-                                     const std::string& bridgeMode) {
+                                     const std::string& bridgeMode,
+                                     const json& spiceConfig) {
     TopologyT topology(converterJson);
     topology._assertErrors = true;
     if (!apply_bridge_simulation_mode(topology, bridgeMode)) {
@@ -1239,6 +1297,7 @@ std::string generate_spice_inductor(const json& converterJson,
             "generate_ngspice_circuit: unknown bridge_simulation_mode '" +
             bridgeMode + "' — expected '', 'pulse', or 'switch'");
     }
+    apply_spice_simulation_config(topology, spiceConfig);
     topology.process();
     return topology.generate_ngspice_circuit(inductance, vinIdx, opIdx);
 }
@@ -1251,7 +1310,8 @@ std::string generate_spice_isolated_scalar(const json& converterJson,
                                             const std::vector<double>& turnsRatios,
                                             double magnetizingInductance,
                                             size_t vinIdx, size_t opIdx,
-                                            const std::string& bridgeMode) {
+                                            const std::string& bridgeMode,
+                                            const json& spiceConfig) {
     TopologyT topology(converterJson);
     topology._assertErrors = true;
     if (!apply_bridge_simulation_mode(topology, bridgeMode)) {
@@ -1259,6 +1319,7 @@ std::string generate_spice_isolated_scalar(const json& converterJson,
             "generate_ngspice_circuit: unknown bridge_simulation_mode '" +
             bridgeMode + "' — expected '', 'pulse', or 'switch'");
     }
+    apply_spice_simulation_config(topology, spiceConfig);
     topology.process();
     double turnsRatio = turnsRatios.empty() ? 1.0 : turnsRatios[0];
     return topology.generate_ngspice_circuit(turnsRatio, magnetizingInductance, vinIdx, opIdx);
@@ -1272,22 +1333,23 @@ json generate_ngspice_circuit(const std::string& topologyName,
                               double magnetizingInductance,
                               size_t vinIdx,
                               size_t opIdx,
-                              std::string bridgeMode) {
+                              std::string bridgeMode,
+                              json spiceConfig) {
     try {
         std::string spice;
         // Non-isolated single-inductor topologies — magnetizingInductance
         // arg is interpreted as the main inductor value.
         if (topologyName == "buck")
-            spice = generate_spice_inductor<OpenMagnetics::Buck>(converterJson, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+            spice = generate_spice_inductor<OpenMagnetics::Buck>(converterJson, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         else if (topologyName == "boost")
-            spice = generate_spice_inductor<OpenMagnetics::Boost>(converterJson, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+            spice = generate_spice_inductor<OpenMagnetics::Boost>(converterJson, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         // Isolated topologies — turnsRatios + magnetizing inductance.
-        else if (topologyName == "flyback") spice = generate_spice_isolated<OpenMagnetics::Flyback>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
-        else if (topologyName == "single_switch_forward") spice = generate_spice_isolated<OpenMagnetics::SingleSwitchForward>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
-        else if (topologyName == "two_switch_forward")    spice = generate_spice_isolated<OpenMagnetics::TwoSwitchForward>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
-        else if (topologyName == "active_clamp_forward")  spice = generate_spice_isolated<OpenMagnetics::ActiveClampForward>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
-        else if (topologyName == "push_pull") spice = generate_spice_isolated<OpenMagnetics::PushPull>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
-        else if (topologyName == "llc")       spice = generate_spice_isolated<OpenMagnetics::Llc>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+        else if (topologyName == "flyback") spice = generate_spice_isolated<OpenMagnetics::Flyback>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
+        else if (topologyName == "single_switch_forward") spice = generate_spice_isolated<OpenMagnetics::SingleSwitchForward>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
+        else if (topologyName == "two_switch_forward")    spice = generate_spice_isolated<OpenMagnetics::TwoSwitchForward>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
+        else if (topologyName == "active_clamp_forward")  spice = generate_spice_isolated<OpenMagnetics::ActiveClampForward>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
+        else if (topologyName == "push_pull") spice = generate_spice_isolated<OpenMagnetics::PushPull>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
+        else if (topologyName == "llc")       spice = generate_spice_isolated<OpenMagnetics::Llc>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         // CLLC has a distinct signature: generate_ngspice_circuit takes
         // (double turnsRatio, const CllcResonantParameters&, ...) instead
         // of the uniform (vector<double> turnsRatios, double Lm, ...)
@@ -1303,37 +1365,38 @@ json generate_ngspice_circuit(const std::string& topologyName,
                     "generate_ngspice_circuit: unknown bridge_simulation_mode '" +
                     bridgeMode + "' — expected '', 'pulse', or 'switch'");
             }
+            apply_spice_simulation_config(topology, spiceConfig);
             topology.process();
             auto params = topology.calculate_resonant_parameters();
             double turnsRatio = turnsRatios.empty() ? 1.0 : turnsRatios[0];
             spice = topology.generate_ngspice_circuit(turnsRatio, params, vinIdx, opIdx);
         }
-        else if (topologyName == "dab")       spice = generate_spice_isolated<OpenMagnetics::Dab>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
-        else if (topologyName == "phase_shifted_full_bridge" || topologyName == "psfb") spice = generate_spice_isolated<OpenMagnetics::Psfb>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
-        else if (topologyName == "phase_shifted_half_bridge" || topologyName == "pshb") spice = generate_spice_isolated<OpenMagnetics::Pshb>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
-        else if (topologyName == "isolated_buck")       spice = generate_spice_isolated<OpenMagnetics::IsolatedBuck>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
-        else if (topologyName == "isolated_buck_boost") spice = generate_spice_isolated<OpenMagnetics::IsolatedBuckBoost>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+        else if (topologyName == "dab")       spice = generate_spice_isolated<OpenMagnetics::Dab>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
+        else if (topologyName == "phase_shifted_full_bridge" || topologyName == "psfb") spice = generate_spice_isolated<OpenMagnetics::Psfb>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
+        else if (topologyName == "phase_shifted_half_bridge" || topologyName == "pshb") spice = generate_spice_isolated<OpenMagnetics::Pshb>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
+        else if (topologyName == "isolated_buck")       spice = generate_spice_isolated<OpenMagnetics::IsolatedBuck>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
+        else if (topologyName == "isolated_buck_boost") spice = generate_spice_isolated<OpenMagnetics::IsolatedBuckBoost>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         // Single-inductor non-isolated (2026-05): Cuk, Sepic, Zeta, FSBB.
         else if (topologyName == "cuk" || topologyName == "advanced_cuk")
-            spice = generate_spice_inductor<OpenMagnetics::Cuk>(converterJson, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+            spice = generate_spice_inductor<OpenMagnetics::Cuk>(converterJson, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         else if (topologyName == "sepic" || topologyName == "advanced_sepic")
-            spice = generate_spice_inductor<OpenMagnetics::Sepic>(converterJson, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+            spice = generate_spice_inductor<OpenMagnetics::Sepic>(converterJson, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         else if (topologyName == "zeta" || topologyName == "advanced_zeta")
-            spice = generate_spice_inductor<OpenMagnetics::Zeta>(converterJson, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+            spice = generate_spice_inductor<OpenMagnetics::Zeta>(converterJson, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         else if (topologyName == "four_switch_buck_boost" || topologyName == "advanced_four_switch_buck_boost")
-            spice = generate_spice_inductor<OpenMagnetics::FourSwitchBuckBoost>(converterJson, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+            spice = generate_spice_inductor<OpenMagnetics::FourSwitchBuckBoost>(converterJson, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         // Isolated with vector turns ratios (2026-05): AsymHB, Clllc, Src, Vienna.
         else if (topologyName == "asymmetric_half_bridge" || topologyName == "advanced_asymmetric_half_bridge")
-            spice = generate_spice_isolated<OpenMagnetics::AsymmetricHalfBridge>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+            spice = generate_spice_isolated<OpenMagnetics::AsymmetricHalfBridge>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         else if (topologyName == "clllc" || topologyName == "advanced_clllc")
-            spice = generate_spice_isolated<OpenMagnetics::Clllc>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+            spice = generate_spice_isolated<OpenMagnetics::Clllc>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         else if (topologyName == "src" || topologyName == "advanced_src")
-            spice = generate_spice_isolated<OpenMagnetics::Src>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+            spice = generate_spice_isolated<OpenMagnetics::Src>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         else if (topologyName == "vienna" || topologyName == "advanced_vienna")
-            spice = generate_spice_isolated<OpenMagnetics::Vienna>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+            spice = generate_spice_isolated<OpenMagnetics::Vienna>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         // Isolated with scalar turns ratio (single secondary): Weinberg.
         else if (topologyName == "weinberg" || topologyName == "advanced_weinberg")
-            spice = generate_spice_isolated_scalar<OpenMagnetics::Weinberg>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode);
+            spice = generate_spice_isolated_scalar<OpenMagnetics::Weinberg>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         // PFC has a distinct method signature — (inductance, dcResistance,
         // simulationTime, timeStep) — because its deck simulates over a
         // line cycle rather than a switching cycle. Use the method's
@@ -1345,6 +1408,7 @@ json generate_ngspice_circuit(const std::string& topologyName,
               || topologyName == "pfc") {
             OpenMagnetics::PowerFactorCorrection topology(converterJson);
             topology._assertErrors = true;
+            apply_spice_simulation_config(topology, spiceConfig);
             topology.process();
             spice = topology.generate_ngspice_circuit(magnetizingInductance);
         }
@@ -1444,7 +1508,8 @@ void register_converter_bindings(py::module& m) {
         py::arg("topology_name"), py::arg("converter_json"),
         py::arg("turns_ratios"), py::arg("magnetizing_inductance"),
         py::arg("vin_index") = 0, py::arg("op_index") = 0,
-        py::arg("bridge_simulation_mode") = std::string(""));
+        py::arg("bridge_simulation_mode") = std::string(""),
+        py::arg("spice_config") = nlohmann::json::object());
 
     m.def("get_extra_components_inputs", &get_extra_components_inputs,
         "Return the design requirements for extra components a topology brings "
