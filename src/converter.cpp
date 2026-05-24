@@ -89,6 +89,7 @@ static std::string normalize_topology_name(const std::string& s) {
         {"cllcResonantConverter",            "cllc"},
         {"cllcConverter",                    "cllc"},
         {"dualActiveBridgeConverter",        "dab"},
+        {"dual_active_bridge",               "dab"},
         {"phaseShiftedFullBridgeConverter",  "phase_shifted_full_bridge"},
         {"phaseShiftedHalfBridgeConverter",  "phase_shifted_half_bridge"},
         {"isolatedBuckConverter",            "isolated_buck"},
@@ -1167,9 +1168,12 @@ dispatch_extra_components(const std::string& topologyName,
         return collect_extra_components<OpenMagnetics::Clllc>(converterJson, mode, magnetic);
     if (topologyName == "src" || topologyName == "advanced_src")
         return collect_extra_components<OpenMagnetics::Src>(converterJson, mode, magnetic);
-    // Vienna intentionally omitted: AdvancedVienna's MKF class does not
-    // expose get_extra_components_inputs() — the rectifier brings no
-    // detached design-requirement components beyond the boost inductor.
+    if (topologyName == "vienna" || topologyName == "advanced_vienna") {
+        // Vienna 3-φ rectifier doesn't carry detached extras beyond
+        // the boost inductor (the main magnetic itself). Return an
+        // empty list so the pipeline can proceed instead of throwing.
+        return {};
+    }
     throw std::invalid_argument(
         "get_extra_components_inputs: topology '" + topologyName +
         "' has no extra-components dispatch (or hasn't been wired in PyMKF)."
