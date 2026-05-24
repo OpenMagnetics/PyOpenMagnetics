@@ -815,23 +815,33 @@ json design_magnetics_from_converter(
         
         std::vector<std::pair<OpenMagnetics::Mas, double>> masMagnetics;
         
-        // Use MKF template method - handles all converters automatically
+        // Use MKF template method - handles all converters automatically.
+        // For topologies that ship an Advanced* subclass (Flyback / Buck /
+        // Boost), dispatch to the Advanced* constructor so the spec's
+        // `desiredInductance` / `desiredTurnsRatios` are honoured as the
+        // design target. The basic ctors set only a *minimum* L (a
+        // ripple-floor constraint) and pick the smallest core satisfying
+        // it — Heaviside's realism gate then fails inductor_isat_margin
+        // because the chosen core is much smaller than the spec asked
+        // for. The same dispatch pattern lives in
+        // process_flyback_internal (used by process_converter); this
+        // mirrors it for design_magnetics_from_converter.
         if (topologyName == "flyback" || topologyName == "advanced_flyback") {
-            OpenMagnetics::Flyback converter(converterJson);
+            OpenMagnetics::AdvancedFlyback converter(converterJson);
             converter._assertErrors = true;
-            masMagnetics = weights.empty() 
+            masMagnetics = weights.empty()
                 ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
                 : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
         }
         else if (topologyName == "buck" || topologyName == "advanced_buck") {
-            OpenMagnetics::Buck converter(converterJson);
+            OpenMagnetics::AdvancedBuck converter(converterJson);
             converter._assertErrors = true;
             masMagnetics = weights.empty()
                 ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
                 : magneticAdviser.get_advised_magnetic_from_converter(converter, weights, maxResults);
         }
         else if (topologyName == "boost" || topologyName == "advanced_boost") {
-            OpenMagnetics::Boost converter(converterJson);
+            OpenMagnetics::AdvancedBoost converter(converterJson);
             converter._assertErrors = true;
             masMagnetics = weights.empty()
                 ? magneticAdviser.get_advised_magnetic_from_converter(converter, maxResults)
