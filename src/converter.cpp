@@ -1389,7 +1389,8 @@ json generate_ngspice_circuit(const std::string& topologyName,
             double turnsRatio = turnsRatios.empty() ? 1.0 : turnsRatios[0];
             spice = topology.generate_ngspice_circuit(turnsRatio, params, vinIdx, opIdx);
         }
-        else if (topologyName == "dab")       spice = generate_spice_isolated<OpenMagnetics::Dab>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
+        else if (topologyName == "dab" || topologyName == "dual_active_bridge" || topologyName == "advanced_dab")
+            spice = generate_spice_isolated<OpenMagnetics::Dab>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         else if (topologyName == "phase_shifted_full_bridge" || topologyName == "psfb") spice = generate_spice_isolated<OpenMagnetics::Psfb>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         else if (topologyName == "phase_shifted_half_bridge" || topologyName == "pshb") spice = generate_spice_isolated<OpenMagnetics::Pshb>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
         else if (topologyName == "isolated_buck")       spice = generate_spice_isolated<OpenMagnetics::IsolatedBuck>(converterJson, turnsRatios, magnetizingInductance, vinIdx, opIdx, bridgeMode, spiceConfig);
