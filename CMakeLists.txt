@@ -389,5 +389,10 @@ include_directories("src/")
 
 install(TARGETS PyOpenMagnetics LIBRARY DESTINATION .)
 
+# Install the package __init__.py so `import PyOpenMagnetics` exposes the
+# compiled extension's API. Without it the wheel installs as an empty PEP-420
+# namespace package and `PyOpenMagnetics.<fn>` resolves to nothing.
+install(FILES __init__.py DESTINATION .)
+
 # Install documentation files for AI assistants
 install(FILES AGENTS.md llms.txt PyOpenMagnetics.pyi DESTINATION .)
