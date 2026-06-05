@@ -182,11 +182,27 @@ if(NOT LOCAL_MKF_MAS)
         message(STATUS "MAS git error: ${MAS_GIT_ERROR}")
     endif()
 
-    if(NOT MKF_POPULATED)
-        message(STATUS "Populating MKF")
-        FetchContent_Populate(MKF)
-    else()
-        message(STATUS "MKF already populated at: ${MKF_SOURCE_DIR}")
+    # Always delete and repopulate MKF to ensure we get the latest main,
+    # mirroring the MAS refresh above. FetchContent will NOT re-fetch an
+    # already-cloned source dir even with GIT_TAG main, so a persisted build
+    # dir (incremental CI cache, local rebuilds) otherwise keeps a STALE MKF
+    # checkout — fixes merged to MKF main would silently never reach the wheel.
+    if(EXISTS ${CMAKE_BINARY_DIR}/_deps/mkf-src)
+        message(STATUS "Removing old MKF source to force fresh clone")
+        file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/_deps/mkf-src)
+    endif()
+    message(STATUS "Populating MKF")
+    FetchContent_Populate(MKF)
+    # Show git log to verify we built against MKF main HEAD
+    execute_process(
+        COMMAND git -C ${mkf_SOURCE_DIR} log --oneline -1
+        OUTPUT_VARIABLE MKF_GIT_LOG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_VARIABLE MKF_GIT_ERROR
+    )
+    message(STATUS "MKF version: ${MKF_GIT_LOG}")
+    if(MKF_GIT_ERROR)
+        message(STATUS "MKF git error: ${MKF_GIT_ERROR}")
     endif()
 
     message(STATUS ${MAS_SOURCE_DIR})
