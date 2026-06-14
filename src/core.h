@@ -43,7 +43,8 @@ double calculate_temperature_from_core_thermal_resistance(json coreJson, double 
 json calculate_gap_reluctance(json coreGapData, std::string modelNameString);
 json get_gap_reluctance_model_information();
 double calculate_inductance_from_number_turns_and_gapping(json coreData, json coilData, json operatingPointData, json modelsData);
-double calculate_number_turns_from_gapping_and_inductance(json coreData, json inputsData, json modelsData);
+double calculate_number_turns_from_gapping_and_inductance(json coreData, json coilData, json inputsData, json modelsData);
+double calculate_number_turns_from_gapping_and_inductance_legacy(json coreData, json inputsData, json modelsData);
 json calculate_gapping_from_number_turns_and_inductance(json coreData, json coilData, json inputsData, std::string gappingTypeJson, int decimals, json modelsData);
 
 // Shape queries by family/manufacturer

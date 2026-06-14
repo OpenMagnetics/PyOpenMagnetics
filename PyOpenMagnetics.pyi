@@ -84,7 +84,7 @@ by reading AGENTS.md before starting.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
-from typing import Dict, List, Any, Optional, Union, Literal
+from typing import Dict, List, Any, Optional, Union, Literal, overload
 
 # Type aliases for JSON-like structures
 JsonDict = Dict[str, Any]
@@ -373,12 +373,23 @@ def calculate_inductance_from_number_turns_and_gapping(
     """
     ...
 
+@overload
 def calculate_number_turns_from_gapping_and_inductance(
-    core: Core, 
-    inputs: Inputs, 
-    models: ModelsDict
+    core_data: Core,
+    coil_data: Coil,
+    inputs_data: Inputs,
+    models_data: ModelsDict
 ) -> int:
-    """Calculate required turns for target inductance with given gap."""
+    """Calculate required turns for target inductance with given gap (coil-aware, preferred)."""
+    ...
+
+@overload
+def calculate_number_turns_from_gapping_and_inductance(
+    core_data: Core,
+    inputs_data: Inputs,
+    models_data: ModelsDict
+) -> int:
+    """Legacy 3-argument form (no coil_data); synthesizes a single-primary-winding coil. Prefer the coil-aware overload."""
     ...
 
 def calculate_gapping_from_number_turns_and_inductance(

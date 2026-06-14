@@ -230,10 +230,12 @@ L = PyOpenMagnetics.calculate_inductance_from_number_turns_and_gapping(
     core, coil, operating_point, models
 )
 
-# Calculate turns from inductance and gap
+# Calculate turns from inductance and gap (coil-aware, preferred)
 N = PyOpenMagnetics.calculate_number_turns_from_gapping_and_inductance(
-    core, inputs, models
+    core, coil, inputs, models
 )
+# Legacy 3-argument form (no coil) is still accepted for backward compatibility:
+# N = PyOpenMagnetics.calculate_number_turns_from_gapping_and_inductance(core, inputs, models)
 
 # Calculate gap from turns and inductance
 core_with_gap = PyOpenMagnetics.calculate_gapping_from_number_turns_and_inductance(

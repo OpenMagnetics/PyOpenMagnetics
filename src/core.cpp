@@ -322,12 +322,34 @@ double calculate_inductance_from_number_turns_and_gapping(json coreData, json co
     return magnetizingInductance;
 }
 
-double calculate_number_turns_from_gapping_and_inductance(json coreData, json inputsData, json modelsData) {
+double calculate_number_turns_from_gapping_and_inductance(json coreData, json coilData, json inputsData, json modelsData) {
+    OpenMagnetics::Core core(coreData);
+    OpenMagnetics::Coil coil(coilData);
+    OpenMagnetics::Inputs inputs(inputsData);
+
+    std::map<std::string, std::string> models = modelsData.get<std::map<std::string, std::string>>();
+
+    auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
+    if (models.find("reluctance") != models.end()) {
+        OpenMagnetics::from_json(models["reluctance"], reluctanceModelName);
+    }
+
+    OpenMagnetics::MagnetizingInductance magnetizingInductanceObj(reluctanceModelName);
+    double numberTurns = magnetizingInductanceObj.calculate_number_turns_from_gapping_and_inductance(core, coil, &inputs);
+
+    return numberTurns;
+}
+
+// Legacy 3-argument variant (no coil_data). Backward-compat shim for callers
+// written before the coil parameter was added; forwards to MKF's 3-argument
+// overload, which synthesizes a single-primary-winding coil internally. New
+// code should pass coil_data and use the 4-argument form above.
+double calculate_number_turns_from_gapping_and_inductance_legacy(json coreData, json inputsData, json modelsData) {
     OpenMagnetics::Core core(coreData);
     OpenMagnetics::Inputs inputs(inputsData);
 
     std::map<std::string, std::string> models = modelsData.get<std::map<std::string, std::string>>();
-    
+
     auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
     if (models.find("reluctance") != models.end()) {
         OpenMagnetics::from_json(models["reluctance"], reluctanceModelName);
@@ -960,14 +982,36 @@ void register_core_bindings(py::module& m) {
         
         Args:
             core_data: JSON object with core specification.
+            coil_data: JSON object with coil/winding specification.
             inputs_data: JSON Inputs with magnetizingInductance requirement.
             models_data: JSON dict with "reluctance" model selection.
-        
+
+        Returns:
+            Required number of turns (may be non-integer).
+        )pbdoc",
+        py::arg("core_data"), py::arg("coil_data"), py::arg("inputs_data"), py::arg("models_data"));
+
+    // Legacy 3-argument overload (no coil_data) registered under the SAME name:
+    // pybind dispatches by arity, so existing 3-arg callers keep working while
+    // new code uses the coil-aware 4-arg form above (the canonical default).
+    m.def("calculate_number_turns_from_gapping_and_inductance", &calculate_number_turns_from_gapping_and_inductance_legacy,
+        R"pbdoc(
+        Legacy variant of calculate_number_turns_from_gapping_and_inductance
+        without coil_data (kept for backward compatibility).
+
+        Synthesizes a single-primary-winding coil internally. Prefer the
+        coil-aware 4-argument form for multi-winding designs.
+
+        Args:
+            core_data: JSON object with core specification.
+            inputs_data: JSON Inputs with magnetizingInductance requirement.
+            models_data: JSON dict with "reluctance" model selection.
+
         Returns:
             Required number of turns (may be non-integer).
         )pbdoc",
         py::arg("core_data"), py::arg("inputs_data"), py::arg("models_data"));
-    
+
     m.def("calculate_gapping_from_number_turns_and_inductance", &calculate_gapping_from_number_turns_and_inductance,
         R"pbdoc(
         Calculate required gap from turns count and target inductance.
