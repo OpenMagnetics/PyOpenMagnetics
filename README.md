@@ -40,6 +40,29 @@ cd PyOpenMagnetics
 pip install .
 ```
 
+#### MKF is pinned to a SHA (build reproducibility — ABT #73)
+
+This build compiles MKF by **globbing its `.cpp` files directly** into the
+extension (it does not drive MKF's own CMake). MKF `main` has since moved to
+"delete `converter_models` + link the Kirchhoff converter-model library
+(`libKirchhoffApi.so`)"; because Kirchhoff and its AAS sibling are **not yet
+published**, a from-scratch build of newer `main` cannot obtain that library
+and **fails to link**.
+
+`CMakeLists.txt` therefore pins the MKF FetchContent to the last self-contained
+commit — `MKF_GIT_TAG=2ae859dcae6c3b2e5a128893247b7714360e863f`, the exact SHA
+the shipping `.so` was built from — and a configure-time guard fails loudly if
+the checkout drifts. A clean rebuild is reproducible as-is:
+
+```bash
+rm -rf build && pip install . --no-deps -v        # or: cmake -S . -B build && ninja -C build
+```
+
+To **advance** the pin you must first wire the Kirchhoff library build into
+`CMakeLists.txt` (publish AAS/Kirchhoff, then `add_subdirectory` +
+`target_link_libraries(... libKirchhoffApi.so)`). Overriding
+`-DMKF_GIT_TAG=main` before that lands will break the link.
+
 ### ⚠️ Import Instructions
 
 **Important:** The compiled extension module may require special import handling:

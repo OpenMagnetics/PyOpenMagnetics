@@ -124,8 +124,31 @@ include_directories("${CMAKE_BINARY_DIR}/_deps/eigen-src")
 
 if(NOT LOCAL_MKF_MAS)
     message(STATUS "Fetching MKF")
-    # Force fresh clone by using a unique timestamp - update this when MKF changes
-    set(MKF_FORCE_REFRESH "2026-04-29-extra-components")
+    # --------------------------------------------------------------------
+    # MKF is PINNED to a SHA, NOT tracked to main (ABT #73).
+    #
+    # MKF main advanced past this commit to "delete converter_models + link
+    # the Kirchhoff converter-model library (libKirchhoffApi.so)". This
+    # vendored build compiles MKF by *globbing* its .cpp files straight into
+    # the PyOpenMagnetics module (see file(GLOB SOURCES ...) below) — it does
+    # NOT drive MKF's own CMakeLists, so it never builds or links
+    # libKirchhoffApi.so. Kirchhoff and its AAS sibling are also UNPUBLISHED,
+    # so a clean checkout cannot obtain the library at all. A from-scratch
+    # build of newer main therefore fails to LINK: KirchhoffBridge.cpp and
+    # WaveformProcessor reference symbols that now live in libKirchhoffApi.so.
+    #
+    # 2ae859dc is the last commit BEFORE that hard dependency — KirchhoffBridge
+    # does not yet exist and MKF's Kirchhoff references are comments only, so
+    # the globbed sources link self-contained. It is the exact commit the
+    # currently-shipping vendored .so was built from (git rev-list 2ae859dc..main
+    # == 9). To ADVANCE the pin you must first wire the Kirchhoff lib build into
+    # THIS file (publish AAS/Kirchhoff, then add_subdirectory + link
+    # libKirchhoffApi.so) — see ABT #73 option (b). Until then, bumping this to
+    # a newer main breaks a clean rebuild.
+    set(MKF_GIT_TAG "2ae859dcae6c3b2e5a128893247b7714360e863f"
+        CACHE STRING "MKF git ref for the vendored PyOM build (pinned; see ABT #73)")
+    # Force fresh clone by using a unique timestamp - update this when the pin changes
+    set(MKF_FORCE_REFRESH "2026-07-01-pin-2ae859dc")
     # Tell MKF to disable matplotplusplus and use SVG-based Painter instead
     set(INCLUDE_PYMKF ON CACHE BOOL "Build Python interface" FORCE)
     # GIT_SUBMODULES_RECURSE pulls in CAS/PEAS (added 2026-04 alongside the
@@ -140,7 +163,7 @@ if(NOT LOCAL_MKF_MAS)
     # leave it out, otherwise FetchContent doubles the clone.
     FetchContent_Declare(MKF
             GIT_REPOSITORY https://github.com/OpenMagnetics/MKF.git
-            GIT_TAG main
+            GIT_TAG ${MKF_GIT_TAG}
             GIT_PROGRESS TRUE
             GIT_SUBMODULES "CAS" "PEAS" "cci_coords"
             GIT_SUBMODULES_RECURSE TRUE)
@@ -182,27 +205,39 @@ if(NOT LOCAL_MKF_MAS)
         message(STATUS "MAS git error: ${MAS_GIT_ERROR}")
     endif()
 
-    # Always delete and repopulate MKF to ensure we get the latest main,
-    # mirroring the MAS refresh above. FetchContent will NOT re-fetch an
-    # already-cloned source dir even with GIT_TAG main, so a persisted build
-    # dir (incremental CI cache, local rebuilds) otherwise keeps a STALE MKF
-    # checkout — fixes merged to MKF main would silently never reach the wheel.
+    # Always delete and repopulate MKF so the checkout matches ${MKF_GIT_TAG}
+    # exactly, mirroring the MAS refresh above. FetchContent will NOT re-checkout
+    # an already-cloned source dir when the pin changes, so a persisted build dir
+    # (incremental CI cache, or a local build that previously tracked main) would
+    # otherwise keep a STALE MKF checkout at the wrong SHA — e.g. a main tip that
+    # needs the unpublished libKirchhoffApi.so and fails to link (ABT #73).
     if(EXISTS ${CMAKE_BINARY_DIR}/_deps/mkf-src)
-        message(STATUS "Removing old MKF source to force fresh clone")
+        message(STATUS "Removing old MKF source to force fresh checkout at ${MKF_GIT_TAG}")
         file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/_deps/mkf-src)
     endif()
     message(STATUS "Populating MKF")
     FetchContent_Populate(MKF)
-    # Show git log to verify we built against MKF main HEAD
+    # Show git log AND assert the checkout is exactly the pinned SHA. A silent
+    # drift here would resurface the libKirchhoffApi.so link failure ABT #73
+    # guards against, so fail LOUDLY at configure time instead.
     execute_process(
-        COMMAND git -C ${mkf_SOURCE_DIR} log --oneline -1
-        OUTPUT_VARIABLE MKF_GIT_LOG
+        COMMAND git -C ${mkf_SOURCE_DIR} rev-parse HEAD
+        OUTPUT_VARIABLE MKF_GIT_HEAD
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_VARIABLE MKF_GIT_ERROR
     )
-    message(STATUS "MKF version: ${MKF_GIT_LOG}")
+    message(STATUS "MKF version: ${MKF_GIT_HEAD}")
     if(MKF_GIT_ERROR)
         message(STATUS "MKF git error: ${MKF_GIT_ERROR}")
+    endif()
+    # Only assert when the pin is a full 40-char SHA (a branch/tag ref can't be
+    # compared to a resolved HEAD; that path is opt-in and the builder owns it).
+    string(LENGTH "${MKF_GIT_TAG}" _mkf_pin_len)
+    if(_mkf_pin_len EQUAL 40 AND NOT "${MKF_GIT_HEAD}" STREQUAL "${MKF_GIT_TAG}")
+        message(FATAL_ERROR
+            "Vendored PyOM built MKF at ${MKF_GIT_HEAD} but the pin is "
+            "${MKF_GIT_TAG} (ABT #73). Delete ${CMAKE_BINARY_DIR}/_deps/mkf-src "
+            "and reconfigure, or fetch the pinned commit.")
     endif()
 
     message(STATUS ${MAS_SOURCE_DIR})
