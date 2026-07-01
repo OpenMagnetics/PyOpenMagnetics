@@ -104,6 +104,61 @@ json calculate_advised_magnetics(json inputsJson, int maximumNumberResults, json
     }
 }
 
+json calculate_advised_magnetics_with_filters(json inputsJson, json filterFlowJson, int maximumNumberResults, json coreModeJson) {
+    // FAST custom design driven by a CALLER-SUPPLIED filter flow: strictlyRequired
+    // filters (e.g. DC/EFFECTIVE_CURRENT_DENSITY, which the default custom flow
+    // omits) DROP any wound candidate that fails them, so designed windings are
+    // current-density gated while the fast path's loss ranking + core search are
+    // preserved. Exposes MagneticAdviser::get_advised_magnetic_fast(inputs, flow, n).
+    try {
+        OpenMagnetics::Inputs inputs(inputsJson);
+        OpenMagnetics::CoreAdviser::CoreAdviserModes coreMode;
+        from_json(coreModeJson, coreMode);
+
+        std::vector<OpenMagnetics::MagneticFilterOperation> filterFlow;
+        for (auto filterJson : filterFlowJson) {
+            OpenMagnetics::MagneticFilterOperation filter(filterJson);
+            filterFlow.push_back(filter);
+        }
+
+        OpenMagnetics::MagneticAdviser magneticAdviser;
+        magneticAdviser.set_core_mode(coreMode);
+        auto masMagnetics = magneticAdviser.get_advised_magnetic_fast(inputs, filterFlow, maximumNumberResults);
+
+        auto scoringsPerFilter = magneticAdviser.get_scorings();
+
+        json results = json();
+        results["data"] = json::array();
+        for (auto& [masMagnetic, scoring] : masMagnetics) {
+            std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+            json result;
+            json masJson;
+            to_json(masJson, masMagnetic);
+            result["mas"] = masJson;
+            result["scoring"] = scoring;
+            if (scoringsPerFilter.count(name)) {
+                json filterScorings;
+                for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+                    filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
+                }
+                result["scoringPerFilter"] = filterScorings;
+            }
+            results["data"].push_back(result);
+        }
+
+        sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
+            return b1["scoring"] > b2["scoring"];
+        });
+
+        return results;
+    }
+    catch (const std::exception &exc) {
+        json exception;
+        exception["data"] = "Exception: " + std::string{exc.what()};
+        return exception;
+    }
+}
+
 json calculate_advised_magnetics_fast(json inputsJson, int maximumNumberResults, json coreModeJson) {
     try {
         OpenMagnetics::Inputs inputs(inputsJson);
@@ -391,7 +446,20 @@ void register_adviser_bindings(py::module& m) {
             ...     print(f"Score: {item['scoring']}, Per filter: {item['scoringPerFilter']}")
         )pbdoc",
         py::arg("inputs_json"), py::arg("max_results"), py::arg("core_mode_json"));
-    
+
+    m.def("calculate_advised_magnetics_with_filters", &calculate_advised_magnetics_with_filters,
+        R"pbdoc(
+        Fast custom magnetic design with a CALLER-SUPPLIED filter flow.
+
+        Like calculate_advised_magnetics_fast(), but strictlyRequired filters in
+        filter_flow_json DROP any wound candidate that fails them — e.g. add
+        DC_CURRENT_DENSITY / EFFECTIVE_CURRENT_DENSITY so designed windings are
+        current-density gated. Each filter op is
+        {"filter": <TitleCaseName>, "invert": bool, "log": bool,
+         "strictlyRequired": bool, "weight": float}.
+        )pbdoc",
+        py::arg("inputs_json"), py::arg("filter_flow_json"), py::arg("max_results"), py::arg("core_mode_json"));
+
     m.def("calculate_advised_magnetics_fast", &calculate_advised_magnetics_fast,
         R"pbdoc(
         Get recommended complete magnetic designs using fast analytical mode.
