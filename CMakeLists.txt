@@ -42,6 +42,9 @@ else ()
 endif()
 
 SET(MAS_DIRECTORY "${CMAKE_BINARY_DIR}/MAS/")
+# quicktype does not create the output directory; a FRESH build dir has no MAS/ yet
+# (mirrors the CAS_DIRECTORY MAKE_DIRECTORY below).
+file(MAKE_DIRECTORY "${MAS_DIRECTORY}")
 if(DEFINED ENV{LOCAL_MKF_DIR})
     SET(LOCAL_MKF_MAS TRUE)
     SET(MAS_DIR "${PROJECT_SOURCE_DIR}/_mas_local")
@@ -299,7 +302,8 @@ add_custom_command(
     -S ${MAS_DIR}/schemas/inputs/designRequirements.json
     -S ${MAS_DIR}/schemas/inputs/operatingConditions.json
     -S ${MAS_DIR}/schemas/inputs/operatingPoint.json
-    -S ${MAS_DIR}/schemas/inputs/operatingPointExcitation.json
+    # operatingPointExcitation moved from MAS to PEAS (MAS 76d5e9e "consolidate on PEAS");
+    # the PEAS copy is already fed above (${MKF_DIR}/PEAS/schemas/inputs/operatingPointExcitation.json).
     -S ${MAS_DIR}/schemas/inputs/topologies/flyback.json
     -S ${MAS_DIR}/schemas/inputs/topologies/currentTransformer.json
     -S ${MAS_DIR}/schemas/inputs/topologies/boost.json
@@ -383,6 +387,10 @@ file(GLOB SOURCES src/*.cpp
     ${MKF_DIR}/src/support/*.cpp
     )
 
+# TEMP: exclude the converter binding — it references MKF converter_models headers deleted
+# by the Kirchhoff externalisation. Not used by El Choker; excluded to build the toroid fix.
+list(FILTER SOURCES EXCLUDE REGEX "/converter\\.cpp$")
+
 set(CCI_GENERATED_CPP "${CMAKE_BINARY_DIR}/generated/CciCoordinatesData.cpp")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_custom_command(
@@ -449,6 +457,12 @@ include_directories("${CMAKE_BINARY_DIR}/_deps/eigen-src")
 include_directories("${CMAKE_BINARY_DIR}/_cmrc/include")
 include_directories("${MAS_DIRECTORY}")
 include_directories("src/")
+
+# Kirchhoff bridge: MKF's converter_models/KirchhoffBridge.cpp #includes KirchhoffApi.hpp
+# and links libKirchhoffApi.so (converters were externalised into the Kirchhoff project).
+# Mirror MKF's own wiring so the bridge compiles + links.
+include_directories("/home/alf/OpenConverters/Kirchhoff/src")
+target_link_libraries(PyOpenMagnetics PRIVATE "/home/alf/OpenConverters/Kirchhoff/build/libKirchhoffApi.so")
 
 # target_link_libraries(PyOpenMagnetics PUBLIC MKF)
 

@@ -5,7 +5,9 @@
 #include "bobbin.h"
 #include "winding.h"
 #include "advisers.h"
-#include "converter.h"
+// #include "converter.h"  // TEMP: converter bindings reference MKF converter_models
+// headers deleted by the Kirchhoff externalisation; excluded to build the toroid fix.
+#include "cmc.h"  // CMC bindings re-pointed at Kirchhoff api::design_cmc (el-choker's path)
 #include "losses.h"
 #include "simulation.h"
 #include "plotting.h"
@@ -33,7 +35,8 @@ PYBIND11_MODULE(PyOpenMagnetics, m) {
     PyMKF::register_bobbin_bindings(m);
     PyMKF::register_winding_bindings(m);
     PyMKF::register_adviser_bindings(m);
-    PyMKF::register_converter_bindings(m);
+    // PyMKF::register_converter_bindings(m);  // TEMP: excluded (see include above)
+    PyMKF::register_cmc_bindings(m);  // CMC via Kirchhoff (calculate_cmc_inputs + advanced)
     PyMKF::register_losses_bindings(m);
     PyMKF::register_simulation_bindings(m);
     PyMKF::register_plotting_bindings(m);
