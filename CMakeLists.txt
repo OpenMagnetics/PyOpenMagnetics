@@ -503,6 +503,17 @@ add_dependencies(KirchhoffApi kirchhoff_ext)
 target_link_libraries(PyOpenMagnetics PRIVATE KirchhoffApi)
 add_dependencies(PyOpenMagnetics kirchhoff_ext)
 
+# Ship libKirchhoffApi next to the extension in the wheel and point the extension's RPATH at
+# itself, so (1) the co-built shared lib resolves at runtime and (2) the wheel-repair tools
+# (auditwheel / delocate / delvewheel) can LOCATE and vendor it — otherwise auditwheel fails with
+# "required library libKirchhoffApi.so could not be located" even though the build linked fine.
+if(APPLE)
+    set_target_properties(PyOpenMagnetics PROPERTIES INSTALL_RPATH "@loader_path" BUILD_WITH_INSTALL_RPATH TRUE)
+elseif(NOT WIN32)
+    set_target_properties(PyOpenMagnetics PROPERTIES INSTALL_RPATH "$ORIGIN" BUILD_WITH_INSTALL_RPATH TRUE)
+endif()
+install(FILES "${KIRCHHOFF_API_LIB}" DESTINATION .)
+
 # target_link_libraries(PyOpenMagnetics PUBLIC MKF)
 
 
