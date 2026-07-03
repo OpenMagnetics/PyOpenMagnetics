@@ -493,6 +493,11 @@ ExternalProject_Add(kirchhoff_ext
         -DKIRCHHOFF_BUILD_SHARED_API=ON   # emit libKirchhoffApi.so (string facade, hidden internals)
         -DKIRCHHOFF_BUILD_PYBIND=OFF
         -DENABLE_NGSPICE=ON               # KH carries the simulator MKF stopped building
+    # Build ONLY the KirchhoffApi shared lib (+ its dependency chain), not Kirchhoff's standalone
+    # test/example executables. The wheel needs only the facade lib, and those demos/tests use POSIX
+    # popen/pclose (MSVC-only _popen/_pclose) that break the Windows build — and compiling 25+ binaries
+    # per Python version is pure waste. src/ (the library) is clean of popen.
+    BUILD_COMMAND "${CMAKE_COMMAND}" --build <BINARY_DIR> --config Release --target KirchhoffApi
     BUILD_ALWAYS OFF
     INSTALL_COMMAND ""
     BUILD_BYPRODUCTS "${KIRCHHOFF_API_LIB}" "${KIRCHHOFF_API_IMPLIB}")
