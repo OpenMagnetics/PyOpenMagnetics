@@ -565,30 +565,12 @@ json calculate_capacitance_matrix(json coilJson, json modelsData) {
     }
 }
 
-json calculate_capacitance_models_between_windings(double energy, double voltageDrop, double relativeTurnsRatio) {
-    try {
-        auto result = OpenMagnetics::StrayCapacitance::calculate_capacitance_models_between_windings(energy, voltageDrop, relativeTurnsRatio);
-
-        json resultJson;
-
-        resultJson["sixCapacitorNetwork"]["c1"] = result.first.get_c1();
-        resultJson["sixCapacitorNetwork"]["c2"] = result.first.get_c2();
-        resultJson["sixCapacitorNetwork"]["c3"] = result.first.get_c3();
-        resultJson["sixCapacitorNetwork"]["c4"] = result.first.get_c4();
-        resultJson["sixCapacitorNetwork"]["c5"] = result.first.get_c5();
-        resultJson["sixCapacitorNetwork"]["c6"] = result.first.get_c6();
-
-        resultJson["tripoleCapacitance"]["c1"] = result.second.get_c1();
-        resultJson["tripoleCapacitance"]["c2"] = result.second.get_c2();
-        resultJson["tripoleCapacitance"]["c3"] = result.second.get_c3();
-
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+json calculate_capacitance_models_between_windings(double /*energy*/, double /*voltageDrop*/, double /*relativeTurnsRatio*/) {
+    // Removed from MKF: OpenMagnetics::StrayCapacitance no longer exposes the six-capacitor /
+    // tripole model helper (dropped in the same MKF cleanup as the converter externalisation;
+    // WebLibMKF dropped this binding too). Kept as a stub so the API surface stays stable.
+    return json{{"error", "calculate_capacitance_models_between_windings: removed from MKF "
+                          "(StrayCapacitance no longer provides the six-capacitor / tripole model)."}};
 }
 
 json export_magnetic_as_symbol(json magneticJson, json inputsJson) {

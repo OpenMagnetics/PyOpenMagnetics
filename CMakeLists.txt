@@ -128,30 +128,21 @@ include_directories("${CMAKE_BINARY_DIR}/_deps/eigen-src")
 if(NOT LOCAL_MKF_MAS)
     message(STATUS "Fetching MKF")
     # --------------------------------------------------------------------
-    # MKF is PINNED to a SHA, NOT tracked to main (ABT #73).
+    # MKF tracks main (ABT #73 resolved).
     #
-    # MKF main advanced past this commit to "delete converter_models + link
-    # the Kirchhoff converter-model library (libKirchhoffApi.so)". This
-    # vendored build compiles MKF by *globbing* its .cpp files straight into
-    # the PyOpenMagnetics module (see file(GLOB SOURCES ...) below) — it does
-    # NOT drive MKF's own CMakeLists, so it never builds or links
-    # libKirchhoffApi.so. Kirchhoff and its AAS sibling are also UNPUBLISHED,
-    # so a clean checkout cannot obtain the library at all. A from-scratch
-    # build of newer main therefore fails to LINK: KirchhoffBridge.cpp and
-    # WaveformProcessor reference symbols that now live in libKirchhoffApi.so.
-    #
-    # 2ae859dc is the last commit BEFORE that hard dependency — KirchhoffBridge
-    # does not yet exist and MKF's Kirchhoff references are comments only, so
-    # the globbed sources link self-contained. It is the exact commit the
-    # currently-shipping vendored .so was built from (git rev-list 2ae859dc..main
-    # == 9). To ADVANCE the pin you must first wire the Kirchhoff lib build into
-    # THIS file (publish AAS/Kirchhoff, then add_subdirectory + link
-    # libKirchhoffApi.so) — see ABT #73 option (b). Until then, bumping this to
-    # a newer main breaks a clean rebuild.
-    set(MKF_GIT_TAG "2ae859dcae6c3b2e5a128893247b7714360e863f"
-        CACHE STRING "MKF git ref for the vendored PyOM build (pinned; see ABT #73)")
+    # MKF main deleted converter_models and links the Kirchhoff converter-model
+    # library (libKirchhoffApi.so) via KirchhoffBridge.cpp. The vendored build
+    # globs MKF's .cpp into the PyOpenMagnetics module, so it needs that .so at
+    # link time — which the Kirchhoff ExternalProject wired below (mirroring
+    # MKF's own MKF_USE_KIRCHHOFF) now provides. Kirchhoff and its AAS/PSMA
+    # siblings are published, so a clean checkout resolves the whole tree. The
+    # earlier 2ae859dc SHA pin (pre-converter_models-deletion) is no longer
+    # needed now that the Kirchhoff lib build is wired in — the prerequisite the
+    # old pin comment named. Tracks main so MKF fixes reach the wheel.
+    set(MKF_GIT_TAG "main"
+        CACHE STRING "MKF git ref for the vendored PyOM build")
     # Force fresh clone by using a unique timestamp - update this when the pin changes
-    set(MKF_FORCE_REFRESH "2026-07-01-pin-2ae859dc")
+    set(MKF_FORCE_REFRESH "2026-07-03-track-main-kirchhoff")
     # Tell MKF to disable matplotplusplus and use SVG-based Painter instead
     set(INCLUDE_PYMKF ON CACHE BOOL "Build Python interface" FORCE)
     # GIT_SUBMODULES_RECURSE pulls in CAS/PEAS (added 2026-04 alongside the
@@ -387,9 +378,7 @@ file(GLOB SOURCES src/*.cpp
     ${MKF_DIR}/src/support/*.cpp
     )
 
-# TEMP: exclude the converter binding — it references MKF converter_models headers deleted
-# by the Kirchhoff externalisation. Not used by El Choker; excluded to build the toroid fix.
-list(FILTER SOURCES EXCLUDE REGEX "/converter\\.cpp$")
+# converter.cpp is now a thin shim over the Kirchhoff string API (libKirchhoffApi) — re-enabled.
 
 set(CCI_GENERATED_CPP "${CMAKE_BINARY_DIR}/generated/CciCoordinatesData.cpp")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -458,11 +447,44 @@ include_directories("${CMAKE_BINARY_DIR}/_cmrc/include")
 include_directories("${MAS_DIRECTORY}")
 include_directories("src/")
 
-# Kirchhoff bridge: MKF's converter_models/KirchhoffBridge.cpp #includes KirchhoffApi.hpp
-# and links libKirchhoffApi.so (converters were externalised into the Kirchhoff project).
-# Mirror MKF's own wiring so the bridge compiles + links.
-include_directories("/home/alf/OpenConverters/Kirchhoff/src")
-target_link_libraries(PyOpenMagnetics PRIVATE "/home/alf/OpenConverters/Kirchhoff/build/libKirchhoffApi.so")
+# Kirchhoff: the externalised converter-model library that replaced MKF's converter_models. converter.cpp
+# and cmc.cpp are thin shims over its Kirchhoff::api string/JSON facade (libKirchhoffApi.so), and MKF's
+# converter_models/KirchhoffBridge.cpp links it too. Built ISOLATED via ExternalProject so Kirchhoff's own
+# `namespace MAS` types stay hidden inside the .so and never collide with MKF's identically-named ones —
+# only JSON strings cross the boundary. Mirrors MKF/CMakeLists.txt's MKF_USE_KIRCHHOFF wiring.
+#   * Default: clone from GitHub at KIRCHHOFF_GIT_TAG (recursive submodules).
+#   * Local dev: -DKIRCHHOFF_SOURCE_DIR=/path/to/Kirchhoff to build a working tree instead.
+include(ExternalProject)
+set(KIRCHHOFF_GIT_TAG "main" CACHE STRING "Kirchhoff git tag/branch to build (when fetching from GitHub)")
+set(KIRCHHOFF_SOURCE_DIR "" CACHE PATH "Local Kirchhoff working tree (leave empty to fetch from GitHub)")
+set(KIRCHHOFF_BUILD_DIR "${CMAKE_BINARY_DIR}/kirchhoff-build")
+set(KIRCHHOFF_API_LIB "${KIRCHHOFF_BUILD_DIR}/libKirchhoffApi.so")
+if(KIRCHHOFF_SOURCE_DIR)
+    set(_kirchhoff_src SOURCE_DIR "${KIRCHHOFF_SOURCE_DIR}")
+    set(_kirchhoff_hdr_dir "${KIRCHHOFF_SOURCE_DIR}/src")
+else()
+    set(_kirchhoff_src GIT_REPOSITORY "git@github.com:OpenConverters/Kirchhoff.git"
+                       GIT_TAG "${KIRCHHOFF_GIT_TAG}")
+    set(_kirchhoff_hdr_dir "${CMAKE_BINARY_DIR}/kirchhoff-ext-prefix/src/kirchhoff_ext/src")
+endif()
+ExternalProject_Add(kirchhoff_ext
+    ${_kirchhoff_src}
+    PREFIX "${CMAKE_BINARY_DIR}/kirchhoff-ext-prefix"
+    BINARY_DIR "${KIRCHHOFF_BUILD_DIR}"
+    CMAKE_ARGS
+        -DCMAKE_BUILD_TYPE=Release
+        -DKIRCHHOFF_BUILD_SHARED_API=ON   # emit libKirchhoffApi.so (string facade, hidden internals)
+        -DKIRCHHOFF_BUILD_PYBIND=OFF
+        -DENABLE_NGSPICE=ON               # KH carries the simulator MKF stopped building
+    BUILD_ALWAYS OFF
+    INSTALL_COMMAND ""
+    BUILD_BYPRODUCTS "${KIRCHHOFF_API_LIB}")
+include_directories("${_kirchhoff_hdr_dir}")
+add_library(KirchhoffApi SHARED IMPORTED)
+set_target_properties(KirchhoffApi PROPERTIES IMPORTED_LOCATION "${KIRCHHOFF_API_LIB}")
+add_dependencies(KirchhoffApi kirchhoff_ext)
+target_link_libraries(PyOpenMagnetics PRIVATE KirchhoffApi)
+add_dependencies(PyOpenMagnetics kirchhoff_ext)
 
 # target_link_libraries(PyOpenMagnetics PUBLIC MKF)
 
