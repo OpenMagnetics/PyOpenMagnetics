@@ -463,7 +463,11 @@ if(KIRCHHOFF_SOURCE_DIR)
     set(_kirchhoff_src SOURCE_DIR "${KIRCHHOFF_SOURCE_DIR}")
     set(_kirchhoff_hdr_dir "${KIRCHHOFF_SOURCE_DIR}/src")
 else()
-    set(_kirchhoff_src GIT_REPOSITORY "git@github.com:OpenConverters/Kirchhoff.git"
+    # HTTPS (not SSH): the manylinux wheel containers have no ssh binary. Kirchhoff and its PSMA
+    # submodules are public, so anonymous HTTPS clones them fine. The submodule URLs in Kirchhoff's
+    # own .gitmodules are SSH, so CI additionally sets url."https://github.com/".insteadOf in
+    # CIBW_BEFORE_ALL (publish.yml) to rewrite those during the recursive clone.
+    set(_kirchhoff_src GIT_REPOSITORY "https://github.com/OpenConverters/Kirchhoff.git"
                        GIT_TAG "${KIRCHHOFF_GIT_TAG}")
     set(_kirchhoff_hdr_dir "${CMAKE_BINARY_DIR}/kirchhoff-ext-prefix/src/kirchhoff_ext/src")
 endif()
