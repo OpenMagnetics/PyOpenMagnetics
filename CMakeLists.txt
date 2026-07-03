@@ -344,6 +344,9 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E remove -f "${CAS_DIRECTORY}/CAS.hpp"
   COMMAND quicktype -l c++ -s schema ${CAS_DIR}/schemas/inputs.json
     -S ${CAS_DIR}/schemas/inputs/designRequirements.json
+    # designRequirements.allowedTechnologies $refs ../capacitor.json#/$defs/technology; feed it as a
+    # source so Windows quicktype resolves it by $id (relative file-URI resolution fails on Windows).
+    -S ${CAS_DIR}/schemas/capacitor.json
     -S ${PEAS_DIR}/schemas/utils.json
     -S ${PEAS_DIR}/schemas/inputs/twoTerminalOperatingPoint.json
     -S ${PEAS_DIR}/schemas/inputs/operatingConditions.json
