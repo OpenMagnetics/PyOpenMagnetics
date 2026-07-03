@@ -458,7 +458,17 @@ include(ExternalProject)
 set(KIRCHHOFF_GIT_TAG "main" CACHE STRING "Kirchhoff git tag/branch to build (when fetching from GitHub)")
 set(KIRCHHOFF_SOURCE_DIR "" CACHE PATH "Local Kirchhoff working tree (leave empty to fetch from GitHub)")
 set(KIRCHHOFF_BUILD_DIR "${CMAKE_BINARY_DIR}/kirchhoff-build")
-set(KIRCHHOFF_API_LIB "${KIRCHHOFF_BUILD_DIR}/libKirchhoffApi.so")
+# Platform-specific shared-lib artifact names. On Windows a shared library links against an
+# import library (.lib, IMPORTED_IMPLIB) with the .dll as the runtime (IMPORTED_LOCATION);
+# Linux/macOS link the .so/.dylib directly.
+if(WIN32)
+    set(KIRCHHOFF_API_LIB "${KIRCHHOFF_BUILD_DIR}/KirchhoffApi.dll")
+    set(KIRCHHOFF_API_IMPLIB "${KIRCHHOFF_BUILD_DIR}/KirchhoffApi.lib")
+elseif(APPLE)
+    set(KIRCHHOFF_API_LIB "${KIRCHHOFF_BUILD_DIR}/libKirchhoffApi.dylib")
+else()
+    set(KIRCHHOFF_API_LIB "${KIRCHHOFF_BUILD_DIR}/libKirchhoffApi.so")
+endif()
 if(KIRCHHOFF_SOURCE_DIR)
     set(_kirchhoff_src SOURCE_DIR "${KIRCHHOFF_SOURCE_DIR}")
     set(_kirchhoff_hdr_dir "${KIRCHHOFF_SOURCE_DIR}/src")
@@ -482,10 +492,13 @@ ExternalProject_Add(kirchhoff_ext
         -DENABLE_NGSPICE=ON               # KH carries the simulator MKF stopped building
     BUILD_ALWAYS OFF
     INSTALL_COMMAND ""
-    BUILD_BYPRODUCTS "${KIRCHHOFF_API_LIB}")
+    BUILD_BYPRODUCTS "${KIRCHHOFF_API_LIB}" "${KIRCHHOFF_API_IMPLIB}")
 include_directories("${_kirchhoff_hdr_dir}")
 add_library(KirchhoffApi SHARED IMPORTED)
 set_target_properties(KirchhoffApi PROPERTIES IMPORTED_LOCATION "${KIRCHHOFF_API_LIB}")
+if(WIN32)
+    set_target_properties(KirchhoffApi PROPERTIES IMPORTED_IMPLIB "${KIRCHHOFF_API_IMPLIB}")
+endif()
 add_dependencies(KirchhoffApi kirchhoff_ext)
 target_link_libraries(PyOpenMagnetics PRIVATE KirchhoffApi)
 add_dependencies(PyOpenMagnetics kirchhoff_ext)

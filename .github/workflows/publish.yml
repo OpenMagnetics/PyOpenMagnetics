@@ -132,6 +132,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
           packages-dir: wheelhouse/
 
       - name: Publish Linux wheels to TestPyPI
@@ -140,6 +141,7 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          skip-existing: true
           packages-dir: wheelhouse/
 
   # Build and publish Windows wheels independently
@@ -209,14 +211,14 @@ jobs:
 
       - name: Publish Windows wheels to PyPI
         if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish_to_pypi)
-        run: python -m twine upload wheelhouse/*.whl
+        run: python -m twine upload --skip-existing wheelhouse/*.whl
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Publish Windows wheels to TestPyPI
         if: github.event_name == 'workflow_dispatch' && !inputs.publish_to_pypi
-        run: python -m twine upload --repository-url https://test.pypi.org/legacy/ wheelhouse/*.whl
+        run: python -m twine upload --skip-existing --repository-url https://test.pypi.org/legacy/ wheelhouse/*.whl
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
@@ -300,14 +302,14 @@ jobs:
 
       - name: Publish macOS wheels to PyPI
         if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish_to_pypi)
-        run: python -m twine upload wheelhouse/*.whl
+        run: python -m twine upload --skip-existing wheelhouse/*.whl
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Publish macOS wheels to TestPyPI
         if: github.event_name == 'workflow_dispatch' && !inputs.publish_to_pypi
-        run: python -m twine upload --repository-url https://test.pypi.org/legacy/ wheelhouse/*.whl
+        run: python -m twine upload --skip-existing --repository-url https://test.pypi.org/legacy/ wheelhouse/*.whl
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
@@ -368,6 +370,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
           packages-dir: dist/
 
       - name: Publish sdist to TestPyPI
@@ -376,4 +379,5 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          skip-existing: true
           packages-dir: dist/
