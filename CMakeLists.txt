@@ -465,8 +465,13 @@ set(KIRCHHOFF_BUILD_DIR "${CMAKE_BINARY_DIR}/kirchhoff-build")
 # import library (.lib, IMPORTED_IMPLIB) with the .dll as the runtime (IMPORTED_LOCATION);
 # Linux/macOS link the .so/.dylib directly.
 if(WIN32)
-    set(KIRCHHOFF_API_LIB "${KIRCHHOFF_BUILD_DIR}/KirchhoffApi.dll")
-    set(KIRCHHOFF_API_IMPLIB "${KIRCHHOFF_BUILD_DIR}/KirchhoffApi.lib")
+    # The Visual Studio generator is multi-config: it emits build artifacts into a per-config
+    # subdirectory (Release/), so the KirchhoffApi DLL + import lib land in kirchhoff-build/Release/,
+    # NOT kirchhoff-build/ directly. The wheel build is always Release (CMAKE_BUILD_TYPE=Release and
+    # the ExternalProject BUILD_COMMAND uses --config Release), so point at that subdir; otherwise the
+    # extension link fails with LNK1181: cannot open input file 'KirchhoffApi.lib'.
+    set(KIRCHHOFF_API_LIB "${KIRCHHOFF_BUILD_DIR}/Release/KirchhoffApi.dll")
+    set(KIRCHHOFF_API_IMPLIB "${KIRCHHOFF_BUILD_DIR}/Release/KirchhoffApi.lib")
 elseif(APPLE)
     set(KIRCHHOFF_API_LIB "${KIRCHHOFF_BUILD_DIR}/libKirchhoffApi.dylib")
 else()
