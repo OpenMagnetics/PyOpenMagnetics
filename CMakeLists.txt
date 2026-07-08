@@ -489,6 +489,27 @@ else()
                        GIT_TAG "${KIRCHHOFF_GIT_TAG}")
     set(_kirchhoff_hdr_dir "${CMAKE_BINARY_DIR}/kirchhoff-ext-prefix/src/kirchhoff_ext/src")
 endif()
+# Kelvin — KH's shared TAS component selector. Since ~mid-2026 KH requires it
+# (add_subdirectory(KELVIN_DIR)) but it is NOT a KH submodule, so the source must be
+# supplied or KH fails to configure ("../Kelvin is not an existing directory"). KH
+# builds it in-tree reusing its own PEAS, so only the checkout is needed. Mirrors
+# MKF/CMakeLists.txt's KIRCHHOFF_KELVIN_DIR wiring. HTTPS for the same manylinux
+# reason as the Kirchhoff clone above.
+set(KIRCHHOFF_KELVIN_DIR "" CACHE PATH "Local Kelvin checkout for the Kirchhoff build (empty = fetch)")
+if(NOT KIRCHHOFF_KELVIN_DIR)
+    set(KIRCHHOFF_KELVIN_GIT_TAG "main" CACHE STRING "Kelvin git tag/branch (when fetched for Kirchhoff)")
+    FetchContent_Declare(kirchhoff_kelvin
+        GIT_REPOSITORY "https://github.com/OpenConverters/Kelvin.git"
+        GIT_TAG "${KIRCHHOFF_KELVIN_GIT_TAG}"
+        GIT_SUBMODULES ""   # KH overrides KELVIN_PEAS_DIR to its own PEAS; Kelvin's own submodules are unused
+        SOURCE_DIR "${CMAKE_BINARY_DIR}/kirchhoff-kelvin-src")
+    # Download only — KH does the add_subdirectory(KELVIN_DIR) in its own context.
+    FetchContent_GetProperties(kirchhoff_kelvin)
+    if(NOT kirchhoff_kelvin_POPULATED)
+        FetchContent_Populate(kirchhoff_kelvin)
+    endif()
+    set(KIRCHHOFF_KELVIN_DIR "${kirchhoff_kelvin_SOURCE_DIR}")
+endif()
 ExternalProject_Add(kirchhoff_ext
     ${_kirchhoff_src}
     PREFIX "${CMAKE_BINARY_DIR}/kirchhoff-ext-prefix"
@@ -498,6 +519,7 @@ ExternalProject_Add(kirchhoff_ext
         -DKIRCHHOFF_BUILD_SHARED_API=ON   # emit libKirchhoffApi.so (string facade, hidden internals)
         -DKIRCHHOFF_BUILD_PYBIND=OFF
         -DENABLE_NGSPICE=ON               # KH carries the simulator MKF stopped building
+        -DKELVIN_DIR=${KIRCHHOFF_KELVIN_DIR}  # Kelvin source (fetched above or a local checkout)
     # Build ONLY the KirchhoffApi shared lib (+ its dependency chain), not Kirchhoff's standalone
     # test/example executables. The wheel needs only the facade lib, and those demos/tests use POSIX
     # popen/pclose (MSVC-only _popen/_pclose) that break the Windows build — and compiling 25+ binaries

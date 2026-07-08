@@ -325,6 +325,21 @@ json sweep_impedance_over_frequency(json magneticJson, double start, double stop
     }
 }
 
+json sweep_common_mode_impedance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, std::string mode, std::string title) {
+    try {
+        OpenMagnetics::Magnetic magnetic(magneticJson);
+        auto result = OpenMagnetics::Sweeper::sweep_common_mode_impedance_over_frequency(magnetic, start, stop, numberElements, mode, title);
+        json resultJson;
+        to_json(resultJson, result);
+        return resultJson;
+    }
+    catch (const std::exception &exc) {
+        json exception;
+        exception["data"] = "Exception: " + std::string{exc.what()};
+        return exception;
+    }
+}
+
 json sweep_differential_mode_impedance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, std::string mode, std::string title) {
     try {
         OpenMagnetics::Magnetic magnetic(magneticJson);
@@ -808,6 +823,15 @@ void register_simulation_bindings(py::module& m) {
         py::arg("mode"),
         py::arg("title"),
         "Sweep impedance over a frequency range.");
+
+    m.def("sweep_common_mode_impedance_over_frequency", &sweep_common_mode_impedance_over_frequency,
+        py::arg("magnetic_json"),
+        py::arg("start"),
+        py::arg("stop"),
+        py::arg("number_elements"),
+        py::arg("mode"),
+        py::arg("title"),
+        "Sweep common-mode impedance (all windings driven in parallel — the CMC datasheet CM measurement; magnetizing tank only, no leakage resonance) over a frequency range.");
 
     m.def("sweep_differential_mode_impedance_over_frequency", &sweep_differential_mode_impedance_over_frequency,
         py::arg("magnetic_json"),
