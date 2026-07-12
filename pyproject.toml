@@ -27,7 +27,7 @@ Contact = "https://www.linkedin.com/in/alfonso-martinez-de-la-torre/"
 
 [tool.scikit-build]
 build-dir = "build/{wheel_tag}"
-cmake.verbose = true
+build.verbose = true
 sdist.exclude = [".venv*", ".venv*/**", "build", "build/**", "dist", "dist/**", "*.egg-info", "__pycache__", "*.pyc"]
 # Include additional files in the wheel
 wheel.packages = ["."]
