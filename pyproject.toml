@@ -60,7 +60,7 @@ before-all = [
   "dnf -y module enable nodejs:20",
   "dnf -y install nodejs npm",
   "npm --version",
-  "npm install -g quicktype@23.0.170"
+  "npm install -g quicktype@23.2.6"
 ]
 # Parallel level 2 (not 3): two large pybind11 TUs compiling at once stays
 # within the runner's RAM. Combined with dropping -g (see CMakeLists.txt),
@@ -68,11 +68,11 @@ before-all = [
 environment = { GIT_LFS_SKIP_SMUDGE=1, CMAKE_BUILD_PARALLEL_LEVEL="2" }
 
 [tool.cibuildwheel.macos]
-before-all = "npm --version && npm install -g quicktype@23.0.170"
+before-all = "npm --version && npm install -g quicktype@23.2.6"
 environment = { MACOSX_DEPLOYMENT_TARGET="14.0", GIT_LFS_SKIP_SMUDGE=1, CMAKE_BUILD_PARALLEL_LEVEL="3" }
 
 [tool.cibuildwheel.windows]
-before-all = "rmdir /S /Q build && npm --version && npm install -g quicktype@23.0.170"
+before-all = "rmdir /S /Q build && npm --version && npm install -g quicktype@23.2.6"
 archs = ["AMD64"]
 
 environment = { GIT_LFS_SKIP_SMUDGE=1, CMAKE_BUILD_PARALLEL_LEVEL="2" }
