@@ -313,13 +313,15 @@ json calculate_filling_factor(json coilJson) {
         // std::pair<double, std::pair<double,double>> to a named
         // FillingFactorsOutput struct (area / maxLayer / overlapping /
         // contiguous / windingFits). Read the members directly; keep the
-        // original three-key JSON output for backward compatibility.
+        // original three keys and add the two new members.
         auto fillingFactors = coil.calculate_filling_factor();
 
         json result;
         result["areaFillingFactor"] = fillingFactors.areaFillingFactor;
         result["overlappingFillingFactor"] = fillingFactors.overlappingFillingFactor;
         result["contiguousFillingFactor"] = fillingFactors.contiguousFillingFactor;
+        result["maxLayerFillingFactor"] = fillingFactors.maxLayerFillingFactor;
+        result["windingFits"] = fillingFactors.windingFits;
         return result;
     }
     catch (const std::exception &exc) {
