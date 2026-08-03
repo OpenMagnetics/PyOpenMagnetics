@@ -309,13 +309,17 @@ json get_available_core_losses_methods(json magneticJson) {
 json calculate_filling_factor(json coilJson) {
     try {
         OpenMagnetics::Coil coil(coilJson, false);
-        auto [areaFillingFactor, otherFactors] = coil.calculate_filling_factor();
-        auto [overlappingFillingFactor, contiguousFillingFactor] = otherFactors;
+        // MKF main changed Coil::calculate_filling_factor() from
+        // std::pair<double, std::pair<double,double>> to a named
+        // FillingFactorsOutput struct (area / maxLayer / overlapping /
+        // contiguous / windingFits). Read the members directly; keep the
+        // original three-key JSON output for backward compatibility.
+        auto fillingFactors = coil.calculate_filling_factor();
 
         json result;
-        result["areaFillingFactor"] = areaFillingFactor;
-        result["overlappingFillingFactor"] = overlappingFillingFactor;
-        result["contiguousFillingFactor"] = contiguousFillingFactor;
+        result["areaFillingFactor"] = fillingFactors.areaFillingFactor;
+        result["overlappingFillingFactor"] = fillingFactors.overlappingFillingFactor;
+        result["contiguousFillingFactor"] = fillingFactors.contiguousFillingFactor;
         return result;
     }
     catch (const std::exception &exc) {
