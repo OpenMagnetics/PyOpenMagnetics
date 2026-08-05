@@ -34,6 +34,14 @@ jobs:
         with:
           node-version: "18"
 
+      - name: Rewrite SSH submodule URLs to HTTPS
+        # Kirchhoff (fetched at build time by CMake ExternalProject) declares its
+        # PSMA schema submodules with git@github.com: URLs, which a runner cannot
+        # authenticate -> "Permission denied (publickey)" and a failed wheel build.
+        # publish.yml already does this inside CIBW_BEFORE_ALL_*; CI never did,
+        # which is why every CI job was red on every OS while publish stayed green.
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
+
       - name: Install quicktype
         run: npm install -g quicktype@23.2.6
 
@@ -72,6 +80,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "18"
+
+      - name: Rewrite SSH submodule URLs to HTTPS
+        # Kirchhoff (fetched at build time by CMake ExternalProject) declares its
+        # PSMA schema submodules with git@github.com: URLs, which a runner cannot
+        # authenticate -> "Permission denied (publickey)" and a failed wheel build.
+        # publish.yml already does this inside CIBW_BEFORE_ALL_*; CI never did,
+        # which is why every CI job was red on every OS while publish stayed green.
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Install quicktype
         run: npm install -g quicktype@23.2.6
