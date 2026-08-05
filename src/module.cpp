@@ -5,6 +5,7 @@
 #include "bobbin.h"
 #include "winding.h"
 #include "advisers.h"
+#include "crossref.h"
 #include "converter.h"  // converter surface re-pointed at Kirchhoff api (converter.cpp shims)
 #include "cmc.h"  // CMC bindings re-pointed at Kirchhoff api::design_cmc (el-choker's path)
 #include "losses.h"
@@ -34,6 +35,7 @@ PYBIND11_MODULE(PyOpenMagnetics, m) {
     PyMKF::register_bobbin_bindings(m);
     PyMKF::register_winding_bindings(m);
     PyMKF::register_adviser_bindings(m);
+    PyMKF::register_crossref_bindings(m);  // core / core-material cross-referencers
     PyMKF::register_converter_bindings(m);  // converter surface via Kirchhoff
     PyMKF::register_cmc_bindings(m);  // CMC via Kirchhoff (calculate_cmc_inputs + advanced)
     PyMKF::register_losses_bindings(m);

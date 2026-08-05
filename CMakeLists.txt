@@ -243,6 +243,10 @@ endif()
 message(STATUS "Compiling MAS")
 
 
+# Every schema the generated header is built from — the DEPENDS list below.
+file(GLOB_RECURSE MAS_SCHEMA_FILES CONFIGURE_DEPENDS "${MAS_DIR}/schemas/*.json")
+file(GLOB_RECURSE PEAS_SCHEMA_FILES CONFIGURE_DEPENDS "${MKF_DIR}/PEAS/schemas/*.json")
+
 add_custom_command(
   OUTPUT "${MAS_DIRECTORY}/MAS.hpp"
   # Force regeneration by removing output first
@@ -321,6 +325,15 @@ add_custom_command(
     -S ${MAS_DIR}/schemas/inputs/topologies/seriesResonant.json
     -S ${MAS_DIR}/schemas/inputs/topologies/vienna.json
     -o ${MAS_DIRECTORY}/MAS.hpp --namespace MAS --source-style single-source --type-style pascal-case --member-style underscore-case --enumerator-style upper-underscore-case --no-boost
+  # WITHOUT THIS, CMake treats MAS.hpp as up to date forever once the file
+  # exists: no dependency is declared, so the schemas can change and the header
+  # silently keeps stale members. That is how a 6 July MAS.hpp survived a 28 July
+  # schema and broke MKF's Coil.h on Winding::set_winding_window — the schema had
+  # `windingWindow`, the generated class did not. (The `remove -f` above does NOT
+  # help: it runs only once CMake has already decided to regenerate.)
+  # Globbed rather than repeating the ~80-entry -S list, which would drift out of
+  # sync with it; CONFIGURE_DEPENDS also re-globs when a schema file is added.
+  DEPENDS ${MAS_SCHEMA_FILES} ${PEAS_SCHEMA_FILES}
   USES_TERMINAL)
 
 add_custom_target(PyMASGeneration
