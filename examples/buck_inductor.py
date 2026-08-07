@@ -52,14 +52,16 @@ def design_buck_inductor():
     print(f"  Peak current: {I_peak:.1f} A")
     print(f"  Valley current: {I_valley:.1f} A")
     
-    # Define inputs for PyOpenMagnetics
+    # Define inputs for PyOpenMagnetics. turnsRatios must be present (empty for
+    # a single-winding inductor) or process_inputs raises EngineError.
     inputs = {
         "designRequirements": {
             "magnetizingInductance": {
                 "nominal": L,
                 "minimum": L * 0.9,
                 "maximum": L * 1.1
-            }
+            },
+            "turnsRatios": []
         },
         "operatingPoints": [{
             "name": "Full Load",
@@ -105,11 +107,11 @@ def design_buck_inductor():
     }
     
     result = PyOpenMagnetics.calculate_advised_magnetics(
-        processed, 5, "STANDARD_CORES"
+        processed, 5, "standard cores"
     )
-    
-    # Extract magnetics list from result (v1.1.2+ format: {"data": [...]})
-    magnetics = result["data"] if isinstance(result, dict) and "data" in result else result
+
+    # Result format: {"data": [...]}. Failures raise PyOpenMagnetics.EngineError.
+    magnetics = result["data"]
     
     print(f"  Found {len(magnetics)} suitable designs")
     

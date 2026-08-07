@@ -169,11 +169,7 @@ def simulate_losses(magnetic, specs):
     }
     
     # Process inputs
-    processed_result = PyOpenMagnetics.process_inputs(inputs)
-    if isinstance(processed_result, dict) and "data" in processed_result:
-        processed_inputs = processed_result["data"]
-    else:
-        processed_inputs = processed_result
+    processed_inputs = PyOpenMagnetics.process_inputs(inputs)
     
     # Calculate core losses
     print("\n[1] Calculating core losses...")

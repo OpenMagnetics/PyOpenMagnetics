@@ -62,162 +62,110 @@ json get_core_losses_model_information(json material) {
 }
 
 json calculate_steinmetz_coefficients(json dataJson, json rangesJson) {
-    try {
-        std::vector<std::pair<double, double>> ranges;
-        for (auto rangeJson : rangesJson) {
-            std::pair<double, double> range{rangeJson[0], rangeJson[1]};
-            ranges.push_back(range);
-        }
-        std::vector<VolumetricLossesPoint> data;
-        for (auto datumJson : dataJson) {
-            VolumetricLossesPoint datum(datumJson);
-            data.push_back(datum);
-        }
-
-        auto [coefficientsPerRange, errorPerRange] = OpenMagnetics::CoreLossesSteinmetzModel::calculate_steinmetz_coefficients(data, ranges);
-
-        json result;
-        to_json(result, coefficientsPerRange);
-        return result;
+    std::vector<std::pair<double, double>> ranges;
+    for (auto rangeJson : rangesJson) {
+        std::pair<double, double> range{rangeJson[0], rangeJson[1]};
+        ranges.push_back(range);
     }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
+    std::vector<VolumetricLossesPoint> data;
+    for (auto datumJson : dataJson) {
+        VolumetricLossesPoint datum(datumJson);
+        data.push_back(datum);
     }
+
+    auto [coefficientsPerRange, errorPerRange] = OpenMagnetics::CoreLossesSteinmetzModel::calculate_steinmetz_coefficients(data, ranges);
+
+    json result;
+    to_json(result, coefficientsPerRange);
+    return result;
 }
 
 json calculate_steinmetz_coefficients_with_error(json dataJson, json rangesJson) {
-    try {
-        std::vector<std::pair<double, double>> ranges;
-        for (auto rangeJson : rangesJson) {
-            std::pair<double, double> range{rangeJson[0], rangeJson[1]};
-            ranges.push_back(range);
-        }
-        std::vector<VolumetricLossesPoint> data;
-        for (auto datumJson : dataJson) {
-            VolumetricLossesPoint datum(datumJson);
-            data.push_back(datum);
-        }
-
-        auto [coefficientsPerRange, errorPerRange] = OpenMagnetics::CoreLossesSteinmetzModel::calculate_steinmetz_coefficients(data, ranges);
-
-        json aux;
-        to_json(aux, coefficientsPerRange);
-        json result;
-        result["coefficientsPerRange"] = aux;
-        result["errorPerRange"] = errorPerRange;
-        return result;
+    std::vector<std::pair<double, double>> ranges;
+    for (auto rangeJson : rangesJson) {
+        std::pair<double, double> range{rangeJson[0], rangeJson[1]};
+        ranges.push_back(range);
     }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
+    std::vector<VolumetricLossesPoint> data;
+    for (auto datumJson : dataJson) {
+        VolumetricLossesPoint datum(datumJson);
+        data.push_back(datum);
     }
+
+    auto [coefficientsPerRange, errorPerRange] = OpenMagnetics::CoreLossesSteinmetzModel::calculate_steinmetz_coefficients(data, ranges);
+
+    json aux;
+    to_json(aux, coefficientsPerRange);
+    json result;
+    result["coefficientsPerRange"] = aux;
+    result["errorPerRange"] = errorPerRange;
+    return result;
 }
 
 json calculate_winding_losses(json magneticJson, json operatingPointJson, double temperature) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        OperatingPoint operatingPoint(operatingPointJson);
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    OperatingPoint operatingPoint(operatingPointJson);
 
-        auto windingLossesOutput = OpenMagnetics::WindingLosses().calculate_losses(magnetic, operatingPoint, temperature);
+    auto windingLossesOutput = OpenMagnetics::WindingLosses().calculate_losses(magnetic, operatingPoint, temperature);
 
-        json result;
-        to_json(result, windingLossesOutput);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    to_json(result, windingLossesOutput);
+    return result;
 }
 
 json calculate_ohmic_losses(json coilJson, json operatingPointJson, double temperature) {
-    try {
-        OpenMagnetics::Coil coil(coilJson, false);
-        OperatingPoint operatingPoint(operatingPointJson);
+    OpenMagnetics::Coil coil(coilJson, false);
+    OperatingPoint operatingPoint(operatingPointJson);
 
-        auto windingLossesOutput = OpenMagnetics::WindingOhmicLosses::calculate_ohmic_losses(coil, operatingPoint, temperature);
+    auto windingLossesOutput = OpenMagnetics::WindingOhmicLosses::calculate_ohmic_losses(coil, operatingPoint, temperature);
 
-        json result;
-        to_json(result, windingLossesOutput);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    to_json(result, windingLossesOutput);
+    return result;
 }
 
 json calculate_magnetic_field_strength_field(json operatingPointJson, json magneticJson) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        OperatingPoint operatingPoint(operatingPointJson);
-        OpenMagnetics::MagneticField magneticField;
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    OperatingPoint operatingPoint(operatingPointJson);
+    OpenMagnetics::MagneticField magneticField;
 
-        auto windingWindowMagneticStrengthFieldOutput = magneticField.calculate_magnetic_field_strength_field(operatingPoint, magnetic);
+    auto windingWindowMagneticStrengthFieldOutput = magneticField.calculate_magnetic_field_strength_field(operatingPoint, magnetic);
 
-        json result;
-        to_json(result, windingWindowMagneticStrengthFieldOutput);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    to_json(result, windingWindowMagneticStrengthFieldOutput);
+    return result;
 }
 
 json calculate_proximity_effect_losses(json coilJson, double temperature, json windingLossesOutputJson, json windingWindowMagneticStrengthFieldOutputJson) {
-    try {
-        OpenMagnetics::Coil coil(coilJson, false);
-        WindingLossesOutput windingLossesOutput(windingLossesOutputJson);
-        WindingWindowMagneticStrengthFieldOutput windingWindowMagneticStrengthFieldOutput(windingWindowMagneticStrengthFieldOutputJson);
+    OpenMagnetics::Coil coil(coilJson, false);
+    WindingLossesOutput windingLossesOutput(windingLossesOutputJson);
+    WindingWindowMagneticStrengthFieldOutput windingWindowMagneticStrengthFieldOutput(windingWindowMagneticStrengthFieldOutputJson);
 
-        auto windingLossesOutputOutput = OpenMagnetics::WindingProximityEffectLosses::calculate_proximity_effect_losses(coil, temperature, windingLossesOutput, windingWindowMagneticStrengthFieldOutput);
+    auto windingLossesOutputOutput = OpenMagnetics::WindingProximityEffectLosses::calculate_proximity_effect_losses(coil, temperature, windingLossesOutput, windingWindowMagneticStrengthFieldOutput);
 
-        json result;
-        to_json(result, windingLossesOutputOutput);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    to_json(result, windingLossesOutputOutput);
+    return result;
 }
 
 json calculate_skin_effect_losses(json coilJson, json windingLossesOutputJson, double temperature) {
-    try {
-        OpenMagnetics::Coil coil(coilJson, false);
-        WindingLossesOutput windingLossesOutput(windingLossesOutputJson);
+    OpenMagnetics::Coil coil(coilJson, false);
+    WindingLossesOutput windingLossesOutput(windingLossesOutputJson);
 
-        auto windingLossesOutputOutput = OpenMagnetics::WindingSkinEffectLosses::calculate_skin_effect_losses(coil, temperature, windingLossesOutput);
-        json result;
-        to_json(result, windingLossesOutputOutput);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    auto windingLossesOutputOutput = OpenMagnetics::WindingSkinEffectLosses::calculate_skin_effect_losses(coil, temperature, windingLossesOutput);
+    json result;
+    to_json(result, windingLossesOutputOutput);
+    return result;
 }
 
 json calculate_skin_effect_losses_per_meter(json wireJson, json currentJson, double temperature, double currentDivider) {
-    try {
-        OpenMagnetics::Wire wire(wireJson);
-        SignalDescriptor current(currentJson);
+    OpenMagnetics::Wire wire(wireJson);
+    SignalDescriptor current(currentJson);
 
-        auto skinEffectLossesPerMeter = OpenMagnetics::WindingSkinEffectLosses::calculate_skin_effect_losses_per_meter(wire, current, temperature, currentDivider);
+    auto skinEffectLossesPerMeter = OpenMagnetics::WindingSkinEffectLosses::calculate_skin_effect_losses_per_meter(wire, current, temperature, currentDivider);
 
-        json result = skinEffectLossesPerMeter;
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result = skinEffectLossesPerMeter;
+    return result;
 }
 
 double calculate_dc_resistance_per_meter(json wireJson, double temperature) {
@@ -269,94 +217,68 @@ double calculate_effective_current_density(json wireJson, json currentJson, doub
 }
 
 double calculate_effective_skin_depth(std::string materialName, json currentJson, double temperature) {
-    try {
-        SignalDescriptor current(currentJson);
+    SignalDescriptor current(currentJson);
 
-        if (!current.get_processed()->get_effective_frequency()) {
-            throw std::runtime_error("Current processed is missing field effective frequency");
-        }
-        auto currentEffectiveFrequency = current.get_processed()->get_effective_frequency().value();
-        double effectiveSkinDepth = OpenMagnetics::WindingSkinEffectLosses::calculate_skin_depth(materialName, currentEffectiveFrequency, temperature);
-        return effectiveSkinDepth;
+    if (!current.get_processed()->get_effective_frequency()) {
+        throw std::runtime_error("Current processed is missing field effective frequency");
     }
-    catch(const std::exception& ex) {
-        return -1;
-    }
+    auto currentEffectiveFrequency = current.get_processed()->get_effective_frequency().value();
+    double effectiveSkinDepth = OpenMagnetics::WindingSkinEffectLosses::calculate_skin_depth(materialName, currentEffectiveFrequency, temperature);
+    return effectiveSkinDepth;
 }
 
 json get_available_core_losses_methods(json magneticJson) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        auto core = magnetic.get_core();
-        auto material = core.get_functional_description().get_material();
-        auto methods = OpenMagnetics::CoreLossesModel::get_methods(material);
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto core = magnetic.get_core();
+    auto material = core.get_functional_description().get_material();
+    auto methods = OpenMagnetics::CoreLossesModel::get_methods(material);
 
-        json result = json::array();
-        for (auto& method : methods) {
-            json aux;
-            to_json(aux, method);
-            result.push_back(aux);
-        }
-        return result;
+    json result = json::array();
+    for (auto& method : methods) {
+        json aux;
+        to_json(aux, method);
+        result.push_back(aux);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json calculate_filling_factor(json coilJson) {
-    try {
-        OpenMagnetics::Coil coil(coilJson, false);
-        // MKF main changed Coil::calculate_filling_factor() from
-        // std::pair<double, std::pair<double,double>> to a named
-        // FillingFactorsOutput struct (area / maxLayer / overlapping /
-        // contiguous / windingFits). Read the members directly; keep the
-        // original three keys and add the two new members.
-        auto fillingFactors = coil.calculate_filling_factor();
+    OpenMagnetics::Coil coil(coilJson, false);
+    // MKF main changed Coil::calculate_filling_factor() from
+    // std::pair<double, std::pair<double,double>> to a named
+    // FillingFactorsOutput struct (area / maxLayer / overlapping /
+    // contiguous / windingFits). Read the members directly; keep the
+    // original three keys and add the two new members.
+    auto fillingFactors = coil.calculate_filling_factor();
 
-        json result;
-        result["areaFillingFactor"] = fillingFactors.areaFillingFactor;
-        result["overlappingFillingFactor"] = fillingFactors.overlappingFillingFactor;
-        result["contiguousFillingFactor"] = fillingFactors.contiguousFillingFactor;
-        result["maxLayerFillingFactor"] = fillingFactors.maxLayerFillingFactor;
-        result["windingFits"] = fillingFactors.windingFits;
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    result["areaFillingFactor"] = fillingFactors.areaFillingFactor;
+    result["overlappingFillingFactor"] = fillingFactors.overlappingFillingFactor;
+    result["contiguousFillingFactor"] = fillingFactors.contiguousFillingFactor;
+    result["maxLayerFillingFactor"] = fillingFactors.maxLayerFillingFactor;
+    result["windingFits"] = fillingFactors.windingFits;
+    return result;
 }
 
 json calculate_ac_resistance_coefficients_per_winding(json magneticJson, double temperature, double frequency) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        auto coil = magnetic.get_coil();
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto coil = magnetic.get_coil();
 
-        json result = json::array();
-        auto windings = coil.get_functional_description();
-        for (size_t windingIndex = 0; windingIndex < windings.size(); ++windingIndex) {
-            auto wire = OpenMagnetics::Coil::resolve_wire(windings[windingIndex]);
-            SignalDescriptor current;
-            ProcessedWaveform processed;
-            processed.set_effective_frequency(frequency);
-            current.set_processed(processed);
+    json result = json::array();
+    auto windings = coil.get_functional_description();
+    for (size_t windingIndex = 0; windingIndex < windings.size(); ++windingIndex) {
+        auto wire = OpenMagnetics::Coil::resolve_wire(windings[windingIndex]);
+        SignalDescriptor current;
+        ProcessedWaveform processed;
+        processed.set_effective_frequency(frequency);
+        current.set_processed(processed);
 
-            auto dcResistancePerMeter = OpenMagnetics::WindingOhmicLosses::calculate_dc_resistance_per_meter(wire, temperature);
-            auto [skinLossesPerMeter, _] = OpenMagnetics::WindingSkinEffectLosses::calculate_skin_effect_losses_per_meter(wire, current, temperature);
-            auto skinAcFactor = (skinLossesPerMeter + dcResistancePerMeter) / dcResistancePerMeter;
-            result.push_back(skinAcFactor);
-        }
-        return result;
+        auto dcResistancePerMeter = OpenMagnetics::WindingOhmicLosses::calculate_dc_resistance_per_meter(wire, temperature);
+        auto [skinLossesPerMeter, _] = OpenMagnetics::WindingSkinEffectLosses::calculate_skin_effect_losses_per_meter(wire, current, temperature);
+        auto skinAcFactor = (skinLossesPerMeter + dcResistancePerMeter) / dcResistancePerMeter;
+        result.push_back(skinAcFactor);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 void register_losses_bindings(py::module& m) {

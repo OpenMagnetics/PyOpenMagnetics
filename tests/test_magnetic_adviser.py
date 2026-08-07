@@ -256,18 +256,12 @@ class TestMagneticAdviserFromCache:
     def test_from_cache_without_cache(self, inductor_inputs, reset_settings):
         """
         Test magnetic adviser from cache when cache is empty.
-        Should return appropriate error message.
+        Should raise EngineError (v1.7.0+; no error-shaped return values).
         """
+        import pytest
         processed_inputs = PyOpenMagnetics.process_inputs(inductor_inputs)
-        
+
         filter_flow = []
-        
-        result = PyOpenMagnetics.calculate_advised_magnetics_from_cache(processed_inputs, filter_flow, 5)
-        
-        # Should handle empty cache - returns error string "Exception: No magnetics found in cache"
-        # or a result structure with empty data
-        if isinstance(result, str):
-            assert "cache" in result.lower() or "exception" in result.lower()
-        else:
-            result_data = parse_json_result(result)
-            assert isinstance(result_data, (dict, list))
+
+        with pytest.raises(PyOpenMagnetics.EngineError, match="[Cc]ache"):
+            PyOpenMagnetics.calculate_advised_magnetics_from_cache(processed_inputs, filter_flow, 5)

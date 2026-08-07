@@ -140,12 +140,12 @@ def test_per_topology_wrappers():
 
 def test_invalid_topology():
     """Test error handling for invalid topology."""
+    import pytest
     converter = {"some": "data"}
-    
-    result = PyMKF.process_converter("invalid_topology", converter)
-    assert "error" in result
-    assert "Unknown topology" in result["error"]
-    print("✓ Invalid topology error handling works")
+
+    with pytest.raises(PyMKF.EngineError, match="[Uu]nknown topology"):
+        PyMKF.process_converter("invalid_topology", converter)
+    print("✓ Invalid topology raises EngineError")
 
 
 def test_llc_converter():
@@ -176,7 +176,9 @@ def test_forward_converters():
     single_switch_forward = {
         "inputVoltage": {"minimum": 48, "maximum": 48},
         "desiredInductance": 1e-3,
-        "desiredTurnsRatios": [1.0, 2.0],  # [demagnetization, output]
+        # [demagnetization, output]. The output ratio must keep duty below 0.5:
+        # n < Vin/(2*(Vout+Vd)) = 48/(2*12.7) ~ 1.89 for a single-switch forward.
+        "desiredTurnsRatios": [1.0, 1.5],
         "diodeVoltageDrop": 0.7,
         "currentRippleRatio": 0.2,
         "operatingPoints": [{
@@ -196,7 +198,7 @@ def test_forward_converters():
     other_forward = {
         "inputVoltage": {"minimum": 48, "maximum": 48},
         "desiredInductance": 1e-3,
-        "desiredTurnsRatios": [2.0],  # Same as number of outputs
+        "desiredTurnsRatios": [1.5],  # Same as number of outputs; keeps duty < 0.5
         "diodeVoltageDrop": 0.7,
         "currentRippleRatio": 0.2,
         "operatingPoints": [{

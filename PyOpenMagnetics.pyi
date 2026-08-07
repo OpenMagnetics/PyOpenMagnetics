@@ -84,6 +84,14 @@ by reading AGENTS.md before starting.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
+class EngineError(RuntimeError):
+    """Raised by every engine failure (v1.7.0+): C++ exceptions surface as this."""
+    ...
+
+__mkf_commit__: str
+__mas_commit__: str
+
+
 from typing import Dict, List, Any, Optional, Union, Literal, overload
 
 # Type aliases for JSON-like structures

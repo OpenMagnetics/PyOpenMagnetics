@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import sys
-sys.path.insert(0, '/home/alf/OpenMagnetics/PyMKF/build/cp312-cp312-linux_x86_64')
 import PyOpenMagnetics as pom
 
 # Search for Round Grade 1 wires

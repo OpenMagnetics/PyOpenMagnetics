@@ -48,97 +48,66 @@ json create_basic_bobbin_by_thickness(json coreDataJson, double thickness) {
 }
 
 json calculate_bobbin_data(json magneticJson) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
+    OpenMagnetics::Magnetic magnetic(magneticJson);
 
-        auto optionalBobbin = magnetic.get_coil().get_bobbin();
-        OpenMagnetics::Bobbin bobbin;
+    auto optionalBobbin = magnetic.get_coil().get_bobbin();
+    OpenMagnetics::Bobbin bobbin;
 
-        if (std::holds_alternative<std::string>(optionalBobbin)) {
-            auto bobbinJson = std::get<std::string>(optionalBobbin);
-            if (bobbinJson == "Dummy") {
-                bobbin = OpenMagnetics::Bobbin::create_quick_bobbin(magnetic.get_mutable_core());
-            }
+    if (std::holds_alternative<std::string>(optionalBobbin)) {
+        auto bobbinJson = std::get<std::string>(optionalBobbin);
+        if (bobbinJson == "Dummy") {
+            bobbin = OpenMagnetics::Bobbin::create_quick_bobbin(magnetic.get_mutable_core());
         }
-        else {
-            bobbin = OpenMagnetics::Bobbin(std::get<OpenMagnetics::Bobbin>(optionalBobbin));
-            bobbin.process_data();
-        }
+    }
+    else {
+        bobbin = OpenMagnetics::Bobbin(std::get<OpenMagnetics::Bobbin>(optionalBobbin));
+        bobbin.process_data();
+    }
 
-        json result;
-        to_json(result, bobbin);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+    json result;
+    to_json(result, bobbin);
+    return result;
 }
 
 json process_bobbin(json bobbinJson) {
-    try {
-        OpenMagnetics::Bobbin bobbin(bobbinJson);
-        bobbin.process_data();
+    OpenMagnetics::Bobbin bobbin(bobbinJson);
+    bobbin.process_data();
 
-        json result;
-        to_json(result, bobbin);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+    json result;
+    to_json(result, bobbin);
+    return result;
 }
 
 bool check_if_fits(json bobbinJson, double dimension, bool isHorizontalOrRadial) {
-    try {
-        OpenMagnetics::Bobbin bobbin(bobbinJson);
-        return bobbin.check_if_fits(dimension, isHorizontalOrRadial);
-    }
-    catch (const std::exception &exc) {
-        std::cout << "Exception: " + std::string{exc.what()} << std::endl;
-        return false;
-    }
+    OpenMagnetics::Bobbin bobbin(bobbinJson);
+    return bobbin.check_if_fits(dimension, isHorizontalOrRadial);
 }
 
 json create_simple_bobbin_from_core(json coreJson) {
-    try {
-        OpenMagnetics::Core core(coreJson, false, false, false);
-        auto bobbin = OpenMagnetics::Bobbin::create_quick_bobbin(core);
+    OpenMagnetics::Core core(coreJson, false, false, false);
+    auto bobbin = OpenMagnetics::Bobbin::create_quick_bobbin(core);
 
-        json result;
-        to_json(result, bobbin);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+    json result;
+    to_json(result, bobbin);
+    return result;
 }
 
 json create_simple_bobbin_from_core_with_custom_thickness(json coreJson, double thickness) {
-    try {
-        OpenMagnetics::Core core(coreJson, false, false, false);
-        auto bobbin = OpenMagnetics::Bobbin::create_quick_bobbin(core, thickness);
+    OpenMagnetics::Core core(coreJson, false, false, false);
+    auto bobbin = OpenMagnetics::Bobbin::create_quick_bobbin(core, thickness);
 
-        json result;
-        to_json(result, bobbin);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+    json result;
+    to_json(result, bobbin);
+    return result;
 }
 
 json create_simple_bobbin_from_core_with_custom_thicknesses(json coreJson, double wallThickness, double columnThickness) {
-    try {
-        OpenMagnetics::Core core(coreJson, false, false, false);
-        auto bobbin = OpenMagnetics::Bobbin::create_quick_bobbin(core, wallThickness, columnThickness);
+    OpenMagnetics::Core core(coreJson, false, false, false);
+    auto bobbin = OpenMagnetics::Bobbin::create_quick_bobbin(core, wallThickness, columnThickness);
 
-        json result;
-        to_json(result, bobbin);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+    json result;
+    to_json(result, bobbin);
+    return result;
 }
 
 void register_bobbin_bindings(py::module& m) {

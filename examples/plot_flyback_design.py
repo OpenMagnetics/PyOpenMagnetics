@@ -448,25 +448,25 @@ def main():
     # 1. Design Summary
     print("  [1/4] Design summary...")
     fig1 = plot_design_summary()
-    fig1.savefig('/home/alf/OpenMagnetics/PyMKF/examples/flyback_summary.png', 
+    fig1.savefig('flyback_summary.png', 
                  dpi=150, bbox_inches='tight', facecolor='white')
     
     # 2. Core cross-section
     print("  [2/4] Core cross-section...")
     fig2 = plot_core_cross_section()
-    fig2.savefig('/home/alf/OpenMagnetics/PyMKF/examples/flyback_core.png', 
+    fig2.savefig('flyback_core.png', 
                  dpi=150, bbox_inches='tight', facecolor='white')
     
     # 3. Waveforms
     print("  [3/4] Operating waveforms...")
     fig3 = plot_waveforms()
-    fig3.savefig('/home/alf/OpenMagnetics/PyMKF/examples/flyback_waveforms.png', 
+    fig3.savefig('flyback_waveforms.png', 
                  dpi=150, bbox_inches='tight', facecolor='white')
     
     # 4. B-H curve
     print("  [4/4] B-H operating point...")
     fig4 = plot_bh_curve()
-    fig4.savefig('/home/alf/OpenMagnetics/PyMKF/examples/flyback_bh_curve.png', 
+    fig4.savefig('flyback_bh_curve.png', 
                  dpi=150, bbox_inches='tight', facecolor='white')
     
     print()

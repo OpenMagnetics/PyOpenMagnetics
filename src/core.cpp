@@ -16,25 +16,15 @@ json get_core_materials() {
 }
 
 double get_material_permeability(json materialName, double temperature, double magneticFieldDcBias, double frequency) {
-    try {
-        auto materialData = OpenMagnetics::find_core_material_by_name(materialName);
-        OpenMagnetics::InitialPermeability initialPermeability;
-        return initialPermeability.get_initial_permeability(materialData, temperature, magneticFieldDcBias, frequency);
-    }
-    catch (const std::exception &exc) {
-        throw std::runtime_error("Exception: " + std::string{exc.what()});
-    }
+    auto materialData = OpenMagnetics::find_core_material_by_name(materialName);
+    OpenMagnetics::InitialPermeability initialPermeability;
+    return initialPermeability.get_initial_permeability(materialData, temperature, magneticFieldDcBias, frequency);
 }
 
 double get_material_resistivity(json materialName, double temperature) {
-    try {
-        auto materialData = OpenMagnetics::find_core_material_by_name(materialName);
-        auto resistivityModel = OpenMagnetics::ResistivityModel::factory(OpenMagnetics::ResistivityModels::CORE_MATERIAL);
-        return (*resistivityModel).get_resistivity(materialData, temperature);
-    }
-    catch (const std::exception &exc) {
-        throw std::runtime_error("Exception: " + std::string{exc.what()});
-    }
+    auto materialData = OpenMagnetics::find_core_material_by_name(materialName);
+    auto resistivityModel = OpenMagnetics::ResistivityModel::factory(OpenMagnetics::ResistivityModels::CORE_MATERIAL);
+    return (*resistivityModel).get_resistivity(materialData, temperature);
 }
 
 json get_core_material_steinmetz_coefficients(json materialName, double frequency) {
@@ -172,15 +162,10 @@ json calculate_shape_data(json shapeJson) {
 }
 
 json calculate_core_data(json coreDataJson, bool includeMaterialData) {
-    try {
-        OpenMagnetics::Core core(coreDataJson, includeMaterialData, true);
-        json result;
-        to_json(result, core);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+    OpenMagnetics::Core core(coreDataJson, includeMaterialData, true);
+    json result;
+    to_json(result, core);
+    return result;
 }
 
 json load_core_data(json coresJson) {
@@ -218,15 +203,10 @@ json get_core_temperature_dependant_parameters(json coreData, double temperature
 }
 
 json get_shape_data(std::string shapeName) {
-    try {
-        auto shapeData = OpenMagnetics::find_core_shape_by_name(shapeName);
-        json result;
-        to_json(result, shapeData);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+    auto shapeData = OpenMagnetics::find_core_shape_by_name(shapeName);
+    json result;
+    to_json(result, shapeData);
+    return result;
 }
 
 std::vector<std::string> get_available_shape_families() {
@@ -392,29 +372,23 @@ json calculate_gapping_from_number_turns_and_inductance(json coreData, json coil
 }
 
 double calculate_core_maximum_magnetic_energy(json coreDataJson, json operatingPointJson) {
-    try {
-        OperatingPoint operatingPoint = OperatingPoint(operatingPointJson);
-        OpenMagnetics::Core core = OpenMagnetics::Core(coreDataJson, false, false, false);
-        if (!core.get_processed_description()) {
-            core.process_data();
-            core.process_gap();
-        }
-
-        auto magneticEnergy = OpenMagnetics::MagneticEnergy();
-
-        double coreMaximumMagneticEnergy;
-        if (operatingPoint.get_excitations_per_winding().size() == 0) {
-            coreMaximumMagneticEnergy = magneticEnergy.calculate_core_maximum_magnetic_energy(core, std::nullopt);
-        }
-        else {
-            coreMaximumMagneticEnergy = magneticEnergy.calculate_core_maximum_magnetic_energy(core, operatingPoint);
-        }
-        return coreMaximumMagneticEnergy;
+    OperatingPoint operatingPoint = OperatingPoint(operatingPointJson);
+    OpenMagnetics::Core core = OpenMagnetics::Core(coreDataJson, false, false, false);
+    if (!core.get_processed_description()) {
+        core.process_data();
+        core.process_gap();
     }
-    catch (const std::exception &exc) {
-        std::cout << "Exception: " + std::string{exc.what()} << std::endl;
-        return -1;
+
+    auto magneticEnergy = OpenMagnetics::MagneticEnergy();
+
+    double coreMaximumMagneticEnergy;
+    if (operatingPoint.get_excitations_per_winding().size() == 0) {
+        coreMaximumMagneticEnergy = magneticEnergy.calculate_core_maximum_magnetic_energy(core, std::nullopt);
     }
+    else {
+        coreMaximumMagneticEnergy = magneticEnergy.calculate_core_maximum_magnetic_energy(core, operatingPoint);
+    }
+    return coreMaximumMagneticEnergy;
 }
 
 double calculate_saturation_current(json magneticJson, double temperature) {
@@ -510,68 +484,48 @@ double calculate_temperature_from_core_thermal_resistance(json coreJson, double 
 }
 
 json get_available_core_shapes_by_family(std::string familyString) {
-    try {
-        std::string familyStringUpper = familyString;
-        std::transform(familyStringUpper.begin(), familyStringUpper.end(), familyStringUpper.begin(), ::toupper);
-        auto family = magic_enum::enum_cast<CoreShapeFamily>(familyStringUpper).value();
-        auto shapeNames = OpenMagnetics::get_core_shape_names(family);
-        json result = json::array();
-        for (auto& name : shapeNames) {
-            result.push_back(name);
-        }
-        return result;
+    std::string familyStringUpper = familyString;
+    std::transform(familyStringUpper.begin(), familyStringUpper.end(), familyStringUpper.begin(), ::toupper);
+    auto family = magic_enum::enum_cast<CoreShapeFamily>(familyStringUpper).value();
+    auto shapeNames = OpenMagnetics::get_core_shape_names(family);
+    json result = json::array();
+    for (auto& name : shapeNames) {
+        result.push_back(name);
     }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+    return result;
 }
 
 json get_available_core_shapes_by_manufacturer(std::string manufacturer) {
-    try {
-        auto shapeNames = OpenMagnetics::get_core_shape_names(manufacturer);
-        json result = json::array();
-        for (auto& name : shapeNames) {
-            result.push_back(name);
-        }
-        return result;
+    auto shapeNames = OpenMagnetics::get_core_shape_names(manufacturer);
+    json result = json::array();
+    for (auto& name : shapeNames) {
+        result.push_back(name);
     }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+    return result;
 }
 
 json get_shape_family_dimensions(std::string familyString, std::string familySubtype) {
-    try {
-        std::string familyStringUpper = familyString;
-        std::transform(familyStringUpper.begin(), familyStringUpper.end(), familyStringUpper.begin(), ::toupper);
-        auto family = magic_enum::enum_cast<CoreShapeFamily>(familyStringUpper).value();
-        auto dimensions = OpenMagnetics::get_shape_family_dimensions(family, familySubtype);
-        json result = json::array();
-        for (auto& dim : dimensions) {
-            result.push_back(dim);
-        }
-        return result;
+    std::string familyStringUpper = familyString;
+    std::transform(familyStringUpper.begin(), familyStringUpper.end(), familyStringUpper.begin(), ::toupper);
+    auto family = magic_enum::enum_cast<CoreShapeFamily>(familyStringUpper).value();
+    auto dimensions = OpenMagnetics::get_shape_family_dimensions(family, familySubtype);
+    json result = json::array();
+    for (auto& dim : dimensions) {
+        result.push_back(dim);
     }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+    return result;
 }
 
 json get_shape_family_subtypes(std::string familyString) {
-    try {
-        std::string familyStringUpper = familyString;
-        std::transform(familyStringUpper.begin(), familyStringUpper.end(), familyStringUpper.begin(), ::toupper);
-        auto family = magic_enum::enum_cast<CoreShapeFamily>(familyStringUpper).value();
-        auto subtypes = OpenMagnetics::get_shape_family_subtypes(family);
-        json result = json::array();
-        for (auto& subtype : subtypes) {
-            result.push_back(subtype);
-        }
-        return result;
+    std::string familyStringUpper = familyString;
+    std::transform(familyStringUpper.begin(), familyStringUpper.end(), familyStringUpper.begin(), ::toupper);
+    auto family = magic_enum::enum_cast<CoreShapeFamily>(familyStringUpper).value();
+    auto subtypes = OpenMagnetics::get_shape_family_subtypes(family);
+    json result = json::array();
+    for (auto& subtype : subtypes) {
+        result.push_back(subtype);
     }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+    return result;
 }
 
 std::vector<std::string> get_available_core_filters() {
@@ -583,13 +537,8 @@ std::vector<std::string> get_available_core_filters() {
 }
 
 std::vector<double> get_maximum_dimensions(json magneticJson) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        return magnetic.get_maximum_dimensions();
-    }
-    catch (const std::exception &exc) {
-        throw std::runtime_error("Exception: " + std::string{exc.what()});
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    return magnetic.get_maximum_dimensions();
 }
 
 json calculate_core_data_from_shape(json shapeJson) {
@@ -597,18 +546,13 @@ json calculate_core_data_from_shape(json shapeJson) {
 }
 
 json calculate_complex_permeability(json materialJson, double frequency) {
-    try {
-        CoreMaterial materialData(materialJson);
-        OpenMagnetics::ComplexPermeability complexPermeabilityObj;
-        auto [realPart, imagPart] = complexPermeabilityObj.get_complex_permeability(materialData, frequency);
-        json result;
-        result["real"] = realPart;
-        result["imaginary"] = imagPart;
-        return result;
-    }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+    CoreMaterial materialData(materialJson);
+    OpenMagnetics::ComplexPermeability complexPermeabilityObj;
+    auto [realPart, imagPart] = complexPermeabilityObj.get_complex_permeability(materialData, frequency);
+    json result;
+    result["real"] = realPart;
+    result["imaginary"] = imagPart;
+    return result;
 }
 
 void register_core_bindings(py::module& m) {

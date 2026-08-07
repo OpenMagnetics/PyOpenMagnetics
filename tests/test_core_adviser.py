@@ -10,10 +10,15 @@ import PyOpenMagnetics
 
 
 def parse_json_result(result):
-    """Parse JSON result string into Python object."""
+    """Unwrap the adviser's {"data": [...]} envelope into the results list.
+
+    calculate_advised_cores has always returned that envelope; the assertions
+    below check the list inside it. Failures raise PyOpenMagnetics.EngineError
+    (v1.7.0+), so there is no error shape to sniff for here.
+    """
     if isinstance(result, str):
-        return json.loads(result)
-    return result
+        result = json.loads(result)
+    return result["data"]
 
 
 class TestCoreAdviserBasic:

@@ -2,6 +2,11 @@
 
 This document catalogs common errors encountered when using PyOpenMagnetics, their causes, and solutions.
 
+> **Since v1.7.0** every engine failure raises `PyOpenMagnetics.EngineError` (a
+> `RuntimeError` subclass) carrying the messages below. Functions never return
+> error strings or `{"data": "<error>"}` objects; the only exception is the
+> plotting family, which returns `{"success": bool, "error": str, ...}`.
+
 ## Table of Contents
 
 - [Installation Errors](#installation-errors)

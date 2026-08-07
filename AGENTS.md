@@ -112,20 +112,9 @@ The package has **no `__init__.py`**. A bare `import PyOpenMagnetics` gives an
 **empty namespace with 0 functions**. You MUST use `importlib`:
 
 ```python
-import importlib.util, os, glob
+import PyOpenMagnetics as PyOM
 
-pkg_dir = os.path.join(
-    os.path.dirname(__import__('PyOpenMagnetics').__path__[0]),
-    'PyOpenMagnetics'
-)
-so_files = glob.glob(os.path.join(pkg_dir, 'PyOpenMagnetics.cpython-*'))
-assert so_files, f"No .so/.pyd found in {pkg_dir}"
-
-spec = importlib.util.spec_from_file_location('PyOpenMagnetics', so_files[0])
-PyOM = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(PyOM)
-
-# MANDATORY â€” must call before any other function
+# MANDATORY - must call before any other function
 PyOM.load_databases({})
 ```
 
@@ -404,17 +393,7 @@ Lm â‰ˆ 800 ÂµH                â†’ for desiredInductance (Method B onl
 ### Method A: `design_magnetics_from_converter()` (single call)
 
 ```python
-import importlib.util, os, glob, json
-
-# Load module
-pkg_dir = os.path.join(
-    os.path.dirname(__import__('PyOpenMagnetics').__path__[0]),
-    'PyOpenMagnetics'
-)
-so_files = glob.glob(os.path.join(pkg_dir, 'PyOpenMagnetics.cpython-*'))
-spec = importlib.util.spec_from_file_location('PyOpenMagnetics', so_files[0])
-PyOM = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(PyOM)
+import PyOpenMagnetics as PyOM
 PyOM.load_databases({})
 
 # Define converter (BASE Flyback schema â€” NO desiredInductance!)
@@ -433,23 +412,16 @@ flyback = {
     }]
 }
 
-# Design (takes 60-120s with "available cores")
-result = PyOM.design_magnetics_from_converter(
-    "flyback", flyback, 1, "available cores", True, None
-)
-
-if isinstance(result, dict) and "error" in result:
-    print(f"Method A failed: {result['error']}")
-    # â†’ Use Method B
+# design_magnetics_from_converter() builds MAS Inputs from the spec (the
+# magnetic adviser is a separate step -- see Method B, which continues from
+# here). Failures raise PyOM.EngineError (v1.7.0+).
+try:
+    inputs = PyOM.design_magnetics_from_converter("flyback", flyback)
+except PyOM.EngineError as e:
+    print(f"Method A failed: {e}")
 else:
-    d = result[0]
-    mas_obj, score = (d[0], d[1]) if isinstance(d, (list, tuple)) else (d, "N/A")
-    core = mas_obj["magnetic"]["core"]["functionalDescription"]
-    coil = mas_obj["magnetic"]["coil"]["functionalDescription"]
-    print(f"Core:  {core['shape'].get('name','?') if isinstance(core['shape'], dict) else core['shape']}")
-    print(f"Material: {core['material'].get('name','?') if isinstance(core['material'], dict) else core['material']}")
-    for w in coil:
-        print(f"  {w.get('name','?')}: {w.get('numberTurns','?')} turns")
+    print(f"Turns ratios: {inputs['designRequirements']['turnsRatios']}")
+    print(f"Operating points: {len(inputs['operatingPoints'])}")
 ```
 
 ### Method B: `process_converter()` â†’ `calculate_advised_magnetics()` (no ngspice needed)
@@ -473,21 +445,21 @@ flyback_adv = {
     }]
 }
 processed = PyOM.process_converter("flyback", flyback_adv, use_ngspice=False)
-assert "error" not in processed
+# failures raise PyOM.EngineError -- no error-shaped return values (v1.7.0+)
 
 # Step 2: Feed into adviser (with optional weights)
 mas_inputs = {
     "designRequirements": processed["designRequirements"],
     "operatingPoints":    processed["operatingPoints"]
 }
-designs = PyOM.calculate_advised_magnetics(
-    mas_inputs, 1, "available cores",
-    {"efficiency": 2.0, "cost": 1.0, "dimensions": 0.5}  # optional weights
-)
+# calculate_advised_magnetics takes (inputs, max_results, core_mode) -- no weights
+# argument (that is calculate_advised_cores). Inputs must be processed first.
+mas_inputs = PyOM.process_inputs(mas_inputs)
+designs = PyOM.calculate_advised_magnetics(mas_inputs, 1, "available cores")
 
-# Step 3: Parse
-d = designs[0]
-mas_obj, score = (d[0], d[1]) if isinstance(d, (list, tuple)) else (d, "N/A")
+# Step 3: Parse -- result is {"data": [{"mas", "scoring", ...}]}
+d = designs["data"][0]
+mas_obj, score = d["mas"], d["scoring"]
 core = mas_obj["magnetic"]["core"]["functionalDescription"]
 coil = mas_obj["magnetic"]["coil"]["functionalDescription"]
 print(f"Core: {core['shape'].get('name','?')}, Material: {core['material'].get('name','?')}")
@@ -570,7 +542,7 @@ wire       = PyOM.find_wire_by_name("Round 0.5 - Grade 1")  # âœ… verified (
 
 ### Bobbins
 ```python
-bobbin = PyOM.find_bobbin_by_name("E 25/13/7")    # âœ… verified (.pyi confirmed)
+bobbin = PyOM.find_bobbin_by_name("Bobbin E25/7")    # âœ… verified (.pyi confirmed)
 ```
 
 ### âŒ Wrong names â€” do NOT use these
@@ -588,7 +560,8 @@ PyOM.get_core_shape_families(True)    # TypeError â€” takes no arguments
 
 ### Inductance Calculation
 ```python
-inductance = PyOM.calculate_inductance(magnetic)
+inductance = PyOM.calculate_inductance_from_number_turns_and_gapping(
+    core, coil, operating_point, models)
 # Returns dict with:
 #   magnetizingInductance â†’ {magnetizingInductance, coreReluctance, gappingReluctance, ...}
 ```
@@ -611,11 +584,18 @@ sim_result = PyOM.simulate(mas)
 
 ### Wire Utilities
 ```python
-# Skin depth at frequency
-delta = PyOM.calculate_effective_skin_depth("copper", 100000, 25)
+# Skin depth: the 2nd arg is a CURRENT SignalDescriptor (needs processed.label +
+# processed.effectiveFrequency), NOT a bare frequency. Passing a number returns garbage.
+current = {
+    "waveform": {"data": [-5, 5, -5], "time": [0, 5e-6, 10e-6]},
+    "processed": {"label": "triangular", "effectiveFrequency": 100000,
+                  "rms": 2.9, "peak": 5, "peakToPeak": 10, "offset": 0, "dutyCycle": 0.5}
+}
+delta = PyOM.calculate_effective_skin_depth("copper", current, 25)   # ~0.21 mm for Cu @100 kHz
 
 # DC resistance per meter for a given wire diameter
-rdc = PyOM.calculate_dc_resistance_per_meter("copper", 0.5e-3, 25)
+wire = PyOM.find_wire_by_name("Round 0.5 - Grade 1")
+rdc = PyOM.calculate_dc_resistance_per_meter(wire, 25)   # (wire object, temperature)
 ```
 
 ### SPICE Export

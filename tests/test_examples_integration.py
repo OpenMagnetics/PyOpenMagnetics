@@ -179,6 +179,7 @@ class TestBobbinCreation:
         """Create basic bobbin for a core."""
         core_data = {
             "functionalDescription": {
+                "type": "two-piece set",   # mandatory (ABT #597)
                 "shape": "ETD 39/20/13",
                 "material": "3C95",
                 "gapping": [],

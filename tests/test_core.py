@@ -126,14 +126,21 @@ class TestCoreMaterialProperties:
         Steinmetz coefficient calculation for core losses.
         Similar to tests in TestCoreLosses.cpp.
         """
-        names = PyOpenMagnetics.get_core_material_names()
-        if len(names) > 0:
-            material = PyOpenMagnetics.find_core_material_by_name(names[0])
-            # API: get_core_material_steinmetz_coefficients(material, frequency)
-            coeffs = PyOpenMagnetics.get_core_material_steinmetz_coefficients(material, 100000.0)
-            
-            assert isinstance(coeffs, dict)
-            assert len(coeffs) > 0
+        # Only ~175 of the ~700 materials carry Steinmetz data; asking for one that
+        # does not raises MATERIAL_DATA_MISSING (this test used to pass on names[0]
+        # only because the binding swallowed that error into a dict — ABT #595).
+        material = PyOpenMagnetics.find_core_material_by_name("3C95")
+        # API: get_core_material_steinmetz_coefficients(material, frequency)
+        coeffs = PyOpenMagnetics.get_core_material_steinmetz_coefficients(material, 100000.0)
+
+        assert isinstance(coeffs, dict)
+        assert len(coeffs) > 0
+
+    def test_get_steinmetz_coefficients_missing_raises(self):
+        """A material without Steinmetz data must raise, not return a fake result."""
+        material = PyOpenMagnetics.find_core_material_by_name("15")
+        with pytest.raises(PyOpenMagnetics.EngineError, match="STEINMETZ"):
+            PyOpenMagnetics.get_core_material_steinmetz_coefficients(material, 100000.0)
 
     @pytest.mark.xfail(reason="get_core_material_available_losses_methods not implemented in PyOpenMagnetics")
     def test_get_available_losses_methods(self):
@@ -160,10 +167,14 @@ class TestCoreCalculations:
         assert "processedDescription" in result or "functionalDescription" in result
 
     def test_calculate_core_geometrical_description(self, sample_core_data):
-        """Calculate core geometrical description."""
-        result = PyOpenMagnetics.calculate_core_geometrical_description(sample_core_data)
-        
-        assert isinstance(result, dict)
+        """Calculate core geometrical description (needs a processed core)."""
+        # The raw fixture carries shape/material as NAMES; the geometrical
+        # description needs them resolved, so process the core first.
+        core = PyOpenMagnetics.calculate_core_data(sample_core_data, False)
+        result = PyOpenMagnetics.calculate_core_geometrical_description(core)
+
+        assert isinstance(result, list)
+        assert len(result) > 0
 
     def test_calculate_core_gapping(self, sample_core_data):
         """

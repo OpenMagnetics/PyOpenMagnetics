@@ -40,51 +40,48 @@ cd PyOpenMagnetics
 pip install .
 ```
 
-#### MKF is pinned to a SHA (build reproducibility — ABT #73)
+#### Build provenance
 
-This build compiles MKF by **globbing its `.cpp` files directly** into the
-extension (it does not drive MKF's own CMake). MKF `main` has since moved to
-"delete `converter_models` + link the Kirchhoff converter-model library
-(`libKirchhoffApi.so`)"; because Kirchhoff and its AAS sibling are **not yet
-published**, a from-scratch build of newer `main` cannot obtain that library
-and **fails to link**.
-
-`CMakeLists.txt` therefore pins the MKF FetchContent to the last self-contained
-commit — `MKF_GIT_TAG=2ae859dcae6c3b2e5a128893247b7714360e863f`, the exact SHA
-the shipping `.so` was built from — and a configure-time guard fails loudly if
-the checkout drifts. A clean rebuild is reproducible as-is:
-
-```bash
-rm -rf build && pip install . --no-deps -v        # or: cmake -S . -B build && ninja -C build
-```
-
-To **advance** the pin you must first wire the Kirchhoff library build into
-`CMakeLists.txt` (publish AAS/Kirchhoff, then `add_subdirectory` +
-`target_link_libraries(... libKirchhoffApi.so)`). Overriding
-`-DMKF_GIT_TAG=main` before that lands will break the link.
-
-### ⚠️ Import Instructions
-
-**Important:** The compiled extension module may require special import handling:
+The build compiles MKF by **globbing its `.cpp` files directly** into the
+extension, tracking MKF/MAS `main`, and builds the Kirchhoff converter-model
+library (`libKirchhoffApi.so`) as an ExternalProject. The exact engine commits a
+wheel was compiled from are baked into the package:
 
 ```python
-import importlib.util
+import PyOpenMagnetics
+print(PyOpenMagnetics.__mkf_commit__)  # MKF SHA this wheel was built from
+print(PyOpenMagnetics.__mas_commit__)  # MAS SHA this wheel was built from
+```
 
-# Option 1: Direct loading (recommended)
-so_path = '/path/to/PyOpenMagnetics.cpython-311-x86_64-linux-gnu.so'
-spec = importlib.util.spec_from_file_location('PyOpenMagnetics', so_path)
-PyOpenMagnetics = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(PyOpenMagnetics)
+A clean rebuild:
 
-# Option 2: Create __init__.py (see AGENTS.md for details)
+```bash
+rm -rf build && pip install . --no-deps -v
+```
 
-# Verify installation
+### Importing and error handling
+
+`import PyOpenMagnetics` works like any other package. Since v1.7.0 every engine
+failure raises **`PyOpenMagnetics.EngineError`** (a `RuntimeError` subclass) —
+functions never return error strings or `{"data": "<error>"}` objects:
+
+```python
+import PyOpenMagnetics
+
 PyOpenMagnetics.load_databases({})
 print(f"✓ Loaded {len(PyOpenMagnetics.get_core_materials())} materials")
 print(f"✓ Loaded {len(PyOpenMagnetics.get_core_shapes())} shapes")
+
+try:
+    PyOpenMagnetics.find_core_shape_by_name("No Such Shape")
+except PyOpenMagnetics.EngineError as e:
+    print(f"Engine error: {e}")
 ```
 
-See [AGENTS.md](AGENTS.md) for complete import instructions and troubleshooting.
+The only exception is the plotting family, which returns a discriminated union
+`{"success": bool, "error": str, ...}` that callers branch on.
+
+See [AGENTS.md](AGENTS.md) for more usage guidance.
 
 ## Quick Start
 
@@ -99,9 +96,11 @@ shape = PyOpenMagnetics.find_core_shape_by_name("E 42/21/15")
 # Find a core material by name
 material = PyOpenMagnetics.find_core_material_by_name("3C95")
 
-# Create a core with gapping
+# Create a core with gapping. "type" is mandatory; shape/material accept
+# either the objects fetched above or plain name strings.
 core_data = {
     "functionalDescription": {
+        "type": "two-piece set",
         "shape": shape,
         "material": material,
         "gapping": [{"type": "subtractive", "length": 0.001}],  # 1mm gap
@@ -173,25 +172,50 @@ for i, item in enumerate(result["data"]):
 ```python
 import PyOpenMagnetics
 
-# Define core and operating point
-core_data = {...}  # Your core definition
-operating_point = {
-    "name": "Nominal",
-    "conditions": {"ambientTemperature": 25},
-    "excitationsPerWinding": [
-        {
-            "frequency": 100000,
-            "magneticFluxDensity": {
-                "processed": {
-                    "peakToPeak": 0.2,  # 200 mT peak-to-peak
-                    "offset": 0
-                }
-            }
-        }
-    ]
-}
+# A complete core (see "Creating a Core" above)
+core = PyOpenMagnetics.calculate_core_data({
+    "functionalDescription": {
+        "type": "two-piece set",
+        "shape": "E 42/21/15",
+        "material": "3C95",
+        "gapping": [{"type": "subtractive", "length": 0.0005}],
+        "numberStacks": 1
+    }
+}, True)
 
-losses = PyOpenMagnetics.calculate_core_losses(core_data, operating_point, "IGSE")
+# A wound coil on that core
+bobbin = PyOpenMagnetics.create_basic_bobbin(core, True)
+coil = PyOpenMagnetics.wind({
+    "bobbin": bobbin,
+    "functionalDescription": [{
+        "name": "Primary",
+        "numberTurns": 20,
+        "numberParallels": 1,
+        "isolationSide": "primary",
+        "wire": "Round 0.5 - Grade 1"
+    }]
+}, 1, [1.0], [0], [])
+
+# Inputs with the excitation waveforms (see the Design Adviser example)
+inputs = PyOpenMagnetics.process_inputs({
+    "designRequirements": {
+        "magnetizingInductance": {"nominal": 100e-6},
+        "turnsRatios": []
+    },
+    "operatingPoints": [{
+        "name": "Nominal",
+        "conditions": {"ambientTemperature": 25},
+        "excitationsPerWinding": [{
+            "name": "Primary",
+            "frequency": 100000,
+            "current": {"waveform": {"data": [-1, 1, -1], "time": [0, 5e-6, 10e-6]}},
+            "voltage": {"waveform": {"data": [50, 50, -50, -50], "time": [0, 5e-6, 5e-6, 10e-6]}}
+        }]
+    }]
+})
+
+models = {"coreLosses": "IGSE", "reluctance": "ZHANG"}
+losses = PyOpenMagnetics.calculate_core_losses(core, coil, inputs, models)
 print(f"Core losses: {losses['coreLosses']} W")
 ```
 
@@ -200,60 +224,65 @@ print(f"Core losses: {losses['coreLosses']} W")
 ```python
 import PyOpenMagnetics
 
-# Define coil requirements
-coil_functional_description = [
-    {
-        "name": "Primary",
-        "numberTurns": 50,
-        "numberParallels": 1,
-        "wire": "Round 0.5 - Grade 1"
-    },
-    {
-        "name": "Secondary",
-        "numberTurns": 10,
-        "numberParallels": 3,
-        "wire": "Round 1.0 - Grade 1"
-    }
-]
+# core from calculate_core_data(...) as above
+bobbin = PyOpenMagnetics.create_basic_bobbin(core, True)
 
-# Wind the coil on the core
-result = PyOpenMagnetics.wind(core_data, coil_functional_description, bobbin_data, [1, 1], [])
-print(f"Winding successful: {result.get('windingResult', 'unknown')}")
-```
-
-## Flyback Converter Wizard
-
-PyOpenMagnetics includes a complete flyback converter design wizard. See `flyback.py` for a full example:
-
-```python
-from flyback import design_flyback, create_mas_inputs, get_advised_magnetics
-
-# Define flyback specifications
-specs = {
-    "input_voltage_min": 90,
-    "input_voltage_max": 375,
-    "outputs": [{"voltage": 12, "current": 2, "diode_drop": 0.5}],
-    "switching_frequency": 100000,
-    "max_duty_cycle": 0.45,
-    "efficiency": 0.85,
-    "current_ripple_ratio": 0.4,
-    "force_dcm": False,
-    "safety_margin": 0.85,
-    "ambient_temperature": 40,
-    "max_drain_source_voltage": None,
+coil_spec = {
+    "bobbin": bobbin,
+    "functionalDescription": [
+        {
+            "name": "Primary",
+            "numberTurns": 50,
+            "numberParallels": 1,
+            "isolationSide": "primary",
+            "wire": "Round 0.5 - Grade 1"
+        },
+        {
+            "name": "Secondary",
+            "numberTurns": 10,
+            "numberParallels": 3,
+            "isolationSide": "secondary",
+            "wire": "Round 1.00 - Grade 1"
+        }
+    ]
 }
 
-# Calculate magnetic requirements
-design = design_flyback(specs)
-print(f"Required inductance: {design['min_inductance']*1e6:.1f} µH")
-print(f"Turns ratio: {design['turns_ratios'][0]:.2f}")
-
-# Create inputs for PyOpenMagnetics
-inputs = create_mas_inputs(specs, design)
-
-# Get recommended magnetics
-magnetics = get_advised_magnetics(inputs, max_results=5)
+# wind(coil, repetitions, proportion_per_winding, pattern, margin_pairs)
+coil = PyOpenMagnetics.wind(coil_spec, 1, [0.5, 0.5], [0, 1], [])
+print(f"Wound {len(coil['turnsDescription'])} turns")
 ```
+
+## Converter-Based Design
+
+The converter surface builds complete MAS Inputs straight from converter
+specifications (the Kirchhoff topology designer sizes inductance, turns ratios
+and waveforms). See `examples/converter_design_example.py` for the full flow:
+
+```python
+import PyOpenMagnetics
+
+flyback_specs = {
+    "inputVoltage": {"minimum": 185, "maximum": 265},
+    "desiredInductance": 800e-6,      # optional pin; omit to let Kirchhoff size it
+    "desiredTurnsRatios": [13.5],     # optional pin
+    "efficiency": 0.88,
+    "operatingPoints": [{
+        "outputVoltages": [12.0],
+        "outputCurrents": [2.0],
+        "switchingFrequency": 100000,
+        "ambientTemperature": 40
+    }]
+}
+
+inputs = PyOpenMagnetics.process_converter("flyback", flyback_specs)
+processed = PyOpenMagnetics.process_inputs(inputs)
+result = PyOpenMagnetics.calculate_advised_magnetics(processed, 5, "standard cores")
+for item in result["data"]:
+    print(item["mas"]["magnetic"]["manufacturerInfo"]["reference"], item["scoring"])
+```
+
+A TAS-shaped spec (an object with `designRequirements` / `operatingPoints[].outputs`)
+is also accepted and passed to Kirchhoff untouched.
 
 ## API Reference
 
@@ -276,13 +305,13 @@ magnetics = get_advised_magnetics(inputs, max_results=5)
 | `calculate_core_data(core, process)` | Calculate complete core data |
 | `calculate_core_gapping(core, gapping)` | Calculate gapping configuration |
 | `calculate_inductance_from_number_turns_and_gapping(...)` | Calculate inductance |
-| `calculate_core_losses(core, operating_point, model)` | Calculate core losses |
+| `calculate_core_losses(core, coil, inputs, models)` | Calculate core losses |
 
 ### Winding Functions
 
 | Function | Description |
 |----------|-------------|
-| `wind(core, coil, bobbin, pattern, layers)` | Wind coils on a core |
+| `wind(coil, repetitions, proportions, pattern, margins)` | Wind coils on a core |
 | `calculate_winding_losses(...)` | Calculate total winding losses |
 | `calculate_ohmic_losses(...)` | Calculate DC losses |
 | `calculate_skin_effect_losses(...)` | Calculate skin effect losses |
@@ -324,7 +353,13 @@ magnetics = get_advised_magnetics(inputs, max_results=5)
 
 All 24 power topologies are exposed with a uniform API. Use the generic
 `process_converter("<topology>", converter, use_ngspice)` (also accepts
-`"advanced_<topology>"`), or the per-topology functions below.
+`"advanced_<topology>"`), or the per-topology functions below. The converter
+spec is either the legacy flat shape shown in "Converter-Based Design" above
+(`inputVoltage`, optional `desiredInductance`/`desiredTurnsRatios`/`efficiency`/
+`currentRippleRatio`, and `operatingPoints[]` with `outputVoltages[]`/
+`outputCurrents[]`/`switchingFrequency`/`ambientTemperature`) or a TAS-shaped
+spec, which is passed through untouched. Failures raise
+`PyOpenMagnetics.EngineError`.
 
 | Function family | Description |
 |----------|-------------|

@@ -3,33 +3,26 @@
 namespace PyMKF {
 
 json simulate(json inputsJson, json magneticJson, json modelsData) {
-    try {
-        OpenMagnetics::Inputs inputs(inputsJson);
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        
-        auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-        if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
-            OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
-        }
-        auto coreLossesModelName = OpenMagnetics::defaults.coreLossesModelDefault;
-        if (!modelsData.is_null() && modelsData.find("coreLosses") != modelsData.end()) {
-            OpenMagnetics::from_json(modelsData["coreLosses"], coreLossesModelName);
-        }
-
-        OpenMagnetics::MagneticSimulator magneticSimulator;
-        magneticSimulator.set_core_losses_model_name(coreLossesModelName);
-        magneticSimulator.set_reluctance_model_name(reluctanceModelName);
-        auto mas = magneticSimulator.simulate(inputs, magnetic);
-
-        json result;
-        to_json(result, mas);
-        return result;
+    OpenMagnetics::Inputs inputs(inputsJson);
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    
+    auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
+    if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
+        OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
+    auto coreLossesModelName = OpenMagnetics::defaults.coreLossesModelDefault;
+    if (!modelsData.is_null() && modelsData.find("coreLosses") != modelsData.end()) {
+        OpenMagnetics::from_json(modelsData["coreLosses"], coreLossesModelName);
     }
+
+    OpenMagnetics::MagneticSimulator magneticSimulator;
+    magneticSimulator.set_core_losses_model_name(coreLossesModelName);
+    magneticSimulator.set_reluctance_model_name(reluctanceModelName);
+    auto mas = magneticSimulator.simulate(inputs, magnetic);
+
+    json result;
+    to_json(result, mas);
+    return result;
 }
 
 std::string export_magnetic_as_subcircuit(json magneticJson) {
@@ -51,557 +44,368 @@ std::string export_magnetic_as_subcircuit(json magneticJson) {
 }
 
 json mas_autocomplete(json masJson, json configuration) {
-    try {
-        OpenMagnetics::Mas mas(masJson);
-        auto completedMas = OpenMagnetics::mas_autocomplete(mas, configuration);
-        json result;
-        to_json(result, completedMas);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Mas mas(masJson);
+    auto completedMas = OpenMagnetics::mas_autocomplete(mas, configuration);
+    json result;
+    to_json(result, completedMas);
+    return result;
 }
 
 json magnetic_autocomplete(json magneticJson, json configuration) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        auto completedMagnetic = OpenMagnetics::magnetic_autocomplete(magnetic, configuration);
-        json result;
-        to_json(result, completedMagnetic);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto completedMagnetic = OpenMagnetics::magnetic_autocomplete(magnetic, configuration);
+    json result;
+    to_json(result, completedMagnetic);
+    return result;
 }
 
 json process_inputs(json inputsJson) {
-    try {
-        OpenMagnetics::Inputs inputs(inputsJson);
-        auto operatingPoints = inputs.get_mutable_operating_points();
-        for (size_t operatingPointIndex = 0; operatingPointIndex < operatingPoints.size(); ++operatingPointIndex) {
-            auto excitationsPerWinding = operatingPoints[operatingPointIndex].get_excitations_per_winding();
-            for (size_t excitationIndex = 0; excitationIndex < excitationsPerWinding.size(); ++excitationIndex) {
-                auto excitation = operatingPoints[operatingPointIndex].get_mutable_excitations_per_winding()[excitationIndex];
-                if (excitation.get_current()) {
-                    auto current = excitation.get_current().value();
-                    if (!current.get_processed() && current.get_waveform()) {
-                        auto processed = OpenMagnetics::Inputs::calculate_basic_processed_data(current.get_waveform().value());
-                        current.set_processed(processed);
-                    }
-                    if (!current.get_harmonics() && current.get_waveform()) {
-                        auto harmonics = OpenMagnetics::Inputs::calculate_harmonics_data(current.get_waveform().value(), excitation.get_frequency());
-                        current.set_harmonics(harmonics);
-                    }
-                    if (!current.get_waveform() && current.get_processed()) {
-                        auto waveform = OpenMagnetics::Inputs::create_waveform(current.get_processed().value(), excitation.get_frequency());
-                        current.set_waveform(waveform);
-                    }
-                    excitation.set_current(current);
+    OpenMagnetics::Inputs inputs(inputsJson);
+    auto operatingPoints = inputs.get_mutable_operating_points();
+    for (size_t operatingPointIndex = 0; operatingPointIndex < operatingPoints.size(); ++operatingPointIndex) {
+        auto excitationsPerWinding = operatingPoints[operatingPointIndex].get_excitations_per_winding();
+        for (size_t excitationIndex = 0; excitationIndex < excitationsPerWinding.size(); ++excitationIndex) {
+            auto excitation = operatingPoints[operatingPointIndex].get_mutable_excitations_per_winding()[excitationIndex];
+            if (excitation.get_current()) {
+                auto current = excitation.get_current().value();
+                if (!current.get_processed() && current.get_waveform()) {
+                    auto processed = OpenMagnetics::Inputs::calculate_basic_processed_data(current.get_waveform().value());
+                    current.set_processed(processed);
                 }
-                if (excitation.get_voltage()) {
-                    auto voltage = excitation.get_voltage().value();
-                    if (!voltage.get_processed() && voltage.get_waveform()) {
-                        auto processed = OpenMagnetics::Inputs::calculate_basic_processed_data(voltage.get_waveform().value());
-                        voltage.set_processed(processed);
-                    }
-                    if (!voltage.get_harmonics() && voltage.get_waveform()) {
-                        auto harmonics = OpenMagnetics::Inputs::calculate_harmonics_data(voltage.get_waveform().value(), excitation.get_frequency());
-                        voltage.set_harmonics(harmonics);
-                    }
-                    if (!voltage.get_waveform() && voltage.get_processed()) {
-                        auto waveform = OpenMagnetics::Inputs::create_waveform(voltage.get_processed().value(), excitation.get_frequency());
-                        voltage.set_waveform(waveform);
-                    }
-                    excitation.set_voltage(voltage);
+                if (!current.get_harmonics() && current.get_waveform()) {
+                    auto harmonics = OpenMagnetics::Inputs::calculate_harmonics_data(current.get_waveform().value(), excitation.get_frequency());
+                    current.set_harmonics(harmonics);
                 }
-                operatingPoints[operatingPointIndex].get_mutable_excitations_per_winding()[excitationIndex] = excitation;
+                if (!current.get_waveform() && current.get_processed()) {
+                    auto waveform = OpenMagnetics::Inputs::create_waveform(current.get_processed().value(), excitation.get_frequency());
+                    current.set_waveform(waveform);
+                }
+                excitation.set_current(current);
             }
-            inputs.get_mutable_operating_points()[operatingPointIndex] = operatingPoints[operatingPointIndex];
+            if (excitation.get_voltage()) {
+                auto voltage = excitation.get_voltage().value();
+                if (!voltage.get_processed() && voltage.get_waveform()) {
+                    auto processed = OpenMagnetics::Inputs::calculate_basic_processed_data(voltage.get_waveform().value());
+                    voltage.set_processed(processed);
+                }
+                if (!voltage.get_harmonics() && voltage.get_waveform()) {
+                    auto harmonics = OpenMagnetics::Inputs::calculate_harmonics_data(voltage.get_waveform().value(), excitation.get_frequency());
+                    voltage.set_harmonics(harmonics);
+                }
+                if (!voltage.get_waveform() && voltage.get_processed()) {
+                    auto waveform = OpenMagnetics::Inputs::create_waveform(voltage.get_processed().value(), excitation.get_frequency());
+                    voltage.set_waveform(waveform);
+                }
+                excitation.set_voltage(voltage);
+            }
+            operatingPoints[operatingPointIndex].get_mutable_excitations_per_winding()[excitationIndex] = excitation;
         }
-        json result;
-        to_json(result, inputs);
-        return result;
+        inputs.get_mutable_operating_points()[operatingPointIndex] = operatingPoints[operatingPointIndex];
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    to_json(result, inputs);
+    return result;
 }
 
 json extract_operating_point(json fileJson, size_t numberWindings, double frequency, double desiredMagnetizingInductance, json mapColumnNamesJson) {
-    try {
-        std::vector<std::map<std::string, std::string>> mapColumnNames = mapColumnNamesJson.get<std::vector<std::map<std::string, std::string>>>();
-        auto reader = OpenMagnetics::CircuitSimulationReader(fileJson);
-        auto operatingPoint = reader.extract_operating_point(numberWindings, frequency, mapColumnNames);
-        operatingPoint = OpenMagnetics::Inputs::process_operating_point(operatingPoint, desiredMagnetizingInductance);
-        json result;
-        to_json(result, operatingPoint);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    std::vector<std::map<std::string, std::string>> mapColumnNames = mapColumnNamesJson.get<std::vector<std::map<std::string, std::string>>>();
+    auto reader = OpenMagnetics::CircuitSimulationReader(fileJson);
+    auto operatingPoint = reader.extract_operating_point(numberWindings, frequency, mapColumnNames);
+    operatingPoint = OpenMagnetics::Inputs::process_operating_point(operatingPoint, desiredMagnetizingInductance);
+    json result;
+    to_json(result, operatingPoint);
+    return result;
 }
 
 json extract_map_column_names(json fileJson, size_t numberWindings, double frequency) {
-    try {
-        auto reader = OpenMagnetics::CircuitSimulationReader(fileJson);
-        auto columnNames = reader.extract_map_column_names(numberWindings, frequency);
-        json result = json::array();
-        for (auto& columnName : columnNames) {
-            json aux;
-            for (auto& [signal, name] : columnName) {
-                aux[signal] = name;
-            }
-            result.push_back(aux);
+    auto reader = OpenMagnetics::CircuitSimulationReader(fileJson);
+    auto columnNames = reader.extract_map_column_names(numberWindings, frequency);
+    json result = json::array();
+    for (auto& columnName : columnNames) {
+        json aux;
+        for (auto& [signal, name] : columnName) {
+            aux[signal] = name;
         }
-        return result;
+        result.push_back(aux);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json extract_column_names(json fileJson) {
-    try {
-        auto reader = OpenMagnetics::CircuitSimulationReader(fileJson);
-        auto columnNames = reader.extract_column_names();
-        json result = json::array();
-        for (auto& columnName : columnNames) {
-            result.push_back(columnName);
-        }
-        return result;
+    auto reader = OpenMagnetics::CircuitSimulationReader(fileJson);
+    auto columnNames = reader.extract_column_names();
+    json result = json::array();
+    for (auto& columnName : columnNames) {
+        result.push_back(columnName);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json calculate_inductance_matrix(json magneticJson, double frequency, json modelsData) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        
-        auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-        if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
-            OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
-        }
-
-        OpenMagnetics::Inductance inductance(reluctanceModelName);
-        auto inductanceMatrix = inductance.calculate_inductance_matrix(magnetic, frequency);
-
-        json result;
-        to_json(result, inductanceMatrix);
-        return result;
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    
+    auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
+    if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
+        OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+
+    OpenMagnetics::Inductance inductance(reluctanceModelName);
+    auto inductanceMatrix = inductance.calculate_inductance_matrix(magnetic, frequency);
+
+    json result;
+    to_json(result, inductanceMatrix);
+    return result;
 }
 
 json calculate_leakage_inductance(json magneticJson, double frequency, size_t sourceIndex) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
+    OpenMagnetics::Magnetic magnetic(magneticJson);
 
-        auto leakageInductanceOutput = OpenMagnetics::LeakageInductance().calculate_leakage_inductance_all_windings(magnetic, frequency, sourceIndex);
+    auto leakageInductanceOutput = OpenMagnetics::LeakageInductance().calculate_leakage_inductance_all_windings(magnetic, frequency, sourceIndex);
 
-        json result;
-        to_json(result, leakageInductanceOutput);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    to_json(result, leakageInductanceOutput);
+    return result;
 }
 
 json calculate_dc_resistance_per_winding(json coilJson, double temperature) {
-    try {
-        OpenMagnetics::Coil coil(coilJson, false);
-        
-        auto resistances = OpenMagnetics::WindingOhmicLosses::calculate_dc_resistance_per_winding(coil, temperature);
+    OpenMagnetics::Coil coil(coilJson, false);
+    
+    auto resistances = OpenMagnetics::WindingOhmicLosses::calculate_dc_resistance_per_winding(coil, temperature);
 
-        json result = resistances;
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result = resistances;
+    return result;
 }
 
 json calculate_resistance_matrix(json magneticJson, double temperature, double frequency) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        
-        OpenMagnetics::WindingLosses windingLosses;
-        auto resistanceMatrix = windingLosses.calculate_resistance_matrix(magnetic, temperature, frequency);
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    
+    OpenMagnetics::WindingLosses windingLosses;
+    auto resistanceMatrix = windingLosses.calculate_resistance_matrix(magnetic, temperature, frequency);
 
-        json result;
-        to_json(result, resistanceMatrix);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    to_json(result, resistanceMatrix);
+    return result;
 }
 
 json calculate_stray_capacitance(json coilJson, json operatingPointJson, json modelsData) {
-    try {
-        OpenMagnetics::Coil coil(coilJson, false);
-        OperatingPoint operatingPoint(operatingPointJson);
-        
-        auto strayCapacitanceModelName = OpenMagnetics::StrayCapacitanceModels::ALBACH;
-        if (!modelsData.is_null() && modelsData.find("strayCapacitance") != modelsData.end()) {
-            OpenMagnetics::from_json(modelsData["strayCapacitance"], strayCapacitanceModelName);
-        }
-
-        OpenMagnetics::StrayCapacitance strayCapacitance(strayCapacitanceModelName);
-        auto strayCapacitanceOutput = strayCapacitance.calculate_capacitance(coil);
-
-        json result;
-        to_json(result, strayCapacitanceOutput);
-        return result;
+    OpenMagnetics::Coil coil(coilJson, false);
+    OperatingPoint operatingPoint(operatingPointJson);
+    
+    auto strayCapacitanceModelName = OpenMagnetics::StrayCapacitanceModels::ALBACH;
+    if (!modelsData.is_null() && modelsData.find("strayCapacitance") != modelsData.end()) {
+        OpenMagnetics::from_json(modelsData["strayCapacitance"], strayCapacitanceModelName);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+
+    OpenMagnetics::StrayCapacitance strayCapacitance(strayCapacitanceModelName);
+    auto strayCapacitanceOutput = strayCapacitance.calculate_capacitance(coil);
+
+    json result;
+    to_json(result, strayCapacitanceOutput);
+    return result;
 }
 
 json calculate_maxwell_capacitance_matrix(json coilJson, json capacitanceAmongWindingsJson) {
-    try {
-        OpenMagnetics::Coil coil(coilJson, false);
-        auto capacitanceAmongWindings = capacitanceAmongWindingsJson.get<std::map<std::string, std::map<std::string, double>>>();
+    OpenMagnetics::Coil coil(coilJson, false);
+    auto capacitanceAmongWindings = capacitanceAmongWindingsJson.get<std::map<std::string, std::map<std::string, double>>>();
 
-        auto maxwellMatrix = OpenMagnetics::StrayCapacitance::calculate_maxwell_capacitance_matrix(coil, capacitanceAmongWindings);
+    auto maxwellMatrix = OpenMagnetics::StrayCapacitance::calculate_maxwell_capacitance_matrix(coil, capacitanceAmongWindings);
 
-        json result = json::array();
-        for (const auto& matrix : maxwellMatrix) {
-            json matrixJson;
-            to_json(matrixJson, matrix);
-            result.push_back(matrixJson);
-        }
-        return result;
+    json result = json::array();
+    for (const auto& matrix : maxwellMatrix) {
+        json matrixJson;
+        to_json(matrixJson, matrix);
+        result.push_back(matrixJson);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json sweep_impedance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, std::string mode, std::string title) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        auto result = OpenMagnetics::Sweeper::sweep_impedance_over_frequency(magnetic, start, stop, numberElements, mode, title);
-        json resultJson;
-        to_json(resultJson, result);
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto result = OpenMagnetics::Sweeper::sweep_impedance_over_frequency(magnetic, start, stop, numberElements, mode, title);
+    json resultJson;
+    to_json(resultJson, result);
+    return resultJson;
 }
 
 json sweep_common_mode_impedance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, std::string mode, std::string title) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        auto result = OpenMagnetics::Sweeper::sweep_common_mode_impedance_over_frequency(magnetic, start, stop, numberElements, mode, title);
-        json resultJson;
-        to_json(resultJson, result);
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto result = OpenMagnetics::Sweeper::sweep_common_mode_impedance_over_frequency(magnetic, start, stop, numberElements, mode, title);
+    json resultJson;
+    to_json(resultJson, result);
+    return resultJson;
 }
 
 json sweep_differential_mode_impedance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, std::string mode, std::string title) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        auto result = OpenMagnetics::Sweeper::sweep_differential_mode_impedance_over_frequency(magnetic, start, stop, numberElements, mode, title);
-        json resultJson;
-        to_json(resultJson, result);
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto result = OpenMagnetics::Sweeper::sweep_differential_mode_impedance_over_frequency(magnetic, start, stop, numberElements, mode, title);
+    json resultJson;
+    to_json(resultJson, result);
+    return resultJson;
 }
 
 json sweep_q_factor_over_frequency(json magneticJson, double start, double stop, size_t numberElements, std::string mode, std::string title) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        auto result = OpenMagnetics::Sweeper::sweep_q_factor_over_frequency(magnetic, start, stop, numberElements, mode, title);
-        json resultJson;
-        to_json(resultJson, result);
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto result = OpenMagnetics::Sweeper::sweep_q_factor_over_frequency(magnetic, start, stop, numberElements, mode, title);
+    json resultJson;
+    to_json(resultJson, result);
+    return resultJson;
 }
 
 json sweep_winding_resistance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, size_t windingIndex, double temperature, std::string mode, std::string title) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        auto result = OpenMagnetics::Sweeper::sweep_winding_resistance_over_frequency(magnetic, start, stop, numberElements, windingIndex, temperature, mode, title);
-        json resultJson;
-        to_json(resultJson, result);
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto result = OpenMagnetics::Sweeper::sweep_winding_resistance_over_frequency(magnetic, start, stop, numberElements, windingIndex, temperature, mode, title);
+    json resultJson;
+    to_json(resultJson, result);
+    return resultJson;
 }
 
 json sweep_resistance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, double temperature, std::string mode, std::string title) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        auto result = OpenMagnetics::Sweeper::sweep_resistance_over_frequency(magnetic, start, stop, numberElements, temperature, mode, title);
-        json resultJson;
-        to_json(resultJson, result);
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto result = OpenMagnetics::Sweeper::sweep_resistance_over_frequency(magnetic, start, stop, numberElements, temperature, mode, title);
+    json resultJson;
+    to_json(resultJson, result);
+    return resultJson;
 }
 
 json sweep_magnetizing_inductance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, double temperature, std::string mode, std::string title) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        auto result = OpenMagnetics::Sweeper::sweep_magnetizing_inductance_over_frequency(magnetic, start, stop, numberElements, temperature, mode, title);
-        json resultJson;
-        to_json(resultJson, result);
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto result = OpenMagnetics::Sweeper::sweep_magnetizing_inductance_over_frequency(magnetic, start, stop, numberElements, temperature, mode, title);
+    json resultJson;
+    to_json(resultJson, result);
+    return resultJson;
 }
 
 json sweep_magnetizing_inductance_over_temperature(json magneticJson, double start, double stop, size_t numberElements, double frequency, std::string mode, std::string title) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        auto result = OpenMagnetics::Sweeper::sweep_magnetizing_inductance_over_temperature(magnetic, start, stop, numberElements, frequency, mode, title);
-        json resultJson;
-        to_json(resultJson, result);
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto result = OpenMagnetics::Sweeper::sweep_magnetizing_inductance_over_temperature(magnetic, start, stop, numberElements, frequency, mode, title);
+    json resultJson;
+    to_json(resultJson, result);
+    return resultJson;
 }
 
 json sweep_magnetizing_inductance_over_dc_bias(json magneticJson, double start, double stop, size_t numberElements, double temperature, std::string mode, std::string title) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        auto result = OpenMagnetics::Sweeper::sweep_magnetizing_inductance_over_dc_bias(magnetic, start, stop, numberElements, temperature, mode, title);
-        json resultJson;
-        to_json(resultJson, result);
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto result = OpenMagnetics::Sweeper::sweep_magnetizing_inductance_over_dc_bias(magnetic, start, stop, numberElements, temperature, mode, title);
+    json resultJson;
+    to_json(resultJson, result);
+    return resultJson;
 }
 
 json sweep_core_losses_over_frequency(json magneticJson, json operatingPointJson, double start, double stop, size_t numberElements, double temperature, std::string mode, std::string title) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        OperatingPoint operatingPoint(operatingPointJson);
-        auto result = OpenMagnetics::Sweeper::sweep_core_losses_over_frequency(magnetic, operatingPoint, start, stop, numberElements, temperature, mode, title);
-        json resultJson;
-        to_json(resultJson, result);
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    OperatingPoint operatingPoint(operatingPointJson);
+    auto result = OpenMagnetics::Sweeper::sweep_core_losses_over_frequency(magnetic, operatingPoint, start, stop, numberElements, temperature, mode, title);
+    json resultJson;
+    to_json(resultJson, result);
+    return resultJson;
 }
 
 json sweep_winding_losses_over_frequency(json magneticJson, json operatingPointJson, double start, double stop, size_t numberElements, double temperature, std::string mode, std::string title) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        OperatingPoint operatingPoint(operatingPointJson);
-        auto result = OpenMagnetics::Sweeper::sweep_winding_losses_over_frequency(magnetic, operatingPoint, start, stop, numberElements, temperature, mode, title);
-        json resultJson;
-        to_json(resultJson, result);
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    OperatingPoint operatingPoint(operatingPointJson);
+    auto result = OpenMagnetics::Sweeper::sweep_winding_losses_over_frequency(magnetic, operatingPoint, start, stop, numberElements, temperature, mode, title);
+    json resultJson;
+    to_json(resultJson, result);
+    return resultJson;
 }
 
 json calculate_coupling_coefficient_matrix(json magneticJson, double frequency, json modelsData) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
+    OpenMagnetics::Magnetic magnetic(magneticJson);
 
-        auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-        if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
-            OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
-        }
-
-        OpenMagnetics::Inductance inductance(reluctanceModelName);
-
-        auto& functionalDescription = magnetic.get_coil().get_functional_description();
-        size_t numWindings = functionalDescription.size();
-
-        ScalarMatrixAtFrequency result;
-        result.set_frequency(frequency);
-
-        std::map<std::string, std::map<std::string, DimensionWithTolerance>> magnitude;
-
-        for (size_t i = 0; i < numWindings; ++i) {
-            std::string windingName_i = functionalDescription[i].get_name();
-
-            for (size_t j = 0; j < numWindings; ++j) {
-                std::string windingName_j = functionalDescription[j].get_name();
-
-                double k = inductance.calculate_coupling_coefficient(magnetic, i, j, frequency);
-
-                DimensionWithTolerance dimValue;
-                dimValue.set_nominal(k);
-                magnitude[windingName_i][windingName_j] = dimValue;
-            }
-        }
-
-        result.set_magnitude(magnitude);
-
-        json resultJson;
-        to_json(resultJson, result);
-        return resultJson;
+    auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
+    if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
+        OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
+
+    OpenMagnetics::Inductance inductance(reluctanceModelName);
+
+    auto& functionalDescription = magnetic.get_coil().get_functional_description();
+    size_t numWindings = functionalDescription.size();
+
+    ScalarMatrixAtFrequency result;
+    result.set_frequency(frequency);
+
+    std::map<std::string, std::map<std::string, DimensionWithTolerance>> magnitude;
+
+    for (size_t i = 0; i < numWindings; ++i) {
+        std::string windingName_i = functionalDescription[i].get_name();
+
+        for (size_t j = 0; j < numWindings; ++j) {
+            std::string windingName_j = functionalDescription[j].get_name();
+
+            double k = inductance.calculate_coupling_coefficient(magnetic, i, j, frequency);
+
+            DimensionWithTolerance dimValue;
+            dimValue.set_nominal(k);
+            magnitude[windingName_i][windingName_j] = dimValue;
+        }
     }
+
+    result.set_magnitude(magnitude);
+
+    json resultJson;
+    to_json(resultJson, result);
+    return resultJson;
 }
 
 json calculate_leakage_inductance_matrix(json magneticJson, double frequency, json modelsData) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
+    OpenMagnetics::Magnetic magnetic(magneticJson);
 
-        auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-        if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
-            OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
-        }
-
-        OpenMagnetics::Inductance inductance(reluctanceModelName);
-        auto leakageInductanceMatrix = inductance.calculate_leakage_inductance_matrix(magnetic, frequency);
-
-        json resultJson;
-        to_json(resultJson, leakageInductanceMatrix);
-        return resultJson;
+    auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
+    if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
+        OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+
+    OpenMagnetics::Inductance inductance(reluctanceModelName);
+    auto leakageInductanceMatrix = inductance.calculate_leakage_inductance_matrix(magnetic, frequency);
+
+    json resultJson;
+    to_json(resultJson, leakageInductanceMatrix);
+    return resultJson;
 }
 
 json calculate_capacitance_matrix(json coilJson, json modelsData) {
-    try {
-        OpenMagnetics::Coil coil(coilJson, false);
+    OpenMagnetics::Coil coil(coilJson, false);
 
-        auto strayCapacitanceModelName = OpenMagnetics::StrayCapacitanceModels::ALBACH;
-        if (!modelsData.is_null() && modelsData.find("strayCapacitance") != modelsData.end()) {
-            OpenMagnetics::from_json(modelsData["strayCapacitance"], strayCapacitanceModelName);
-        }
+    auto strayCapacitanceModelName = OpenMagnetics::StrayCapacitanceModels::ALBACH;
+    if (!modelsData.is_null() && modelsData.find("strayCapacitance") != modelsData.end()) {
+        OpenMagnetics::from_json(modelsData["strayCapacitance"], strayCapacitanceModelName);
+    }
 
-        OpenMagnetics::StrayCapacitance strayCapacitance(strayCapacitanceModelName);
-        auto strayCapacitanceOutput = strayCapacitance.calculate_capacitance(coil);
+    OpenMagnetics::StrayCapacitance strayCapacitance(strayCapacitanceModelName);
+    auto strayCapacitanceOutput = strayCapacitance.calculate_capacitance(coil);
 
-        json resultJson;
-        if (strayCapacitanceOutput.get_capacitance_matrix()) {
-            auto capacitanceMatrix = strayCapacitanceOutput.get_capacitance_matrix().value();
-            for (const auto& [outerKey, innerMap] : capacitanceMatrix) {
-                resultJson[outerKey] = json();
-                for (const auto& [innerKey, scalarMatrix] : innerMap) {
-                    json matrixJson;
-                    to_json(matrixJson, scalarMatrix);
-                    resultJson[outerKey][innerKey] = matrixJson;
-                }
+    json resultJson;
+    if (strayCapacitanceOutput.get_capacitance_matrix()) {
+        auto capacitanceMatrix = strayCapacitanceOutput.get_capacitance_matrix().value();
+        for (const auto& [outerKey, innerMap] : capacitanceMatrix) {
+            resultJson[outerKey] = json();
+            for (const auto& [innerKey, scalarMatrix] : innerMap) {
+                json matrixJson;
+                to_json(matrixJson, scalarMatrix);
+                resultJson[outerKey][innerKey] = matrixJson;
             }
         }
+    }
 
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return resultJson;
 }
 
 json calculate_capacitance_models_between_windings(double /*energy*/, double /*voltageDrop*/, double /*relativeTurnsRatio*/) {
     // Removed from MKF: OpenMagnetics::StrayCapacitance no longer exposes the six-capacitor /
     // tripole model helper (dropped in the same MKF cleanup as the converter externalisation;
     // WebLibMKF dropped this binding too). Kept as a stub so the API surface stays stable.
-    return json{{"error", "calculate_capacitance_models_between_windings: removed from MKF "
-                          "(StrayCapacitance no longer provides the six-capacitor / tripole model)."}};
+    throw std::runtime_error("calculate_capacitance_models_between_windings: removed from MKF "
+                             "(StrayCapacitance no longer provides the six-capacitor / tripole model).");
 }
 
 json export_magnetic_as_symbol(json magneticJson, json inputsJson) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
-        OpenMagnetics::Inputs inputs(inputsJson);
-        auto result = OpenMagnetics::CircuitSimulatorExporter().export_magnetic_as_symbol(magnetic);
-        json resultJson;
-        resultJson["data"] = result;
-        return resultJson;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    OpenMagnetics::Inputs inputs(inputsJson);
+    auto result = OpenMagnetics::CircuitSimulatorExporter().export_magnetic_as_symbol(magnetic);
+    json resultJson;
+    resultJson["data"] = result;
+    return resultJson;
 }
 
 void register_simulation_bindings(py::module& m) {

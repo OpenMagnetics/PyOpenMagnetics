@@ -2,8 +2,6 @@
 """
 Debug script for PyOpenMagnetics plotting functions.
 """
-import sys
-sys.path.insert(0, '/home/alf/OpenMagnetics/PyMKF/build/cp312-cp312-linux_x86_64')
 
 import PyOpenMagnetics as pom
 import os

@@ -246,14 +246,7 @@ def design_flyback_transformer():
     
     # Step 3: Process inputs (adds harmonics for loss calculation)
     print("Processing inputs (calculating harmonics)...")
-    processed_result = PyOpenMagnetics.process_inputs(inputs)
-    
-    # Extract the actual processed inputs from the result
-    if isinstance(processed_result, dict) and "data" in processed_result:
-        processed_inputs = processed_result["data"]
-    else:
-        processed_inputs = processed_result
-    
+    processed_inputs = PyOpenMagnetics.process_inputs(inputs)
     print("✓ Inputs processed successfully")
     
     # Step 4: Get design recommendations
@@ -261,38 +254,14 @@ def design_flyback_transformer():
     print("Searching for optimal magnetic designs...")
     print("(This may take 10-30 seconds...)")
     
-    magnetics = []
-    try:
-        result = PyOpenMagnetics.calculate_advised_magnetics(
-            processed_inputs,
-            5,
-            "standard cores"
-        )
-        
-        # Handle result format
-        if isinstance(result, dict) and "data" in result:
-            data = result["data"]
-            if isinstance(data, str):
-                # Try to parse as JSON
-                try:
-                    import json
-                    data = json.loads(data)
-                except:
-                    pass
-            if isinstance(data, list):
-                magnetics = data
-                print(f"✓ Found {len(magnetics)} suitable designs")
-            else:
-                print(f"✗ Unexpected data format: {type(data)}")
-                print(f"   Data: {data[:200] if isinstance(data, str) else data}")
-        else:
-            magnetics = result if isinstance(result, list) else []
-            print(f"✓ Found {len(magnetics)} suitable designs")
-            
-    except Exception as e:
-        print(f"✗ Error: {e}")
-        import traceback
-        traceback.print_exc()
+    # Failures raise PyOpenMagnetics.EngineError — no error-shaped return values.
+    result = PyOpenMagnetics.calculate_advised_magnetics(
+        processed_inputs,
+        5,
+        "standard cores"
+    )
+    magnetics = result["data"]
+    print(f"✓ Found {len(magnetics)} suitable designs")
     
     # Step 5: Analyze designs
     print("\n" + "=" * 70)

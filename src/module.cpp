@@ -28,6 +28,22 @@ std::string get_module_path() {
 PYBIND11_MODULE(PyOpenMagnetics, m) {
     m.doc() = "OpenMagnetics Python bindings for magnetic component design";
 
+    // ABT #595: every C++ exception escaping a binding surfaces as PyOpenMagnetics.EngineError
+    // (a RuntimeError subclass). The bindings no longer catch-and-stringify into success-shaped
+    // return values — errors are Python exceptions, full stop. Registered before the bindings so
+    // it runs ahead of pybind11's built-in std::exception -> RuntimeError translator; pybind11's
+    // own exceptions (error_already_set, stop_iteration, ...) are re-thrown for the built-in
+    // chain to handle.
+    static py::exception<std::exception> engineError(m, "EngineError", PyExc_RuntimeError);
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        }
+        catch (const py::error_already_set&) { throw; }
+        catch (const py::builtin_exception&) { throw; }
+        catch (const std::exception& e) { PyErr_SetString(engineError.ptr(), e.what()); }
+    });
+
     // Register all module bindings
     PyMKF::register_database_bindings(m);
     PyMKF::register_core_bindings(m);

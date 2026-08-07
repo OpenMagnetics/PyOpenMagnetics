@@ -4,13 +4,15 @@
 // converter_models). This TU is a THIN shim over Kirchhoff::api::design_cmc — the string-in/JSON-out
 // facade of libKirchhoffApi.so — that re-shapes its {"inputs", "cmcDiagnostics"} result into the
 // legacy calculate_cmc_inputs contract El Choker and the WASM wizard consume: the MAS Inputs spread
-// at the ROOT plus a "cmcDiagnostics" sibling, or {"error": "..."} on failure (never a throw).
+// at the ROOT plus a "cmcDiagnostics" sibling. Kirchhoff failures (its "Exception: ..." strings)
+// are re-thrown so they surface as PyOpenMagnetics.EngineError in Python (ABT #595).
 // Only KirchhoffApi.hpp is included, so no Kirchhoff MAS type ever enters an MKF translation unit.
 
 #include "pybind11_json/pybind11_json.hpp"
 #include "json.hpp"
 #include <KirchhoffApi.hpp>
 
+#include <stdexcept>
 #include <string>
 
 namespace py = pybind11;
@@ -24,8 +26,8 @@ json cmc_inputs_via_kirchhoff(const json& cmcInputsJson, const char* functionNam
     const std::string out = Kirchhoff::api::design_cmc(cmcInputsJson.dump());
     constexpr const char* kExceptionPrefix = "Exception: ";
     if (out.rfind(kExceptionPrefix, 0) == 0) {
-        return json{{"error", std::string(functionName) + ": " +
-                              out.substr(std::string(kExceptionPrefix).size())}};
+        throw std::runtime_error(std::string(functionName) + ": " +
+                                 out.substr(std::string(kExceptionPrefix).size()));
     }
     json parsed = json::parse(out);
     // Legacy contract: the MAS Inputs at the root + the diagnostics as a sibling key.
@@ -42,7 +44,7 @@ json calculate_advanced_cmc_inputs(json cmcInputsJson) {
     // The advanced entry REQUIRES the pinned inductance (the legacy AdvancedCommonModeChoke ctor
     // did j.at("desiredInductance")); Kirchhoff treats its presence as the mode switch.
     if (!cmcInputsJson.contains("desiredInductance")) {
-        return json{{"error", "calculate_advanced_cmc_inputs: 'desiredInductance' is required"}};
+        throw std::invalid_argument("calculate_advanced_cmc_inputs: 'desiredInductance' is required");
     }
     return cmc_inputs_via_kirchhoff(cmcInputsJson, "calculate_advanced_cmc_inputs");
 }

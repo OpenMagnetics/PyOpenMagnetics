@@ -108,16 +108,11 @@ def design_flyback_transformer():
     }
     
     result = PyOpenMagnetics.calculate_advised_magnetics(
-        processed_inputs, 3, "STANDARD_CORES"
+        processed_inputs, 3, "standard cores"
     )
-    
-    # Extract magnetics list from result (v1.1.2+ format: {"data": [...]})
-    # Note: If there's an error, data will be a string containing the exception message
-    data = result.get("data", result) if isinstance(result, dict) else result
-    if isinstance(data, str):
-        print(f"    ✗ Error: {data}")
-        return None
-    magnetics = data
+
+    # Result format: {"data": [...]}. Failures raise PyOpenMagnetics.EngineError.
+    magnetics = result["data"]
     
     print(f"    ✓ Found {len(magnetics)} suitable designs")
     

@@ -3,117 +3,68 @@
 namespace PyMKF {
 
 json get_wires() {
-    try {
-        auto wires = OpenMagnetics::get_wires();
-        json result = json::array();
-        for (auto elem : wires) {
-            json aux;
-            to_json(aux, elem);
-            result.push_back(aux);
-        }
-        return result;
+    auto wires = OpenMagnetics::get_wires();
+    json result = json::array();
+    for (auto elem : wires) {
+        json aux;
+        to_json(aux, elem);
+        result.push_back(aux);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json get_wire_names() {
-    try {
-        auto wireNames = OpenMagnetics::get_wire_names();
-        json result = json::array();
-        for (auto elem : wireNames) {
-            result.push_back(elem);
-        }
-        return result;
+    auto wireNames = OpenMagnetics::get_wire_names();
+    json result = json::array();
+    for (auto elem : wireNames) {
+        result.push_back(elem);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json get_wire_materials() {
-    try {
-        auto wireMaterials = OpenMagnetics::get_wire_materials();
-        json result = json::array();
-        for (auto elem : wireMaterials) {
-            json aux;
-            to_json(aux, elem);
-            result.push_back(aux);
-        }
-        return result;
+    auto wireMaterials = OpenMagnetics::get_wire_materials();
+    json result = json::array();
+    for (auto elem : wireMaterials) {
+        json aux;
+        to_json(aux, elem);
+        result.push_back(aux);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json get_wire_material_names() {
-    try {
-        auto wireMaterialNames = OpenMagnetics::get_wire_material_names();
-        json result = json::array();
-        for (auto elem : wireMaterialNames) {
-            result.push_back(elem);
-        }
-        return result;
+    auto wireMaterialNames = OpenMagnetics::get_wire_material_names();
+    json result = json::array();
+    for (auto elem : wireMaterialNames) {
+        result.push_back(elem);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json find_wire_by_name(json wireName) {
-    try {
-        auto wireData = OpenMagnetics::find_wire_by_name(wireName);
-        json result;
-        to_json(result, wireData);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    auto wireData = OpenMagnetics::find_wire_by_name(wireName);
+    json result;
+    to_json(result, wireData);
+    return result;
 }
 
 json find_wire_material_by_name(json wireMaterialName) {
-    try {
-        auto wireMaterialData = OpenMagnetics::find_wire_material_by_name(wireMaterialName);
-        json result;
-        to_json(result, wireMaterialData);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    auto wireMaterialData = OpenMagnetics::find_wire_material_by_name(wireMaterialName);
+    json result;
+    to_json(result, wireMaterialData);
+    return result;
 }
 
 json find_wire_by_dimension(double dimension, json wireTypeJson, json wireStandardJson) {
-    try {
-        WireType wireType;
-        from_json(wireTypeJson, wireType);
-        WireStandard wireStandard;
-        from_json(wireStandardJson, wireStandard);
-        auto wireMaterialData = OpenMagnetics::find_wire_by_dimension(dimension, wireType, wireStandard, false);
-        json result;
-        to_json(result, wireMaterialData);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    WireType wireType;
+    from_json(wireTypeJson, wireType);
+    WireStandard wireStandard;
+    from_json(wireStandardJson, wireStandard);
+    auto wireMaterialData = OpenMagnetics::find_wire_by_dimension(dimension, wireType, wireStandard, false);
+    json result;
+    to_json(result, wireMaterialData);
+    return result;
 }
 
 json get_wire_data(json windingDataJson) {
@@ -251,57 +202,35 @@ std::vector<double> get_outer_dimensions(json wireJson) {
 }
 
 json get_equivalent_wire(json oldWireJson, json newWireTypeJson, double effectivefrequency) {
-    try {
-        OpenMagnetics::Wire oldWire(oldWireJson);
-        WireType newWireType;
-        from_json(newWireTypeJson, newWireType);
+    OpenMagnetics::Wire oldWire(oldWireJson);
+    WireType newWireType;
+    from_json(newWireTypeJson, newWireType);
 
-        auto newWire = OpenMagnetics::Wire::get_equivalent_wire(oldWire, newWireType, effectivefrequency);
+    auto newWire = OpenMagnetics::Wire::get_equivalent_wire(oldWire, newWireType, effectivefrequency);
 
-        json result;
-        to_json(result, newWire);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        std::cout << std::string{exc.what()} << std::endl;
-        return "Exception: " + std::string{exc.what()};
-    }
+    json result;
+    to_json(result, newWire);
+    return result;
 }
 
 json get_coating(json wireJson) {
-    try {
-        OpenMagnetics::Wire wire(wireJson);
-        InsulationWireCoating insulationWireCoating;
-        if (wire.resolve_coating()) {
-            insulationWireCoating = wire.resolve_coating().value();
-        }
-        else {
-            insulationWireCoating.set_type(InsulationWireCoatingType::BARE);
-        }
-        json result;
-        to_json(result, insulationWireCoating);
-        return result;
+    OpenMagnetics::Wire wire(wireJson);
+    InsulationWireCoating insulationWireCoating;
+    if (wire.resolve_coating()) {
+        insulationWireCoating = wire.resolve_coating().value();
     }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
+    else {
+        insulationWireCoating.set_type(InsulationWireCoatingType::BARE);
     }
+    json result;
+    to_json(result, insulationWireCoating);
+    return result;
 }
 
 json get_coating_label(json wireJson) {
-    try {
-        OpenMagnetics::Wire wire(wireJson);
-        auto coatingLabel = wire.encode_coating_label();
-        return coatingLabel;
-    }
-    catch(const std::runtime_error& re) {
-        return "Exception: " + std::string{re.what()};
-    }
-    catch(const std::exception& ex) {
-        return "Exception: " + std::string{ex.what()};
-    }
-    catch(...) {
-        return "Unknown failure occurred. Possible memory corruption";
-    }
+    OpenMagnetics::Wire wire(wireJson);
+    auto coatingLabel = wire.encode_coating_label();
+    return coatingLabel;
 }
 
 json get_wire_coating_by_label(std::string label) {
@@ -341,48 +270,31 @@ std::vector<std::string> get_coating_labels_by_type(json wireTypeJson) {
 }
 
 double get_coating_thickness(json wireJson) {
-    try {
-        OpenMagnetics::Wire wire(wireJson);
-        return wire.get_coating_thickness();
-    }
-    catch (const std::exception &exc) {
-        std::cout << std::string{exc.what()} << std::endl;
-        return -1;
-    }
+    OpenMagnetics::Wire wire(wireJson);
+    return wire.get_coating_thickness();
 }
 
 double get_coating_relative_permittivity(json wireJson) {
-    try {
-        OpenMagnetics::Wire wire(wireJson);
-        return wire.get_coating_relative_permittivity();
-    }
-    catch (const std::exception &exc) {
-        std::cout << std::string{exc.what()} << std::endl;
-        return -1;
-    }
+    OpenMagnetics::Wire wire(wireJson);
+    return wire.get_coating_relative_permittivity();
 }
 
 json get_coating_insulation_material(json wireJson) {
+    OpenMagnetics::Wire wire(wireJson);
+    OpenMagnetics::InsulationMaterial material;
+
     try {
-        OpenMagnetics::Wire wire(wireJson);
-        OpenMagnetics::InsulationMaterial material;
-
-        try {
-            material = wire.resolve_coating_insulation_material();
-        }
-        catch (const std::exception &e) {
-            if (std::string{e.what()} == "Coating is missing material information") {
-                material = OpenMagnetics::find_insulation_material_by_name(OpenMagnetics::defaults.defaultEnamelledInsulationMaterial);
-            }
-        }
-
-        json result;
-        to_json(result, material);
-        return result;
+        material = wire.resolve_coating_insulation_material();
     }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
+    catch (const std::exception &e) {
+        if (std::string{e.what()} == "Coating is missing material information") {
+            material = OpenMagnetics::find_insulation_material_by_name(OpenMagnetics::defaults.defaultEnamelledInsulationMaterial);
+        }
     }
+
+    json result;
+    to_json(result, material);
+    return result;
 }
 
 std::vector<std::string> get_available_wires() {
@@ -452,27 +364,20 @@ std::vector<std::string> get_planar_thicknesses() {
 }
 
 json get_planar_wire_by_standard_name(std::string standardName) {
-    try {
-        auto wires = OpenMagnetics::get_wires(WireType::PLANAR);
-        for (auto& wire : wires) {
-            if (!wire.get_standard_name()) {
-                continue;
-            }
-            if (wire.get_standard_name().value() == standardName) {
-                json result;
-                to_json(result, wire);
-                return result;
-            }
+    auto wires = OpenMagnetics::get_wires(WireType::PLANAR);
+    for (auto& wire : wires) {
+        if (!wire.get_standard_name()) {
+            continue;
         }
-        json result;
-        result["errorMessage"] = "Planar wire not found by standard name";
-        return result;
+        if (wire.get_standard_name().value() == standardName) {
+            json result;
+            to_json(result, wire);
+            return result;
+        }
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    result["errorMessage"] = "Planar wire not found by standard name";
+    return result;
 }
 
 void register_wire_bindings(py::module& m) {

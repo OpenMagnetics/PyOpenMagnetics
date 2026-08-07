@@ -15,18 +15,24 @@
 //   * ngspice sim/deck from a built MAS Inputs (the simulate_<topo>_ideal_waveforms /
 //     generate_<topo>_ngspice_circuit family): Kirchhoff's sim/deck verbs take a TAS built from a SPEC,
 //     not a finished MAS Inputs, so there is no 1:1. We re-derive a TAS from the spec carried in the
-//     Inputs when present, else return a structured {"error": ...} (never a throw) — these are WASM-parity
-//     endpoints no PyOM consumer calls today; the design surface above is what el-choker et al. use.
+//     Inputs when present, else throw — these are WASM-parity endpoints no PyOM consumer calls today;
+//     the design surface above is what el-choker et al. use.
+//
+// Kirchhoff failures (its "Exception: ..." strings — no throw crosses the .so boundary) are re-thrown
+// here so they surface as PyOpenMagnetics.EngineError in Python (ABT #595/#596).
 //
 // Only KirchhoffApi.hpp is included here, so no Kirchhoff MAS:: type ever enters an MKF translation unit
 // (the string boundary is the whole point — see cmc.cpp, which does the same for the CMC designer).
+// PEAS/src/DimensionJson.hpp is header-only json tooling, not a Kirchhoff type, so it keeps that rule.
 
 #include "converter.h"
 
 #include "pybind11_json/pybind11_json.hpp"
 #include "json.hpp"
 #include <KirchhoffApi.hpp>
+#include <PEAS/src/DimensionJson.hpp>
 
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 
@@ -39,17 +45,135 @@ namespace {
 
 constexpr const char* kExceptionPrefix = "Exception: ";
 
-// Kirchhoff returns "Exception: ..." on failure (no throw crosses the boundary). Turn that into the
-// legacy {"error": "<fn>: ..."} object; otherwise parse the JSON payload.
+// Kirchhoff returns "Exception: ..." on failure (no throw crosses the boundary). Re-throw it so the
+// caller gets a real Python exception; otherwise parse the JSON payload.
+[[noreturn]] void kh_throw(const std::string& out, const char* fn) {
+    throw std::runtime_error(std::string(fn) + ": " +
+                             out.substr(std::char_traits<char>::length(kExceptionPrefix)));
+}
+
 json kh_json(const std::string& out, const char* fn) {
     if (out.rfind(kExceptionPrefix, 0) == 0) {
-        return json{{"error", std::string(fn) + ": " + out.substr(std::char_traits<char>::length(kExceptionPrefix))}};
+        kh_throw(out, fn);
     }
     return json::parse(out);
 }
 
-// Map PyOM's legacy short topology names (and the "advanced_" mode prefix, which Kirchhoff derives from
-// the spec's desiredInductance instead) onto Kirchhoff's dispatcher names.
+// ABT #596: the legacy PyOM converter spec (flat inputVoltage / desiredInductance /
+// operatingPoints[].outputVoltages[]/outputCurrents[]) predates Kirchhoff's TAS-inputs contract
+// (designRequirements + operatingPoints[].outputs[]). Detect the legacy shape and adapt it; a
+// TAS-shaped spec (has designRequirements) passes through untouched. Legacy keys Kirchhoff derives
+// itself are deliberately dropped: desiredDutyCycle / maximumDutyCycle (duty comes from the topology
+// equations) and diodeVoltageDrop (Kirchhoff uses its DIDEAL rectifier model).
+bool is_legacy_spec(const json& spec) {
+    if (!spec.is_object() || spec.contains("designRequirements")) {
+        return false;
+    }
+    if (!spec.contains("operatingPoints") || !spec.at("operatingPoints").is_array() ||
+        spec.at("operatingPoints").empty()) {
+        return false;
+    }
+    return spec.at("operatingPoints").at(0).contains("outputVoltages");
+}
+
+json legacy_outputs_of(const json& op, const char* where) {
+    const json& vouts = op.at("outputVoltages");
+    const json& iouts = op.at("outputCurrents");
+    if (!vouts.is_array() || !iouts.is_array() || vouts.empty() || vouts.size() != iouts.size()) {
+        throw std::invalid_argument(std::string("legacy converter spec: ") + where +
+                                    " needs matching non-empty outputVoltages/outputCurrents arrays");
+    }
+    json outputs = json::array();
+    for (size_t k = 0; k < vouts.size(); ++k) {
+        json o;
+        o["voltage"] = vouts.at(k);
+        o["power"] = vouts.at(k).get<double>() * iouts.at(k).get<double>();
+        outputs.push_back(o);
+    }
+    return outputs;
+}
+
+json legacy_spec_to_tas_inputs(const json& spec) {
+    if (!is_legacy_spec(spec)) {
+        return spec;
+    }
+    const json& ops = spec.at("operatingPoints");
+    const json& op0 = ops.at(0);
+
+    json dr;
+    if (spec.contains("inputVoltage")) {
+        dr["inputVoltage"] = spec.at("inputVoltage");
+    }
+    if (op0.contains("switchingFrequency")) {
+        dr["switchingFrequency"]["nominal"] = op0.at("switchingFrequency");
+    }
+    if (spec.contains("minSwitchingFrequency")) {
+        dr["switchingFrequency"]["minimum"] = spec.at("minSwitchingFrequency");
+    }
+    if (spec.contains("maxSwitchingFrequency")) {
+        dr["switchingFrequency"]["maximum"] = spec.at("maxSwitchingFrequency");
+    }
+    if (spec.contains("efficiency")) {
+        dr["efficiency"] = spec.at("efficiency");
+    }
+    if (spec.contains("lineFrequency")) {   // AC-input topologies (PFC, Vienna)
+        dr["lineFrequency"]["nominal"] = spec.at("lineFrequency");
+    } else if (op0.contains("lineFrequency")) {
+        dr["lineFrequency"]["nominal"] = op0.at("lineFrequency");
+    }
+    if (spec.contains("isolationVoltage")) {
+        dr["isolationVoltage"] = spec.at("isolationVoltage");
+    }
+    if (spec.contains("desiredInductance")) {
+        dr["magnetizingInductance"]["nominal"] = spec.at("desiredInductance");
+    }
+    if (spec.contains("desiredTurnsRatios")) {
+        dr["turnsRatios"] = spec.at("desiredTurnsRatios");
+    }
+
+    json drOutputs = json::array();
+    for (const auto& o : legacy_outputs_of(op0, "operatingPoints[0]")) {
+        json out;
+        out["name"] = "output " + std::to_string(drOutputs.size());
+        out["voltage"]["nominal"] = o.at("voltage");
+        out["power"]["nominal"] = o.at("power");
+        drOutputs.push_back(out);
+    }
+    dr["outputs"] = drOutputs;
+
+    json tas;
+    tas["designRequirements"] = std::move(dr);
+    tas["operatingPoints"] = json::array();
+    for (size_t i = 0; i < ops.size(); ++i) {
+        const json& op = ops.at(i);
+        json top;
+        top["name"] = "operating point " + std::to_string(i);
+        if (spec.contains("inputVoltage")) {
+            top["inputVoltage"] = PEAS::resolve_dimensional_values(spec.at("inputVoltage"));
+        }
+        if (op.contains("ambientTemperature")) {
+            top["ambientTemperature"] = op.at("ambientTemperature");
+        }
+        top["outputs"] = legacy_outputs_of(op, "operatingPoints[i]");
+        tas["operatingPoints"].push_back(std::move(top));
+    }
+
+    // Kirchhoff sizing knobs travel in config; map the legacy ripple key onto it.
+    json config = spec.value("config", json::object());
+    if (spec.contains("currentRippleRatio") && !config.contains("rippleRatio")) {
+        config["rippleRatio"] = spec.at("currentRippleRatio");
+    }
+    if (!config.empty()) {
+        tas["config"] = std::move(config);
+    }
+    return tas;
+}
+
+// Map PyOM's legacy long topology names (and the "advanced_" mode prefix, which Kirchhoff derives from
+// the spec's desiredInductance instead) onto Kirchhoff's dispatcher names. Kirchhoff registers the SHORT
+// names (KirchhoffApi.cpp tas_builders(): forward, acf, fsbb, pfc, psfb, pshb, ahb, ...), so the long
+// legacy aliases map down; short names pass through untouched (ABT #596 — the old map pointed the wrong
+// way and broke every aliased topology).
 std::string kh_topology(const std::string& raw) {
     std::string s = raw;
     if (s.rfind("advanced_", 0) == 0) {
@@ -57,14 +181,14 @@ std::string kh_topology(const std::string& raw) {
     }
     static const std::unordered_map<std::string, std::string> kMap = {
         {"single_switch_forward", "forward"},
-        {"two_switch_forward", "two_switch_forward"},
-        {"active_clamp_forward", "active_clamp_forward"},
-        {"pfc", "power_factor_correction"},
-        {"psfb", "phase_shifted_full_bridge"},
-        {"pshb", "phase_shifted_half_bridge"},
-        {"ahb", "asymmetric_half_bridge"},
-        {"cmc", "common_mode_choke"},
-        {"dmc", "differential_mode_choke"},
+        {"active_clamp_forward", "acf"},
+        {"four_switch_buck_boost", "fsbb"},
+        {"power_factor_correction", "pfc"},
+        {"phase_shifted_full_bridge", "psfb"},
+        {"phase_shifted_half_bridge", "pshb"},
+        {"asymmetric_half_bridge", "ahb"},
+        {"common_mode_choke", "cmc"},
+        {"differential_mode_choke", "dmc"},
     };
     auto it = kMap.find(s);
     return it != kMap.end() ? it->second : s;
@@ -72,38 +196,41 @@ std::string kh_topology(const std::string& raw) {
 
 // Design entry: spec -> MAS::Inputs (the legacy process_converter / calculate_<topo>_inputs contract).
 json design_inputs(const std::string& topology, const json& spec, const char* fn) {
-    return kh_json(Kirchhoff::api::design_magnetic_inputs(kh_topology(topology), spec.dump()), fn);
+    return kh_json(Kirchhoff::api::design_magnetic_inputs(kh_topology(topology),
+                                                          legacy_spec_to_tas_inputs(spec).dump()), fn);
 }
 
 // ngspice deck from a converter SPEC: design a TAS then assemble the deck. Returns {"netlist": "<spice>"}.
 json ngspice_deck_from_spec(const std::string& topology, const json& spec, const char* fn) {
-    const std::string tas = Kirchhoff::api::design_tas(kh_topology(topology), spec.dump());
+    const std::string tas = Kirchhoff::api::design_tas(kh_topology(topology),
+                                                       legacy_spec_to_tas_inputs(spec).dump());
     if (tas.rfind(kExceptionPrefix, 0) == 0) {
-        return json{{"error", std::string(fn) + ": " + tas.substr(std::char_traits<char>::length(kExceptionPrefix))}};
+        kh_throw(tas, fn);
     }
     const std::string deck = Kirchhoff::api::generate_ngspice_circuit(tas, "{}");
     if (deck.rfind(kExceptionPrefix, 0) == 0) {
-        return json{{"error", std::string(fn) + ": " + deck.substr(std::char_traits<char>::length(kExceptionPrefix))}};
+        kh_throw(deck, fn);
     }
     return json{{"netlist", deck}};
 }
 
 // ngspice sim from a converter SPEC: design a TAS then run it. Returns Kirchhoff's per-vector summary.
 json ngspice_sim_from_spec(const std::string& topology, const json& spec, const char* fn) {
-    const std::string tas = Kirchhoff::api::design_tas(kh_topology(topology), spec.dump());
+    const std::string tas = Kirchhoff::api::design_tas(kh_topology(topology),
+                                                       legacy_spec_to_tas_inputs(spec).dump());
     if (tas.rfind(kExceptionPrefix, 0) == 0) {
-        return json{{"error", std::string(fn) + ": " + tas.substr(std::char_traits<char>::length(kExceptionPrefix))}};
+        kh_throw(tas, fn);
     }
     return kh_json(Kirchhoff::api::simulate_ngspice(tas, "{}"), fn);
 }
 
 // A built-MAS-Inputs simulate/deck endpoint whose spec is not recoverable: Kirchhoff needs a spec/TAS, not
-// a finished Inputs. Report it structurally (WASM-parity surface, unused by PyOM consumers).
-json needs_spec_error(const char* fn) {
-    return json{{"error", std::string(fn) +
+// a finished Inputs (WASM-parity surface, unused by PyOM consumers).
+[[noreturn]] void needs_spec_error(const char* fn) {
+    throw std::runtime_error(std::string(fn) +
         ": Kirchhoff builds ngspice decks/sims from a converter SPEC (design_tas), not a finished MAS "
         "Inputs. Call the SPEC-based path (generate_ngspice_circuit(topology, spec, ...) / "
-        "process_converter) instead."}};
+        "process_converter) instead.");
 }
 
 } // namespace
@@ -233,7 +360,7 @@ json get_extra_components_inputs(const std::string& /*topologyName*/,
                                  json /*converterJson*/,
                                  const std::string& /*modeStr*/,
                                  json /*magneticJson*/) {
-    return needs_spec_error("get_extra_components_inputs");
+    needs_spec_error("get_extra_components_inputs");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -247,7 +374,7 @@ namespace {
 json dmc_inputs_via_kirchhoff(const json& spec, const char* fn) {
     const std::string out = Kirchhoff::api::design_dmc(spec.dump());
     if (out.rfind(kExceptionPrefix, 0) == 0) {
-        return json{{"error", std::string(fn) + ": " + out.substr(std::char_traits<char>::length(kExceptionPrefix))}};
+        kh_throw(out, fn);
     }
     json parsed = json::parse(out);
     json result = std::move(parsed.at("inputs"));
@@ -328,12 +455,12 @@ namespace {
 json sim_from_inputs(const std::string& topology, const json& inputs, const char* fn) {
     if (inputs.contains("converterSpec")) return ngspice_sim_from_spec(topology, inputs.at("converterSpec"), fn);
     if (inputs.contains("spec")) return ngspice_sim_from_spec(topology, inputs.at("spec"), fn);
-    return needs_spec_error(fn);
+    needs_spec_error(fn);
 }
 json deck_from_inputs(const std::string& topology, const json& inputs, const char* fn) {
     if (inputs.contains("converterSpec")) return ngspice_deck_from_spec(topology, inputs.at("converterSpec"), fn);
     if (inputs.contains("spec")) return ngspice_deck_from_spec(topology, inputs.at("spec"), fn);
-    return needs_spec_error(fn);
+    needs_spec_error(fn);
 }
 
 } // namespace
@@ -437,7 +564,7 @@ void register_converter_bindings(py::module& m) {
 
     m.def("generate_ngspice_circuit", &generate_ngspice_circuit,
         "Return the ngspice SPICE deck for a converter SPEC (Kirchhoff design_tas + generate_ngspice_circuit). "
-        "Returns {'netlist': '<spice>'} or {'error': '...'}.",
+        "Returns {'netlist': '<spice>'}; raises PyOpenMagnetics.EngineError on failure.",
         py::arg("topology_name"), py::arg("converter_json"),
         py::arg("turns_ratios"), py::arg("magnetizing_inductance"),
         py::arg("vin_index") = 0, py::arg("op_index") = 0,

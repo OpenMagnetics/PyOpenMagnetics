@@ -11,114 +11,94 @@ void load_databases(json databasesJson) {
 }
 
 std::string read_databases(std::string path, bool addInternalData) {
-    try {
-        auto masPath = std::filesystem::path{path};
-        json data;
-        std::string line;
-        {
-            data["coreMaterials"] = json();
-            std::ifstream coreMaterials(masPath.append("core_materials.ndjson"));
-            while (getline (coreMaterials, line)) {
-                json jf = json::parse(line);
-                data["coreMaterials"][jf["name"]] = jf;
-            }
+    auto masPath = std::filesystem::path{path};
+    json data;
+    std::string line;
+    {
+        data["coreMaterials"] = json();
+        std::ifstream coreMaterials(masPath.append("core_materials.ndjson"));
+        while (getline (coreMaterials, line)) {
+            json jf = json::parse(line);
+            data["coreMaterials"][jf["name"]] = jf;
         }
-        {
-            data["coreShapes"] = json();
-            std::ifstream coreMaterials(masPath.append("core_shapes.ndjson"));
-            while (getline (coreMaterials, line)) {
-                json jf = json::parse(line);
-                data["coreShapes"][jf["name"]] = jf;
-            }
-        }
-        {
-            data["wires"] = json();
-            std::ifstream coreMaterials(masPath.append("wires.ndjson"));
-            while (getline (coreMaterials, line)) {
-                json jf = json::parse(line);
-                data["wires"][jf["name"]] = jf;
-            }
-        }
-        {
-            data["bobbins"] = json();
-            std::ifstream coreMaterials(masPath.append("bobbins.ndjson"));
-            while (getline (coreMaterials, line)) {
-                json jf = json::parse(line);
-                data["bobbins"][jf["name"]] = jf;
-            }
-        }
-        {
-            data["insulationMaterials"] = json();
-            std::ifstream coreMaterials(masPath.append("insulation_materials.ndjson"));
-            while (getline (coreMaterials, line)) {
-                json jf = json::parse(line);
-                data["insulationMaterials"][jf["name"]] = jf;
-            }
-        }
-        {
-            data["wireMaterials"] = json();
-            std::ifstream coreMaterials(masPath.append("wire_materials.ndjson"));
-            while (getline (coreMaterials, line)) {
-                json jf = json::parse(line);
-                data["wireMaterials"][jf["name"]] = jf;
-            }
-        }
-        OpenMagnetics::load_databases(data, true, addInternalData);
-        return "0";
     }
-    catch (const std::exception &exc) {
-        return std::string{exc.what()};
+    {
+        data["coreShapes"] = json();
+        std::ifstream coreMaterials(masPath.append("core_shapes.ndjson"));
+        while (getline (coreMaterials, line)) {
+            json jf = json::parse(line);
+            data["coreShapes"][jf["name"]] = jf;
+        }
     }
+    {
+        data["wires"] = json();
+        std::ifstream coreMaterials(masPath.append("wires.ndjson"));
+        while (getline (coreMaterials, line)) {
+            json jf = json::parse(line);
+            data["wires"][jf["name"]] = jf;
+        }
+    }
+    {
+        data["bobbins"] = json();
+        std::ifstream coreMaterials(masPath.append("bobbins.ndjson"));
+        while (getline (coreMaterials, line)) {
+            json jf = json::parse(line);
+            data["bobbins"][jf["name"]] = jf;
+        }
+    }
+    {
+        data["insulationMaterials"] = json();
+        std::ifstream coreMaterials(masPath.append("insulation_materials.ndjson"));
+        while (getline (coreMaterials, line)) {
+            json jf = json::parse(line);
+            data["insulationMaterials"][jf["name"]] = jf;
+        }
+    }
+    {
+        data["wireMaterials"] = json();
+        std::ifstream coreMaterials(masPath.append("wire_materials.ndjson"));
+        while (getline (coreMaterials, line)) {
+            json jf = json::parse(line);
+            data["wireMaterials"][jf["name"]] = jf;
+        }
+    }
+    OpenMagnetics::load_databases(data, true, addInternalData);
+    return "0";
 }
 
 std::string load_mas(std::string key, json masJson, bool expand) {
-    try {
-        OpenMagnetics::Mas mas(masJson);
-        if (expand) {
-            mas.set_magnetic(OpenMagnetics::magnetic_autocomplete(mas.get_mutable_magnetic()));
-            mas.set_inputs(OpenMagnetics::inputs_autocomplete(mas.get_mutable_inputs(), mas.get_mutable_magnetic()));
-        }
-        masDatabase[key] = mas;
-        return std::to_string(masDatabase.size());
+    OpenMagnetics::Mas mas(masJson);
+    if (expand) {
+        mas.set_magnetic(OpenMagnetics::magnetic_autocomplete(mas.get_mutable_magnetic()));
+        mas.set_inputs(OpenMagnetics::inputs_autocomplete(mas.get_mutable_inputs(), mas.get_mutable_magnetic()));
     }
-    catch (const std::exception &exc) {
-        return std::string{exc.what()};
-    }
+    masDatabase[key] = mas;
+    return std::to_string(masDatabase.size());
 }
 
 std::string load_magnetic(std::string key, json magneticJson, bool expand) {
-    try {
-        OpenMagnetics::Magnetic magnetic(magneticJson);
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    if (expand) {
+        magnetic = OpenMagnetics::magnetic_autocomplete(magnetic);
+    }
+    OpenMagnetics::Mas mas;
+    mas.set_magnetic(magnetic);
+    masDatabase[key] = mas;
+    return std::to_string(masDatabase.size());
+}
+
+std::string load_magnetics(std::string keys, json magneticJsons, bool expand) {
+    json keysJson = json::parse(keys);
+    for (size_t magneticIndex = 0; magneticIndex < magneticJsons.size(); magneticIndex++) {
+        OpenMagnetics::Magnetic magnetic(magneticJsons[magneticIndex]);
         if (expand) {
             magnetic = OpenMagnetics::magnetic_autocomplete(magnetic);
         }
         OpenMagnetics::Mas mas;
         mas.set_magnetic(magnetic);
-        masDatabase[key] = mas;
-        return std::to_string(masDatabase.size());
+        masDatabase[to_string(keysJson[magneticIndex])] = mas;
     }
-    catch (const std::exception &exc) {
-        return std::string{exc.what()};
-    }
-}
-
-std::string load_magnetics(std::string keys, json magneticJsons, bool expand) {
-    try {
-        json keysJson = json::parse(keys);
-        for (size_t magneticIndex = 0; magneticIndex < magneticJsons.size(); magneticIndex++) {
-            OpenMagnetics::Magnetic magnetic(magneticJsons[magneticIndex]);
-            if (expand) {
-                magnetic = OpenMagnetics::magnetic_autocomplete(magnetic);
-            }
-            OpenMagnetics::Mas mas;
-            mas.set_magnetic(magnetic);
-            masDatabase[to_string(keysJson[magneticIndex])] = mas;
-        }
-        return std::to_string(masDatabase.size());
-    }
-    catch (const std::exception &exc) {
-        return std::string{exc.what()};
-    }
+    return std::to_string(masDatabase.size());
 }
 
 json read_mas(std::string key) {
@@ -174,59 +154,42 @@ bool is_wire_database_empty() {
 }
 
 std::string load_magnetics_from_file(std::string path, bool expand) {
-    try {
-        std::ifstream in(path);
-        if (in) {
-            std::string line;
-            while (getline(in, line)) {
-                json jf = json::parse(line);
-                OpenMagnetics::Magnetic magnetic(jf);
-                if (expand) {
-                    magnetic = OpenMagnetics::magnetic_autocomplete(magnetic);
-                }
-                std::string key = magnetic.get_manufacturer_info()->get_reference().value();
-                OpenMagnetics::magneticsCache.load(key, magnetic);
+    std::ifstream in(path);
+    if (in) {
+        std::string line;
+        while (getline(in, line)) {
+            json jf = json::parse(line);
+            OpenMagnetics::Magnetic magnetic(jf);
+            if (expand) {
+                magnetic = OpenMagnetics::magnetic_autocomplete(magnetic);
             }
+            std::string key = magnetic.get_manufacturer_info()->get_reference().value();
+            OpenMagnetics::magneticsCache.load(key, magnetic);
         }
-        return std::to_string(OpenMagnetics::magneticsCache.size());
     }
-    catch (const std::exception &exc) {
-        return std::string{exc.what()};
-    }
+    return std::to_string(OpenMagnetics::magneticsCache.size());
 }
 
 std::string clear_magnetic_cache() {
-    try {
-        OpenMagnetics::magneticsCache.clear();
-        return std::to_string(OpenMagnetics::magneticsCache.size());
-    }
-    catch (const std::exception &exc) {
-        return std::string{exc.what()};
-    }
+    OpenMagnetics::magneticsCache.clear();
+    return std::to_string(OpenMagnetics::magneticsCache.size());
 }
 
 json load_cores(json fileToLoadJson, bool includeToroids, bool useOnlyCoresInStock) {
-    try {
-        OpenMagnetics::settings.set_use_toroidal_cores(includeToroids);
-        OpenMagnetics::settings.set_use_only_cores_in_stock(useOnlyCoresInStock);
+    OpenMagnetics::settings.set_use_toroidal_cores(includeToroids);
+    OpenMagnetics::settings.set_use_only_cores_in_stock(useOnlyCoresInStock);
 
-        if (!fileToLoadJson.is_null() && fileToLoadJson.is_string()) {
-            std::string fileToLoad = fileToLoadJson;
-            OpenMagnetics::load_cores(fileToLoad);
-        }
-        else {
-            OpenMagnetics::load_cores();
-        }
+    if (!fileToLoadJson.is_null() && fileToLoadJson.is_string()) {
+        std::string fileToLoad = fileToLoadJson;
+        OpenMagnetics::load_cores(fileToLoad);
+    }
+    else {
+        OpenMagnetics::load_cores();
+    }
 
-        json result;
-        result["count"] = OpenMagnetics::coreDatabase.size();
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    result["count"] = OpenMagnetics::coreDatabase.size();
+    return result;
 }
 
 void clear_loaded_cores() {
@@ -234,22 +197,17 @@ void clear_loaded_cores() {
 }
 
 std::string load_magnetics_from_string(std::string jsonText) {
-    try {
-        std::istringstream in(jsonText);
-        std::string line;
-        while (getline(in, line)) {
-            if (line.empty()) continue;
-            json jf = json::parse(line);
-            OpenMagnetics::Magnetic magnetic(jf);
-            magnetic = OpenMagnetics::magnetic_autocomplete(magnetic);
-            std::string key = magnetic.get_manufacturer_info()->get_reference().value();
-            OpenMagnetics::magneticsCache.load(key, magnetic);
-        }
-        return std::to_string(OpenMagnetics::magneticsCache.size());
+    std::istringstream in(jsonText);
+    std::string line;
+    while (getline(in, line)) {
+        if (line.empty()) continue;
+        json jf = json::parse(line);
+        OpenMagnetics::Magnetic magnetic(jf);
+        magnetic = OpenMagnetics::magnetic_autocomplete(magnetic);
+        std::string key = magnetic.get_manufacturer_info()->get_reference().value();
+        OpenMagnetics::magneticsCache.load(key, magnetic);
     }
-    catch (const std::exception &exc) {
-        return std::string{exc.what()};
-    }
+    return std::to_string(OpenMagnetics::magneticsCache.size());
 }
 
 void register_database_bindings(py::module& m) {

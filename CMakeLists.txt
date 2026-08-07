@@ -142,7 +142,7 @@ if(NOT LOCAL_MKF_MAS)
     set(MKF_GIT_TAG "main"
         CACHE STRING "MKF git ref for the vendored PyOM build")
     # Force fresh clone by using a unique timestamp - update this when the pin changes
-    set(MKF_FORCE_REFRESH "2026-08-05-v1.6.4-mkf-dragback-adviser-thermal")
+    set(MKF_FORCE_REFRESH "2026-08-10-v1.7.0-mkf-d9293885")
     # Tell MKF to disable matplotplusplus and use SVG-based Painter instead
     set(INCLUDE_PYMKF ON CACHE BOOL "Build Python interface" FORCE)
     # GIT_SUBMODULES_RECURSE pulls in CAS/PEAS (added 2026-04 alongside the
@@ -166,7 +166,7 @@ if(NOT LOCAL_MKF_MAS)
     # Skip Git LFS to avoid bandwidth quota issues - data files are optional for build
     set(ENV{GIT_LFS_SKIP_SMUDGE} "1")
     # Force fresh clone by using a unique timestamp - update this when MAS changes
-    set(MAS_FORCE_REFRESH "2025-02-26-01")
+    set(MAS_FORCE_REFRESH "2026-08-10-v1.7.0-mas-f736d41")
     FetchContent_Declare(
            mas
            GIT_REPOSITORY https://github.com/OpenMagnetics/MAS.git
@@ -180,10 +180,14 @@ if(NOT LOCAL_MKF_MAS)
     message(STATUS "MAS_POPULATED: ${MAS_POPULATED}")
     message(STATUS "MKF_POPULATED: ${MKF_POPULATED}")
 
-    # Always delete and repopulate MAS to ensure we get the latest
+    # Always delete and repopulate MAS to ensure we get the latest. The subbuild
+    # dir must go too: its stamp files survive the source deletion and make the
+    # next populate run a git "update" step inside the freshly-emptied mas-src,
+    # which fails with "fatal: not a git repository".
     if(EXISTS ${CMAKE_BINARY_DIR}/_deps/mas-src)
         message(STATUS "Removing old MAS source to force fresh clone")
         file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/_deps/mas-src)
+        file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/_deps/mas-subbuild)
     endif()
     message(STATUS "Populating MAS")
     FetchContent_Populate(mas)
@@ -198,6 +202,12 @@ if(NOT LOCAL_MKF_MAS)
     if(MAS_GIT_ERROR)
         message(STATUS "MAS git error: ${MAS_GIT_ERROR}")
     endif()
+    # Resolve the MAS commit for the wheel's _build_info.py (ABT #601).
+    execute_process(
+        COMMAND git -C ${mas_SOURCE_DIR} rev-parse HEAD
+        OUTPUT_VARIABLE MAS_GIT_HEAD
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
 
     # Always delete and repopulate MKF so the checkout matches ${MKF_GIT_TAG}
     # exactly, mirroring the MAS refresh above. FetchContent will NOT re-checkout
@@ -208,6 +218,8 @@ if(NOT LOCAL_MKF_MAS)
     if(EXISTS ${CMAKE_BINARY_DIR}/_deps/mkf-src)
         message(STATUS "Removing old MKF source to force fresh checkout at ${MKF_GIT_TAG}")
         file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/_deps/mkf-src)
+        # Same stamp-staleness hazard as the MAS subbuild above.
+        file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/_deps/mkf-subbuild)
     endif()
     message(STATUS "Populating MKF")
     FetchContent_Populate(MKF)
@@ -238,7 +250,31 @@ if(NOT LOCAL_MKF_MAS)
 else()
     message(STATUS "Using local MKF at ${MKF_DIR}")
     message(STATUS "Using local MAS at ${MAS_DIR}")
+    # Local-checkout builds still record their engine commits (ABT #601).
+    execute_process(
+        COMMAND git -C ${MKF_DIR} rev-parse HEAD
+        OUTPUT_VARIABLE MKF_GIT_HEAD
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    execute_process(
+        COMMAND git -C ${MAS_DIR} rev-parse HEAD
+        OUTPUT_VARIABLE MAS_GIT_HEAD
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
 endif()
+
+# ABT #601: bake the resolved MKF/MAS commits into the package so a wheel is
+# self-describing (PyOpenMagnetics.__mkf_commit__ / __mas_commit__). Before this,
+# MKF_GIT_HEAD was only message(STATUS)-ed to the CMake log and provenance could
+# not be recovered from an install. Fail loudly rather than shipping a wheel with
+# unknown provenance.
+if(NOT MKF_GIT_HEAD OR NOT MAS_GIT_HEAD)
+    message(FATAL_ERROR
+        "Could not resolve MKF/MAS commits for _build_info.py "
+        "(MKF_GIT_HEAD='${MKF_GIT_HEAD}', MAS_GIT_HEAD='${MAS_GIT_HEAD}'). "
+        "The MKF/MAS source dirs must be git checkouts (ABT #601).")
+endif()
+configure_file(packaging/_build_info.py.in "${CMAKE_BINARY_DIR}/_build_info.py" @ONLY)
 
 message(STATUS "Compiling MAS")
 
@@ -570,8 +606,12 @@ install(TARGETS PyOpenMagnetics LIBRARY DESTINATION .)
 
 # Install the package __init__.py so `import PyOpenMagnetics` exposes the
 # compiled extension's API. Without it the wheel installs as an empty PEP-420
-# namespace package and `PyOpenMagnetics.<fn>` resolves to nothing.
-install(FILES __init__.py DESTINATION .)
+# namespace package and `PyOpenMagnetics.<fn>` resolves to nothing. It lives in
+# packaging/ (not the repo root) so the repo checkout cannot shadow the installed
+# package when pytest runs from the repo root (ABT #597).
+install(FILES packaging/__init__.py DESTINATION .)
+# Engine-commit provenance, configured above from the resolved MKF/MAS heads.
+install(FILES "${CMAKE_BINARY_DIR}/_build_info.py" DESTINATION .)
 
 # Install documentation files for AI assistants
 install(FILES AGENTS.md llms.txt PyOpenMagnetics.pyi DESTINATION .)

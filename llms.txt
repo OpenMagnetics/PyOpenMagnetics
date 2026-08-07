@@ -76,7 +76,7 @@ coil = {
             "name": "Secondary", 
             "numberTurns": 5,
             "numberParallels": 2,
-            "wire": "Round 1.0 - Grade 1",
+            "wire": "Round 1.00 - Grade 1",
             "isolationSide": "secondary"
         }
     ]
@@ -179,7 +179,7 @@ wire = PyOpenMagnetics.find_wire_by_name("Round 0.5 - Grade 1")
 wire = PyOpenMagnetics.find_wire_by_dimension(0.0005, "round", "IEC 60317")
 
 # Wire dimensions
-outer_d = PyOpenMagnetics.get_wire_outer_diameter_enamelled_round(wire)
+outer_d = PyOpenMagnetics.get_wire_outer_diameter_enamelled_round(0.0005, 1, "IEC 60317")
 outer_dims = PyOpenMagnetics.get_outer_dimensions(wire)  # Works for any type
 
 # Wire types: "round", "litz", "rectangular", "foil"
@@ -192,7 +192,7 @@ standards = PyOpenMagnetics.get_available_wire_standards()
 #### Bobbins
 ```python
 bobbins = PyOpenMagnetics.get_bobbins()
-bobbin = PyOpenMagnetics.find_bobbin_by_name("E 42/21/15 Bobbin")
+bobbin = PyOpenMagnetics.find_bobbin_by_name("Bobbin E42/20")   # names are "Bobbin <shape>"
 ```
 
 ### Core Calculations
@@ -509,13 +509,15 @@ defaults = PyOpenMagnetics.get_default_models()
 
 ## Error Handling
 
-Most functions return JSON objects. Check for errors:
+Since v1.7.0 every engine failure raises `PyOpenMagnetics.EngineError` (a
+`RuntimeError` subclass). Functions never return error strings or
+`{"data": "<error>"}` objects; the only exception is the plotting family,
+which returns `{"success": bool, "error": str, ...}`.
 ```python
-result = PyOpenMagnetics.calculate_core_data(bad_data, False)
-if isinstance(result, str) and result.startswith("Exception:"):
-    print(f"Error: {result}")
-elif "data" in result and "Exception" in str(result.get("data", "")):
-    print(f"Error: {result['data']}")
+try:
+    result = PyOpenMagnetics.calculate_core_data(bad_data, False)
+except PyOpenMagnetics.EngineError as e:
+    print(f"Error: {e}")
 ```
 
 ## Converter Topology Workflows
@@ -557,8 +559,8 @@ buck = {
     "efficiency": 0.95,
     "currentRippleRatio": 0.3,               # ΔI / I_out
     "operatingPoints": [{
-        "outputVoltage": 3.3,
-        "outputCurrent": 5.0,
+        "outputVoltages": [3.3],             # plural ARRAYS, one entry per rail
+        "outputCurrents": [5.0],
         "switchingFrequency": 500000,
         "ambientTemperature": 25
     }],
@@ -576,8 +578,8 @@ boost = {
     "efficiency": 0.98,
     "currentRippleRatio": 0.2,
     "operatingPoints": [{
-        "outputVoltage": 400,
-        "outputCurrent": 2.5,
+        "outputVoltages": [400],             # plural ARRAYS, one entry per rail
+        "outputCurrents": [2.5],
         "switchingFrequency": 65000,
         "ambientTemperature": 40
     }],
@@ -623,7 +625,7 @@ two_switch_forward = {
         "ambientTemperature": 55
     }],
     "desiredInductance": 200e-6,
-    "desiredTurnsRatios": [16.7],
+    "desiredTurnsRatios": [5.0],             # n*(Vout+Vd)/Vin must keep duty < 0.5
     "desiredOutputInductances": [25e-6]
 }
 inputs = PyOpenMagnetics.process_two_switch_forward(two_switch_forward)
@@ -644,7 +646,7 @@ active_clamp_forward = {
         "ambientTemperature": 45
     }],
     "desiredInductance": 30e-6,
-    "desiredTurnsRatios": [4.0],
+    "desiredTurnsRatios": [1.3],             # n*(Vout+Vd)/Vin must keep duty < 0.5
     "desiredOutputInductances": [5e-6]
 }
 inputs = PyOpenMagnetics.process_active_clamp_forward(active_clamp_forward)
@@ -661,8 +663,8 @@ push_pull = {
     "currentRippleRatio": 0.3,
     "maximumDrainSourceVoltage": 100,        # 2x Vin stress
     "operatingPoints": [{
-        "outputVoltage": 48,
-        "outputCurrent": 5,
+        "outputVoltages": [48],              # plural ARRAYS, one entry per rail
+        "outputCurrents": [5],
         "switchingFrequency": 100000,
         "ambientTemperature": 40
     }],
@@ -682,8 +684,9 @@ isolated_buck = {
     "efficiency": 0.91,
     "currentRippleRatio": 0.25,
     "operatingPoints": [{
-        "outputVoltages": [15],
-        "outputCurrents": [3],
+        # isolated_buck needs >=2 outputs: primary + >=1 isolated secondary
+        "outputVoltages": [15, 15],
+        "outputCurrents": [3, 3],
         "switchingFrequency": 200000,
         "ambientTemperature": 35
     }],
@@ -702,8 +705,9 @@ isolated_buck_boost = {
     "efficiency": 0.88,
     "currentRippleRatio": 0.3,
     "operatingPoints": [{
-        "outputVoltages": [24],              # Can be higher or lower than input
-        "outputCurrents": [2],
+        # isolated_buck_boost needs 2 outputs: primary + isolated secondary
+        "outputVoltages": [24, 24],          # Can be higher or lower than input
+        "outputCurrents": [2, 2],
         "switchingFrequency": 150000,
         "ambientTemperature": 30
     }],
@@ -717,14 +721,11 @@ inputs = PyOpenMagnetics.process_isolated_buck_boost(isolated_buck_boost)
 ```python
 # Current sensing transformer
 current_transformer = {
-    "primaryCurrent": {
-        "waveform": {"data": [0, 10, 10, 0], "time": [0, 1e-6, 5e-6, 6e-6]},
-        "frequency": 100000
-    },
-    "operatingPoints": [{
-        "burdenResistance": 10,              # Sense resistor (Ω)
-        "ambientTemperature": 25
-    }]
+    "waveformLabel": "unipolarRectangular",  # sinusoidal | unipolarRectangular | unipolarTriangular
+    "maximumPrimaryCurrentPeak": 10.0,       # A peak through the primary
+    "frequency": 100000,
+    "burdenResistor": 10.0,                  # Sense resistor (Ohm)
+    "ambientTemperature": 25
 }
 # Process with desired turns ratio
 turns_ratio = 100                            # 100:1 CT
@@ -750,7 +751,8 @@ coil = {
 # Custom inputs for power inductor
 inputs = {
     "designRequirements": {
-        "magnetizingInductance": {"nominal": 47e-6, "minimum": 42e-6}
+        "magnetizingInductance": {"nominal": 47e-6, "minimum": 42e-6},
+        "turnsRatios": []                    # required; empty for a 1-winding inductor
     },
     "operatingPoints": [{
         "conditions": {"ambientTemperature": 85},

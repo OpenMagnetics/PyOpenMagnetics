@@ -3,105 +3,91 @@
 namespace PyMKF {
 
 json calculate_advised_cores(json inputsJson, json weightsJson, int maximumNumberResults, json coreModeJson) {
-    try {
-        OpenMagnetics::Inputs inputs(inputsJson);
-        OpenMagnetics::CoreAdviser::CoreAdviserModes coreMode;
-        from_json(coreModeJson, coreMode);
-        std::map<std::string, double> weightsKeysJson = weightsJson;
-        std::map<OpenMagnetics::CoreAdviser::CoreAdviserFilters, double> weights;
+    OpenMagnetics::Inputs inputs(inputsJson);
+    OpenMagnetics::CoreAdviser::CoreAdviserModes coreMode;
+    from_json(coreModeJson, coreMode);
+    std::map<std::string, double> weightsKeysJson = weightsJson;
+    std::map<OpenMagnetics::CoreAdviser::CoreAdviserFilters, double> weights;
 
-        weights[OpenMagnetics::CoreAdviser::CoreAdviserFilters::COST] = 1;
-        weights[OpenMagnetics::CoreAdviser::CoreAdviserFilters::EFFICIENCY] = 1;
-        weights[OpenMagnetics::CoreAdviser::CoreAdviserFilters::DIMENSIONS] = 1;
+    weights[OpenMagnetics::CoreAdviser::CoreAdviserFilters::COST] = 1;
+    weights[OpenMagnetics::CoreAdviser::CoreAdviserFilters::EFFICIENCY] = 1;
+    weights[OpenMagnetics::CoreAdviser::CoreAdviserFilters::DIMENSIONS] = 1;
 
-        for (auto const& [filterName, weight] : weightsKeysJson) {
-            OpenMagnetics::CoreAdviser::CoreAdviserFilters filter;
-            OpenMagnetics::from_json(filterName, filter);
-            weights[filter] = weight;
-        }
+    for (auto const& [filterName, weight] : weightsKeysJson) {
+        OpenMagnetics::CoreAdviser::CoreAdviserFilters filter;
+        OpenMagnetics::from_json(filterName, filter);
+        weights[filter] = weight;
+    }
 
-        OpenMagnetics::CoreAdviser coreAdviser;
-        coreAdviser.set_mode(coreMode);
-        auto masMagnetics = coreAdviser.get_advised_core(inputs, weights, maximumNumberResults);
+    OpenMagnetics::CoreAdviser coreAdviser;
+    coreAdviser.set_mode(coreMode);
+    auto masMagnetics = coreAdviser.get_advised_core(inputs, weights, maximumNumberResults);
 
-        auto scoringsPerFilter = coreAdviser.get_scorings();
+    auto scoringsPerFilter = coreAdviser.get_scorings();
 
-        json results = json();
-        results["data"] = json::array();
-        for (auto& [masMagnetic, scoring] : masMagnetics) {
-            std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
-            json result;
-            json masJson;
-            to_json(masJson, masMagnetic);
-            result["mas"] = masJson;
-            result["scoring"] = scoring;
-            if (scoringsPerFilter.count(name)) {
-                json filterScorings;
-                for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
-                    filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
-                }
-                result["scoringPerFilter"] = filterScorings;
+    json results = json();
+    results["data"] = json::array();
+    for (auto& [masMagnetic, scoring] : masMagnetics) {
+        std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+        json result;
+        json masJson;
+        to_json(masJson, masMagnetic);
+        result["mas"] = masJson;
+        result["scoring"] = scoring;
+        if (scoringsPerFilter.count(name)) {
+            json filterScorings;
+            for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+                filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
             }
-            results["data"].push_back(result);
+            result["scoringPerFilter"] = filterScorings;
         }
-
-        sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
-            return b1["scoring"] > b2["scoring"];
-        });
-
-        OpenMagnetics::settings.reset();
-
-        return results;
+        results["data"].push_back(result);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+
+    sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
+        return b1["scoring"] > b2["scoring"];
+    });
+
+    OpenMagnetics::settings.reset();
+
+    return results;
 }
 
 json calculate_advised_magnetics(json inputsJson, int maximumNumberResults, json coreModeJson) {
-    try {
-        OpenMagnetics::Inputs inputs(inputsJson);
-        OpenMagnetics::CoreAdviser::CoreAdviserModes coreMode;
-        from_json(coreModeJson, coreMode);
+    OpenMagnetics::Inputs inputs(inputsJson);
+    OpenMagnetics::CoreAdviser::CoreAdviserModes coreMode;
+    from_json(coreModeJson, coreMode);
 
-        OpenMagnetics::MagneticAdviser magneticAdviser;
-        magneticAdviser.set_core_mode(coreMode);
-        auto masMagnetics = magneticAdviser.get_advised_magnetic(inputs, maximumNumberResults);
+    OpenMagnetics::MagneticAdviser magneticAdviser;
+    magneticAdviser.set_core_mode(coreMode);
+    auto masMagnetics = magneticAdviser.get_advised_magnetic(inputs, maximumNumberResults);
 
-        auto scoringsPerFilter = magneticAdviser.get_scorings();
+    auto scoringsPerFilter = magneticAdviser.get_scorings();
 
-        json results = json();
-        results["data"] = json::array();
-        for (auto& [masMagnetic, scoring] : masMagnetics) {
-            std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
-            json result;
-            json masJson;
-            to_json(masJson, masMagnetic);
-            result["mas"] = masJson;
-            result["scoring"] = scoring;
-            if (scoringsPerFilter.count(name)) {
-                json filterScorings;
-                for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
-                    filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
-                }
-                result["scoringPerFilter"] = filterScorings;
+    json results = json();
+    results["data"] = json::array();
+    for (auto& [masMagnetic, scoring] : masMagnetics) {
+        std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+        json result;
+        json masJson;
+        to_json(masJson, masMagnetic);
+        result["mas"] = masJson;
+        result["scoring"] = scoring;
+        if (scoringsPerFilter.count(name)) {
+            json filterScorings;
+            for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+                filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
             }
-            results["data"].push_back(result);
+            result["scoringPerFilter"] = filterScorings;
         }
-
-        sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
-            return b1["scoring"] > b2["scoring"];
-        });
-
-        return results;
+        results["data"].push_back(result);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+
+    sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
+        return b1["scoring"] > b2["scoring"];
+    });
+
+    return results;
 }
 
 json calculate_advised_magnetics_with_filters(json inputsJson, json filterFlowJson, int maximumNumberResults, json coreModeJson) {
@@ -110,277 +96,235 @@ json calculate_advised_magnetics_with_filters(json inputsJson, json filterFlowJs
     // omits) DROP any wound candidate that fails them, so designed windings are
     // current-density gated while the fast path's loss ranking + core search are
     // preserved. Exposes MagneticAdviser::get_advised_magnetic_fast(inputs, flow, n).
-    try {
-        OpenMagnetics::Inputs inputs(inputsJson);
-        OpenMagnetics::CoreAdviser::CoreAdviserModes coreMode;
-        from_json(coreModeJson, coreMode);
+    OpenMagnetics::Inputs inputs(inputsJson);
+    OpenMagnetics::CoreAdviser::CoreAdviserModes coreMode;
+    from_json(coreModeJson, coreMode);
 
-        std::vector<OpenMagnetics::MagneticFilterOperation> filterFlow;
-        for (auto filterJson : filterFlowJson) {
-            OpenMagnetics::MagneticFilterOperation filter(filterJson);
-            filterFlow.push_back(filter);
-        }
+    std::vector<OpenMagnetics::MagneticFilterOperation> filterFlow;
+    for (auto filterJson : filterFlowJson) {
+        OpenMagnetics::MagneticFilterOperation filter(filterJson);
+        filterFlow.push_back(filter);
+    }
 
-        OpenMagnetics::MagneticAdviser magneticAdviser;
-        magneticAdviser.set_core_mode(coreMode);
-        auto masMagnetics = magneticAdviser.get_advised_magnetic_fast(inputs, filterFlow, maximumNumberResults);
+    OpenMagnetics::MagneticAdviser magneticAdviser;
+    magneticAdviser.set_core_mode(coreMode);
+    auto masMagnetics = magneticAdviser.get_advised_magnetic_fast(inputs, filterFlow, maximumNumberResults);
 
-        auto scoringsPerFilter = magneticAdviser.get_scorings();
+    auto scoringsPerFilter = magneticAdviser.get_scorings();
 
-        json results = json();
-        results["data"] = json::array();
-        for (auto& [masMagnetic, scoring] : masMagnetics) {
-            std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
-            json result;
-            json masJson;
-            to_json(masJson, masMagnetic);
-            result["mas"] = masJson;
-            result["scoring"] = scoring;
-            if (scoringsPerFilter.count(name)) {
-                json filterScorings;
-                for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
-                    filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
-                }
-                result["scoringPerFilter"] = filterScorings;
+    json results = json();
+    results["data"] = json::array();
+    for (auto& [masMagnetic, scoring] : masMagnetics) {
+        std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+        json result;
+        json masJson;
+        to_json(masJson, masMagnetic);
+        result["mas"] = masJson;
+        result["scoring"] = scoring;
+        if (scoringsPerFilter.count(name)) {
+            json filterScorings;
+            for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+                filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
             }
-            results["data"].push_back(result);
+            result["scoringPerFilter"] = filterScorings;
         }
-
-        sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
-            return b1["scoring"] > b2["scoring"];
-        });
-
-        return results;
+        results["data"].push_back(result);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+
+    sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
+        return b1["scoring"] > b2["scoring"];
+    });
+
+    return results;
 }
 
 json calculate_advised_magnetics_fast(json inputsJson, int maximumNumberResults, json coreModeJson) {
-    try {
-        OpenMagnetics::Inputs inputs(inputsJson);
-        OpenMagnetics::CoreAdviser::CoreAdviserModes coreMode;
-        from_json(coreModeJson, coreMode);
+    OpenMagnetics::Inputs inputs(inputsJson);
+    OpenMagnetics::CoreAdviser::CoreAdviserModes coreMode;
+    from_json(coreModeJson, coreMode);
 
-        OpenMagnetics::MagneticAdviser magneticAdviser;
-        magneticAdviser.set_core_mode(coreMode);
-        auto masMagnetics = magneticAdviser.get_advised_magnetic_fast(inputs, maximumNumberResults);
+    OpenMagnetics::MagneticAdviser magneticAdviser;
+    magneticAdviser.set_core_mode(coreMode);
+    auto masMagnetics = magneticAdviser.get_advised_magnetic_fast(inputs, maximumNumberResults);
 
-        json results = json();
-        results["data"] = json::array();
-        for (auto& [masMagnetic, scoring] : masMagnetics) {
-            std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
-            json result;
-            json masJson;
-            to_json(masJson, masMagnetic);
-            result["mas"] = masJson;
-            result["scoring"] = scoring;
-            results["data"].push_back(result);
-        }
-
-        return results;
+    json results = json();
+    results["data"] = json::array();
+    for (auto& [masMagnetic, scoring] : masMagnetics) {
+        std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+        json result;
+        json masJson;
+        to_json(masJson, masMagnetic);
+        result["mas"] = masJson;
+        result["scoring"] = scoring;
+        results["data"].push_back(result);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+
+    return results;
 }
 
 json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson, int maximumNumberResults) {
-    try {
-        OpenMagnetics::settings.set_coil_delimit_and_compact(true);
-        OpenMagnetics::Inputs inputs(inputsJson);
-        std::map<OpenMagnetics::MagneticFilters, double> weights;
+    OpenMagnetics::settings.set_coil_delimit_and_compact(true);
+    OpenMagnetics::Inputs inputs(inputsJson);
+    std::map<OpenMagnetics::MagneticFilters, double> weights;
 
-        std::vector <OpenMagnetics::Magnetic> catalog;
+    std::vector <OpenMagnetics::Magnetic> catalog;
 
-        for (auto magneticJson : catalogJson) {
-            OpenMagnetics::Magnetic magnetic(magneticJson);
-            catalog.push_back(magnetic);
-        }
+    for (auto magneticJson : catalogJson) {
+        OpenMagnetics::Magnetic magnetic(magneticJson);
+        catalog.push_back(magnetic);
+    }
 
-        OpenMagnetics::MagneticAdviser magneticAdviser;
-        auto masMagnetics = magneticAdviser.get_advised_magnetic(inputs, catalog, maximumNumberResults);
+    OpenMagnetics::MagneticAdviser magneticAdviser;
+    auto masMagnetics = magneticAdviser.get_advised_magnetic(inputs, catalog, maximumNumberResults);
 
-        auto scoringsPerFilter = magneticAdviser.get_scorings();
+    auto scoringsPerFilter = magneticAdviser.get_scorings();
 
-        json results = json();
-        results["data"] = json::array();
-        for (auto& [masMagnetic, scoring] : masMagnetics) {
-            std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
-            json result;
-            json masJson;
-            to_json(masJson, masMagnetic);
-            result["mas"] = masJson;
-            result["scoring"] = scoring;
-            if (scoringsPerFilter.count(name)) {
-                json filterScorings;
-                for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
-                    filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
-                }
-                result["scoringPerFilter"] = filterScorings;
+    json results = json();
+    results["data"] = json::array();
+    for (auto& [masMagnetic, scoring] : masMagnetics) {
+        std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+        json result;
+        json masJson;
+        to_json(masJson, masMagnetic);
+        result["mas"] = masJson;
+        result["scoring"] = scoring;
+        if (scoringsPerFilter.count(name)) {
+            json filterScorings;
+            for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+                filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
             }
-            results["data"].push_back(result);
+            result["scoringPerFilter"] = filterScorings;
         }
-
-        sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
-            return b1["scoring"] > b2["scoring"];
-        });
-
-        return results;
+        results["data"].push_back(result);
     }
-    catch (const std::exception &exc) {
-        std::cout << inputsJson << std::endl;
-        std::cout << catalogJson << std::endl;
-        std::cout << maximumNumberResults << std::endl;
-        return "Exception: " + std::string{exc.what()};
-    }
+
+    sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
+        return b1["scoring"] > b2["scoring"];
+    });
+
+    return results;
 }
 
 json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson, int maximumNumberResults) {
-    try {
-        OpenMagnetics::settings.set_coil_delimit_and_compact(true);
-        OpenMagnetics::Inputs inputs(inputsJson);
+    OpenMagnetics::settings.set_coil_delimit_and_compact(true);
+    OpenMagnetics::Inputs inputs(inputsJson);
 
-        std::vector<OpenMagnetics::MagneticFilterOperation> filterFlow;
-        for (auto filterJson : filterFlowJson) {
-            OpenMagnetics::MagneticFilterOperation filter(filterJson);
-            filterFlow.push_back(filter);
-        }
+    std::vector<OpenMagnetics::MagneticFilterOperation> filterFlow;
+    for (auto filterJson : filterFlowJson) {
+        OpenMagnetics::MagneticFilterOperation filter(filterJson);
+        filterFlow.push_back(filter);
+    }
 
-        if (OpenMagnetics::magneticsCache.size() == 0) {
-            return "Exception: No magnetics found in cache";
-        }
+    if (OpenMagnetics::magneticsCache.size() == 0) {
+        throw std::runtime_error("No magnetics found in cache");
+    }
 
-        OpenMagnetics::MagneticAdviser magneticAdviser;
-        auto masMagnetics = magneticAdviser.get_advised_magnetic(inputs, OpenMagnetics::magneticsCache.get(), filterFlow, maximumNumberResults);
+    OpenMagnetics::MagneticAdviser magneticAdviser;
+    auto masMagnetics = magneticAdviser.get_advised_magnetic(inputs, OpenMagnetics::magneticsCache.get(), filterFlow, maximumNumberResults);
 
-        auto scoringsPerFilter = magneticAdviser.get_scorings();
+    auto scoringsPerFilter = magneticAdviser.get_scorings();
 
-        json results = json();
-        results["data"] = json::array();
-        for (auto& [masMagnetic, scoring] : masMagnetics) {
-            std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
-            json result;
-            json masJson;
-            to_json(masJson, masMagnetic);
-            result["mas"] = masJson;
-            result["scoring"] = scoring;
-            if (scoringsPerFilter.count(name)) {
-                json filterScorings;
-                for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
-                    filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
-                }
-                result["scoringPerFilter"] = filterScorings;
+    json results = json();
+    results["data"] = json::array();
+    for (auto& [masMagnetic, scoring] : masMagnetics) {
+        std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+        json result;
+        json masJson;
+        to_json(masJson, masMagnetic);
+        result["mas"] = masJson;
+        result["scoring"] = scoring;
+        if (scoringsPerFilter.count(name)) {
+            json filterScorings;
+            for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+                filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
             }
-            results["data"].push_back(result);
+            result["scoringPerFilter"] = filterScorings;
         }
-
-        sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
-            return b1["scoring"] > b2["scoring"];
-        });
-
-        return results;
+        results["data"].push_back(result);
     }
-    catch (const std::exception &exc) {
-        return "Exception: " + std::string{exc.what()};
-    }
+
+    sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
+        return b1["scoring"] > b2["scoring"];
+    });
+
+    return results;
 }
 
 json calculate_advised_sections(json masJson, json patternJson, int repetitions) {
-    try {
-        OpenMagnetics::Mas mas(masJson);
-        std::vector<size_t> pattern;
-        for (auto& elem : patternJson) {
-            pattern.push_back(elem);
-        }
-        auto bobbin = mas.get_magnetic().get_coil().get_bobbin();
-        if (std::holds_alternative<std::string>(bobbin)) {
-            auto bobbinString = std::get<std::string>(bobbin);
-            if (bobbinString == "Dummy") {
-                mas.get_mutable_magnetic().get_mutable_coil().set_bobbin(
-                    OpenMagnetics::Bobbin::create_quick_bobbin(mas.get_mutable_magnetic().get_mutable_core()));
-            }
-        }
-        for (size_t windingIndex = 0; windingIndex < mas.get_magnetic().get_coil().get_functional_description().size(); ++windingIndex) {
-            mas.get_mutable_magnetic().get_mutable_coil().get_mutable_functional_description()[windingIndex].set_wire("Dummy");
-        }
-        auto sections = OpenMagnetics::CoilAdviser().get_advised_sections(mas, pattern, repetitions);
-        json result = json::array();
-        for (auto& section : sections) {
-            json aux;
-            to_json(aux, section);
-            result.push_back(aux);
-        }
-        return result;
+    OpenMagnetics::Mas mas(masJson);
+    std::vector<size_t> pattern;
+    for (auto& elem : patternJson) {
+        pattern.push_back(elem);
     }
-    catch (const std::exception& exc) {
-        return json{{"error", std::string("calculate_advised_sections: ") + exc.what()}};
+    auto bobbin = mas.get_magnetic().get_coil().get_bobbin();
+    if (std::holds_alternative<std::string>(bobbin)) {
+        auto bobbinString = std::get<std::string>(bobbin);
+        if (bobbinString == "Dummy") {
+            mas.get_mutable_magnetic().get_mutable_coil().set_bobbin(
+                OpenMagnetics::Bobbin::create_quick_bobbin(mas.get_mutable_magnetic().get_mutable_core()));
+        }
     }
+    for (size_t windingIndex = 0; windingIndex < mas.get_magnetic().get_coil().get_functional_description().size(); ++windingIndex) {
+        mas.get_mutable_magnetic().get_mutable_coil().get_mutable_functional_description()[windingIndex].set_wire("Dummy");
+    }
+    auto sections = OpenMagnetics::CoilAdviser().get_advised_sections(mas, pattern, repetitions);
+    json result = json::array();
+    for (auto& section : sections) {
+        json aux;
+        to_json(aux, section);
+        result.push_back(aux);
+    }
+    return result;
 }
 
 json calculate_advised_coil(json masJson) {
-    try {
-        OpenMagnetics::Settings::GetInstance().set_coil_delimit_and_compact(true);
-        OpenMagnetics::Mas mas(masJson);
-        for (size_t windingIndex = 0; windingIndex < mas.get_magnetic().get_coil().get_functional_description().size(); ++windingIndex) {
-            mas.get_mutable_magnetic().get_mutable_coil().get_mutable_functional_description()[windingIndex].set_wire("Dummy");
-        }
-        mas.get_mutable_magnetic().get_mutable_coil().set_turns_description(std::nullopt);
-        mas.get_mutable_magnetic().get_mutable_coil().set_layers_description(std::nullopt);
-        mas.get_mutable_magnetic().get_mutable_coil().set_sections_description(std::nullopt);
-        mas.get_mutable_magnetic().get_mutable_coil().set_groups_description(std::nullopt);
-        OpenMagnetics::CoilAdviser coilAdviser;
-        auto masMagneticsWithCoil = coilAdviser.get_advised_coil(mas, 1);
-        if (masMagneticsWithCoil.size() > 0) {
-            json result;
-            to_json(result, masMagneticsWithCoil[0]);
-            return result;
-        }
-        else {
-            return json{{"error", "No coil found"}};
-        }
+    OpenMagnetics::Settings::GetInstance().set_coil_delimit_and_compact(true);
+    OpenMagnetics::Mas mas(masJson);
+    for (size_t windingIndex = 0; windingIndex < mas.get_magnetic().get_coil().get_functional_description().size(); ++windingIndex) {
+        mas.get_mutable_magnetic().get_mutable_coil().get_mutable_functional_description()[windingIndex].set_wire("Dummy");
     }
-    catch (const std::exception& exc) {
-        return json{{"error", std::string("calculate_advised_coil: ") + exc.what()}};
+    mas.get_mutable_magnetic().get_mutable_coil().set_turns_description(std::nullopt);
+    mas.get_mutable_magnetic().get_mutable_coil().set_layers_description(std::nullopt);
+    mas.get_mutable_magnetic().get_mutable_coil().set_sections_description(std::nullopt);
+    mas.get_mutable_magnetic().get_mutable_coil().set_groups_description(std::nullopt);
+    OpenMagnetics::CoilAdviser coilAdviser;
+    auto masMagneticsWithCoil = coilAdviser.get_advised_coil(mas, 1);
+    if (masMagneticsWithCoil.size() > 0) {
+        json result;
+        to_json(result, masMagneticsWithCoil[0]);
+        return result;
+    }
+    else {
+        throw std::runtime_error("calculate_advised_coil: no coil found");
     }
 }
 
 json calculate_advised_wires(json windingJson, json sectionJson, json currentJson, json solidInsulationRequirementsJson, double temperature, uint8_t numberSections, size_t maximumNumberResults, bool usePlanarWires) {
-    try {
-        OpenMagnetics::Settings::GetInstance().set_coil_delimit_and_compact(true);
-        OpenMagnetics::Winding winding(windingJson);
-        OpenMagnetics::WireSolidInsulationRequirements wireSolidInsulationRequirements(solidInsulationRequirementsJson);
-        Section section(sectionJson);
-        SignalDescriptor current(currentJson);
-        OpenMagnetics::WireAdviser wireAdviser;
-        wireAdviser.set_wire_solid_insulation_requirements(wireSolidInsulationRequirements);
-        std::vector<std::pair<OpenMagnetics::Winding, double>> windingsWithScoring;
-        if (usePlanarWires) {
-            windingsWithScoring = wireAdviser.get_advised_planar_wire(winding, section, current, temperature, numberSections, maximumNumberResults);
-        }
-        else {
-            windingsWithScoring = wireAdviser.get_advised_wire(winding, section, current, temperature, numberSections, maximumNumberResults);
-        }
-        json results;
-        results["data"] = json::array();
-        for (auto& [w, scoring] : windingsWithScoring) {
-            json result;
-            json windingJson;
-            to_json(windingJson, w);
-            result["winding"] = windingJson;
-            result["scoring"] = scoring;
-            results["data"].push_back(result);
-        }
-        return results;
+    OpenMagnetics::Settings::GetInstance().set_coil_delimit_and_compact(true);
+    OpenMagnetics::Winding winding(windingJson);
+    OpenMagnetics::WireSolidInsulationRequirements wireSolidInsulationRequirements(solidInsulationRequirementsJson);
+    Section section(sectionJson);
+    SignalDescriptor current(currentJson);
+    OpenMagnetics::WireAdviser wireAdviser;
+    wireAdviser.set_wire_solid_insulation_requirements(wireSolidInsulationRequirements);
+    std::vector<std::pair<OpenMagnetics::Winding, double>> windingsWithScoring;
+    if (usePlanarWires) {
+        windingsWithScoring = wireAdviser.get_advised_planar_wire(winding, section, current, temperature, numberSections, maximumNumberResults);
     }
-    catch (const std::exception& exc) {
-        return json{{"error", std::string("calculate_advised_wires: ") + exc.what()}};
+    else {
+        windingsWithScoring = wireAdviser.get_advised_wire(winding, section, current, temperature, numberSections, maximumNumberResults);
     }
+    json results;
+    results["data"] = json::array();
+    for (auto& [w, scoring] : windingsWithScoring) {
+        json result;
+        json windingJson;
+        to_json(windingJson, w);
+        result["winding"] = windingJson;
+        result["scoring"] = scoring;
+        results["data"].push_back(result);
+    }
+    return results;
 }
 
 void register_adviser_bindings(py::module& m) {
@@ -397,7 +341,7 @@ void register_adviser_bindings(py::module& m) {
             weights_json: JSON object with filter weights. Keys can be:
                          "COST", "EFFICIENCY", "DIMENSIONS" with float values 0-1.
             max_results: Maximum number of core recommendations to return.
-            core_mode_json: Core selection mode - "AVAILABLE_CORES" or "STANDARD_CORES".
+            core_mode_json: Core selection mode - "available cores", "standard cores" or "custom cores".
         
         Returns:
             JSON object with "data" array containing ranked results.
@@ -410,7 +354,7 @@ void register_adviser_bindings(py::module& m) {
         Example:
             >>> inputs = PyMKF.process_inputs(raw_inputs)
             >>> weights = {"COST": 1, "EFFICIENCY": 1, "DIMENSIONS": 0.5}
-            >>> result = PyMKF.calculate_advised_cores(inputs, weights, 10, "AVAILABLE_CORES")
+            >>> result = PyMKF.calculate_advised_cores(inputs, weights, 10, "available cores")
             >>> for item in result["data"]:
             ...     print(f"Score: {item['scoring']}, Per filter: {item['scoringPerFilter']}")
         )pbdoc",
@@ -429,7 +373,7 @@ void register_adviser_bindings(py::module& m) {
             inputs_json: JSON object containing design requirements and operating points.
                          Should be processed using process_inputs() first.
             max_results: Maximum number of magnetic recommendations to return.
-            core_mode_json: Core selection mode - "AVAILABLE_CORES" or "STANDARD_CORES".
+            core_mode_json: Core selection mode - "available cores", "standard cores" or "custom cores".
         
         Returns:
             JSON object with "data" array containing ranked results.
@@ -441,7 +385,7 @@ void register_adviser_bindings(py::module& m) {
         
         Example:
             >>> inputs = PyMKF.process_inputs(raw_inputs)
-            >>> result = PyMKF.calculate_advised_magnetics(inputs, 5, "AVAILABLE_CORES")
+            >>> result = PyMKF.calculate_advised_magnetics(inputs, 5, "available cores")
             >>> for item in result["data"]:
             ...     print(f"Score: {item['scoring']}, Per filter: {item['scoringPerFilter']}")
         )pbdoc",
@@ -476,7 +420,7 @@ void register_adviser_bindings(py::module& m) {
             inputs_json: JSON object containing design requirements and operating points.
                          Should be processed using process_inputs() first.
             max_results: Maximum number of magnetic recommendations to return.
-            core_mode_json: Core selection mode - "AVAILABLE_CORES" or "STANDARD_CORES".
+            core_mode_json: Core selection mode - "available cores", "standard cores" or "custom cores".
 
         Returns:
             JSON object with "data" array containing results sorted by total losses.
@@ -486,7 +430,7 @@ void register_adviser_bindings(py::module& m) {
 
         Example:
             >>> inputs = PyMKF.process_inputs(raw_inputs)
-            >>> result = PyMKF.calculate_advised_magnetics_fast(inputs, 5, "STANDARD_CORES")
+            >>> result = PyMKF.calculate_advised_magnetics_fast(inputs, 5, "standard cores")
             >>> for item in result["data"]:
             ...     print(f"Total losses: {item['scoring']} W")
         )pbdoc",
@@ -534,8 +478,8 @@ void register_adviser_bindings(py::module& m) {
             max_results: Maximum number of recommendations to return.
         
         Returns:
-            JSON object with "data" array containing ranked results,
-            or error string if cache is empty.
+            JSON object with "data" array containing ranked results.
+            Raises PyOpenMagnetics.EngineError if the cache is empty.
             Each result has:
             - "mas": Mas object with magnetic data
             - "scoring": Overall float score
@@ -543,7 +487,7 @@ void register_adviser_bindings(py::module& m) {
         
         Note:
             Cache must be populated before calling this function.
-            Returns "Exception: No magnetics found in cache" if cache is empty.
+            Raises PyOpenMagnetics.EngineError if the cache is empty.
         )pbdoc",
         py::arg("inputs_json"), py::arg("filter_flow_json"), py::arg("max_results"));
 

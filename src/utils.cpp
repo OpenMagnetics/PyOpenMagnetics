@@ -17,50 +17,29 @@ json calculate_basic_processed_data(json waveformJson) {
 }
 
 json calculate_harmonics(json waveformJson, double frequency) {
-    try {
-        Waveform waveform(waveformJson);
-        auto sampledWaveform = OpenMagnetics::Inputs::calculate_sampled_waveform(waveform, frequency);
-        auto harmonics = OpenMagnetics::Inputs::calculate_harmonics_data(sampledWaveform, frequency);
-        json result;
-        to_json(result, harmonics);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    Waveform waveform(waveformJson);
+    auto sampledWaveform = OpenMagnetics::Inputs::calculate_sampled_waveform(waveform, frequency);
+    auto harmonics = OpenMagnetics::Inputs::calculate_harmonics_data(sampledWaveform, frequency);
+    json result;
+    to_json(result, harmonics);
+    return result;
 }
 
 json calculate_sampled_waveform(json waveformJson, double frequency) {
-    try {
-        Waveform waveform(waveformJson);
-        auto sampledWaveform = OpenMagnetics::Inputs::calculate_sampled_waveform(waveform, frequency);
-        json result;
-        to_json(result, sampledWaveform);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    Waveform waveform(waveformJson);
+    auto sampledWaveform = OpenMagnetics::Inputs::calculate_sampled_waveform(waveform, frequency);
+    json result;
+    to_json(result, sampledWaveform);
+    return result;
 }
 
 json calculate_processed_data(json signalDescriptorJson, json sampledWaveformJson, bool includeDcComponent) {
-    try {
-        SignalDescriptor signalDescriptor(signalDescriptorJson);
-        Waveform sampledWaveform(sampledWaveformJson);
-        auto processed = OpenMagnetics::Inputs::calculate_processed_data(signalDescriptor, sampledWaveform, includeDcComponent);
-        json result;
-        to_json(result, processed);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    SignalDescriptor signalDescriptor(signalDescriptorJson);
+    Waveform sampledWaveform(sampledWaveformJson);
+    auto processed = OpenMagnetics::Inputs::calculate_processed_data(signalDescriptor, sampledWaveform, includeDcComponent);
+    json result;
+    to_json(result, processed);
+    return result;
 }
 
 double calculate_instantaneous_power(json excitationJson) {
@@ -190,119 +169,70 @@ std::vector<double> python_list_to_vector(py::list pythonList) {
 }
 
 json standardize_signal_descriptor(json signalDescriptorJson, double frequency) {
-    try {
-        SignalDescriptor signalDescriptor(signalDescriptorJson);
-        signalDescriptor = OpenMagnetics::Inputs::standardize_waveform(signalDescriptor, frequency);
-        auto sampledWaveform = OpenMagnetics::Inputs::calculate_sampled_waveform(signalDescriptor.get_waveform().value(), frequency);
-        signalDescriptor.set_harmonics(OpenMagnetics::Inputs::calculate_harmonics_data(sampledWaveform, frequency));
-        signalDescriptor.set_processed(OpenMagnetics::Inputs::calculate_processed_data(signalDescriptor, sampledWaveform, true));
-        json result;
-        to_json(result, signalDescriptor);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    SignalDescriptor signalDescriptor(signalDescriptorJson);
+    signalDescriptor = OpenMagnetics::Inputs::standardize_waveform(signalDescriptor, frequency);
+    auto sampledWaveform = OpenMagnetics::Inputs::calculate_sampled_waveform(signalDescriptor.get_waveform().value(), frequency);
+    signalDescriptor.set_harmonics(OpenMagnetics::Inputs::calculate_harmonics_data(sampledWaveform, frequency));
+    signalDescriptor.set_processed(OpenMagnetics::Inputs::calculate_processed_data(signalDescriptor, sampledWaveform, true));
+    json result;
+    to_json(result, signalDescriptor);
+    return result;
 }
 
 json create_waveform(json processedJson, double frequency) {
-    try {
-        ProcessedWaveform processed(processedJson);
-        auto waveform = OpenMagnetics::Inputs::create_waveform(processed, frequency);
-        json result;
-        to_json(result, waveform);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    ProcessedWaveform processed(processedJson);
+    auto waveform = OpenMagnetics::Inputs::create_waveform(processed, frequency);
+    json result;
+    to_json(result, waveform);
+    return result;
 }
 
 json calculate_processed(json harmonicsJson, json waveformJson) {
-    try {
-        Harmonics harmonics(harmonicsJson);
-        Waveform waveform(waveformJson);
-        auto processed = OpenMagnetics::Inputs::calculate_processed_data(harmonics, waveform, true);
-        json result;
-        to_json(result, processed);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    Harmonics harmonics(harmonicsJson);
+    Waveform waveform(waveformJson);
+    auto processed = OpenMagnetics::Inputs::calculate_processed_data(harmonics, waveform, true);
+    json result;
+    to_json(result, processed);
+    return result;
 }
 
 json scale_waveform_time_to_frequency(json waveformJson, double newFrequency) {
-    try {
-        Waveform waveform(waveformJson);
-        auto scaled = OpenMagnetics::Inputs::scale_time_to_frequency(waveform, newFrequency);
-        json result;
-        to_json(result, scaled);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    Waveform waveform(waveformJson);
+    auto scaled = OpenMagnetics::Inputs::scale_time_to_frequency(waveform, newFrequency);
+    json result;
+    to_json(result, scaled);
+    return result;
 }
 
 json scale_excitation_time_to_frequency(json excitationJson, double newFrequency) {
-    try {
-        OperatingPointExcitation excitation(excitationJson);
-        OpenMagnetics::Inputs::scale_time_to_frequency(excitation, newFrequency, false, true);
-        json result;
-        to_json(result, excitation);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OperatingPointExcitation excitation(excitationJson);
+    OpenMagnetics::Inputs::scale_time_to_frequency(excitation, newFrequency, false, true);
+    json result;
+    to_json(result, excitation);
+    return result;
 }
 
 json calculate_induced_voltage(json excitationJson, double magnetizingInductance) {
-    try {
-        OperatingPointExcitation excitation(excitationJson);
-        auto voltage = OpenMagnetics::Inputs::calculate_induced_voltage(excitation, magnetizingInductance);
-        json result;
-        to_json(result, voltage);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    OperatingPointExcitation excitation(excitationJson);
+    auto voltage = OpenMagnetics::Inputs::calculate_induced_voltage(excitation, magnetizingInductance);
+    json result;
+    to_json(result, voltage);
+    return result;
 }
 
 json calculate_induced_current(json excitationJson, double magnetizingInductance) {
-    try {
-        OperatingPointExcitation excitation(excitationJson);
-        auto current = OpenMagnetics::Inputs::calculate_magnetizing_current(excitation, magnetizingInductance, true, 0.0);
+    OperatingPointExcitation excitation(excitationJson);
+    auto current = OpenMagnetics::Inputs::calculate_magnetizing_current(excitation, magnetizingInductance, true, 0.0);
 
-        if (excitation.get_voltage() && excitation.get_voltage()->get_processed() && excitation.get_voltage()->get_processed()->get_duty_cycle()) {
-            auto processed = current.get_processed().value();
-            processed.set_duty_cycle(excitation.get_voltage()->get_processed()->get_duty_cycle().value());
-            current.set_processed(processed);
-        }
+    if (excitation.get_voltage() && excitation.get_voltage()->get_processed() && excitation.get_voltage()->get_processed()->get_duty_cycle()) {
+        auto processed = current.get_processed().value();
+        processed.set_duty_cycle(excitation.get_voltage()->get_processed()->get_duty_cycle().value());
+        current.set_processed(processed);
+    }
 
-        json result;
-        to_json(result, current);
-        return result;
-    }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    json result;
+    to_json(result, current);
+    return result;
 }
 
 bool check_requirement(json requirementJson, double value) {
@@ -311,37 +241,23 @@ bool check_requirement(json requirementJson, double value) {
 }
 
 json get_main_harmonic_indexes(json harmonicsJson, double threshold, int mainHarmonicIndex) {
-    try {
-        Harmonics harmonics(harmonicsJson);
-        auto indexes = OpenMagnetics::get_main_harmonic_indexes(harmonics, threshold, static_cast<size_t>(mainHarmonicIndex));
-        json result = json::array();
-        for (auto idx : indexes) {
-            result.push_back(idx);
-        }
-        return result;
+    Harmonics harmonics(harmonicsJson);
+    auto indexes = OpenMagnetics::get_main_harmonic_indexes(harmonics, threshold, static_cast<size_t>(mainHarmonicIndex));
+    json result = json::array();
+    for (auto idx : indexes) {
+        result.push_back(idx);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 json get_excitation_harmonic_indexes(json excitationJson, double threshold) {
-    try {
-        OperatingPointExcitation excitation(excitationJson);
-        auto indexes = OpenMagnetics::get_main_harmonic_indexes(excitation, threshold);
-        json result = json::array();
-        for (auto idx : indexes) {
-            result.push_back(idx);
-        }
-        return result;
+    OperatingPointExcitation excitation(excitationJson);
+    auto indexes = OpenMagnetics::get_main_harmonic_indexes(excitation, threshold);
+    json result = json::array();
+    for (auto idx : indexes) {
+        result.push_back(idx);
     }
-    catch (const std::exception &exc) {
-        json exception;
-        exception["data"] = "Exception: " + std::string{exc.what()};
-        return exception;
-    }
+    return result;
 }
 
 void register_utils_bindings(py::module& m) {
