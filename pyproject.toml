@@ -30,11 +30,11 @@ build-dir = "build/{wheel_tag}"
 build.verbose = true
 sdist.exclude = [".venv*", ".venv*/**", "build", "build/**", "dist", "dist/**", "*.egg-info", "__pycache__", "*.pyc"]
 # All wheel contents come from CMake install() (extension, libKirchhoffApi,
-# packaging/__init__.py, generated _build_info.py); no Python package dir to copy.
+# _packaging/__init__.py, generated _build_info.py); no Python package dir to copy.
 wheel.packages = []
 wheel.install-dir = "PyOpenMagnetics"
 # Ensure AGENTS.md and llms.txt are included in sdist and wheel
-sdist.include = ["packaging/__init__.py", "packaging/_build_info.py.in", "AGENTS.md", "llms.txt", "PyOpenMagnetics.pyi"]
+sdist.include = ["_packaging/__init__.py", "_packaging/_build_info.py.in", "AGENTS.md", "llms.txt", "PyOpenMagnetics.pyi"]
 
 [[tool.scikit-build.overrides]]
 if.platform-system = "^linux"

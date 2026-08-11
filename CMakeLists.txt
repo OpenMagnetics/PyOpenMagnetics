@@ -274,7 +274,7 @@ if(NOT MKF_GIT_HEAD OR NOT MAS_GIT_HEAD)
         "(MKF_GIT_HEAD='${MKF_GIT_HEAD}', MAS_GIT_HEAD='${MAS_GIT_HEAD}'). "
         "The MKF/MAS source dirs must be git checkouts (ABT #601).")
 endif()
-configure_file(packaging/_build_info.py.in "${CMAKE_BINARY_DIR}/_build_info.py" @ONLY)
+configure_file(_packaging/_build_info.py.in "${CMAKE_BINARY_DIR}/_build_info.py" @ONLY)
 
 message(STATUS "Compiling MAS")
 
@@ -607,9 +607,12 @@ install(TARGETS PyOpenMagnetics LIBRARY DESTINATION .)
 # Install the package __init__.py so `import PyOpenMagnetics` exposes the
 # compiled extension's API. Without it the wheel installs as an empty PEP-420
 # namespace package and `PyOpenMagnetics.<fn>` resolves to nothing. It lives in
-# packaging/ (not the repo root) so the repo checkout cannot shadow the installed
-# package when pytest runs from the repo root (ABT #597).
-install(FILES packaging/__init__.py DESTINATION .)
+# _packaging/ (not the repo root) so the repo checkout cannot shadow the installed
+# package when pytest runs from the repo root (ABT #597). The leading underscore
+# matters: a directory literally named "packaging" shadows the REAL `packaging`
+# PyPI library that build backends and pytest import, breaking `python -m build`
+# and pytest with "No module named packaging.PyOpenMagnetics".
+install(FILES _packaging/__init__.py DESTINATION .)
 # Engine-commit provenance, configured above from the resolved MKF/MAS heads.
 install(FILES "${CMAKE_BINARY_DIR}/_build_info.py" DESTINATION .)
 
