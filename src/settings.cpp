@@ -134,7 +134,17 @@ json get_settings() {
     settingsJson["painterColorCurrentDensity"] = OpenMagnetics::settings.get_painter_color_current_density();
     settingsJson["painterColorMagneticFieldMinimum"] = OpenMagnetics::settings.get_painter_color_magnetic_field_minimum();
     settingsJson["painterColorMagneticFieldMaximum"] = OpenMagnetics::settings.get_painter_color_magnetic_field_maximum();
-    settingsJson["painterCciCoordinatesPath"] = OpenMagnetics::settings.get_painter_cci_coordinates_path();
+    // ABT #647: the CCI coordinate directory is OPTIONAL — strand counts up to 1000 use the
+    // build-time embedded coordinates — so merely REPORTING the settings must not force it to
+    // resolve. get_painter_cci_coordinates_path() throws when nothing resolves, which made a
+    // routine get_settings() fail on every relocated install (i.e. every published wheel: the
+    // builder's source tree is gone by then). Report null for "none resolved" instead.
+    if (auto cciCoordinatesPath = OpenMagnetics::settings.try_get_painter_cci_coordinates_path()) {
+        settingsJson["painterCciCoordinatesPath"] = cciCoordinatesPath.value();
+    }
+    else {
+        settingsJson["painterCciCoordinatesPath"] = nullptr;
+    }
     settingsJson["painterMirroringDimension"] = OpenMagnetics::settings.get_painter_mirroring_dimension();
     if (OpenMagnetics::settings.get_painter_magnetic_field_strength_model()) {
         json aux;
@@ -316,7 +326,10 @@ void set_settings(json settingsJson) {
     if (settingsJson.contains("painterColorCurrentDensity")) OpenMagnetics::settings.set_painter_color_current_density(settingsJson["painterColorCurrentDensity"]);
     if (settingsJson.contains("painterColorMagneticFieldMinimum")) OpenMagnetics::settings.set_painter_color_magnetic_field_minimum(settingsJson["painterColorMagneticFieldMinimum"]);
     if (settingsJson.contains("painterColorMagneticFieldMaximum")) OpenMagnetics::settings.set_painter_color_magnetic_field_maximum(settingsJson["painterColorMagneticFieldMaximum"]);
-    if (settingsJson.contains("painterCciCoordinatesPath")) OpenMagnetics::settings.set_painter_cci_coordinates_path(settingsJson["painterCciCoordinatesPath"]);
+    // null means "not set" (see get_settings above), so set_settings(get_settings()) round-trips
+    // instead of trying to assign a null to a std::string.
+    if (settingsJson.contains("painterCciCoordinatesPath") && !settingsJson["painterCciCoordinatesPath"].is_null())
+        OpenMagnetics::settings.set_painter_cci_coordinates_path(settingsJson["painterCciCoordinatesPath"]);
     if (settingsJson.contains("painterMirroringDimension")) OpenMagnetics::settings.set_painter_mirroring_dimension(settingsJson["painterMirroringDimension"]);
     if (settingsJson.contains("painterMagneticFieldStrengthModel")) {
         OpenMagnetics::MagneticFieldStrengthModels model;
