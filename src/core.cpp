@@ -125,7 +125,7 @@ json calculate_core_geometrical_description(json coreDataJson) {
 
 json calculate_core_gapping(json coreDataJson) {
     OpenMagnetics::Core core(coreDataJson, false, false, false);
-    core.process_gap();
+    core.process_gap_or_throw();
     json result = json::array();
     for (auto& gap : core.get_functional_description().get_gapping()) {
         json aux;
