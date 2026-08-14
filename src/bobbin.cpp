@@ -117,7 +117,21 @@ void register_bobbin_bindings(py::module& m) {
     m.def("create_basic_bobbin", &create_basic_bobbin, "Create a basic bobbin from core data");
     m.def("create_basic_bobbin_by_thickness", &create_basic_bobbin_by_thickness, "Create a basic bobbin with specified thickness");
     m.def("calculate_bobbin_data", &calculate_bobbin_data, "Calculate bobbin specifications");
-    m.def("process_bobbin", &process_bobbin, "Process bobbin geometry");
+    m.def("process_bobbin", &process_bobbin,
+        R"pbdoc(
+        Process a bobbin's functionalDescription into its processedDescription
+        (winding window, column/wall thickness, coordinates).
+
+        Args:
+            bobbin_json: JSON Bobbin OBJECT — a Python dict, e.g. a row of MAS's
+                data/bobbins.ndjson. It must NOT be pre-serialised: passing
+                json.dumps(row) hands the engine a json *string*, which carries no
+                functionalDescription and is refused (ABT #763).
+
+        Returns:
+            JSON Bobbin object with processedDescription filled in.
+        )pbdoc",
+        py::arg("bobbin_json"));
     m.def("check_if_fits", &check_if_fits, "Check if winding fits in available space");
 
     m.def("create_simple_bobbin_from_core", &create_simple_bobbin_from_core,
