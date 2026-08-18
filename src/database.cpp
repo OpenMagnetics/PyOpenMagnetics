@@ -10,6 +10,22 @@ void load_databases(json databasesJson) {
     OpenMagnetics::load_databases(databasesJson, true);
 }
 
+// ABT #815: MKF's thread-safety contract (see the THREAD-SAFETY CONTRACT note
+// in MKF's support/Utils.h) was unreachable from Python — a host could not
+// force-load the catalogues nor freeze them, so it had no way to use the
+// engine from more than one thread and had to serialise every call.
+void load_all_databases() {
+    OpenMagnetics::load_all_databases();
+}
+
+void set_databases_frozen(bool frozen) {
+    OpenMagnetics::set_databases_frozen(frozen);
+}
+
+bool databases_frozen() {
+    return OpenMagnetics::databases_frozen();
+}
+
 std::string read_databases(std::string path, bool addInternalData) {
     auto masPath = std::filesystem::path{path};
     json data;
@@ -212,6 +228,29 @@ std::string load_magnetics_from_string(std::string jsonText) {
 
 void register_database_bindings(py::module& m) {
     m.def("load_databases", &load_databases, "Load all databases from JSON");
+    m.def("load_all_databases", &load_all_databases,
+        R"pbdoc(
+        Force-load every reference catalogue (cores, shapes, materials, wires,
+        bobbins, insulation) that is still empty.
+
+        Call this on one thread BEFORE using the engine from several threads:
+        the catalogues lazy-load with an unsynchronised "if empty, load" check,
+        so a first touch inside a parallel region is a data race. Pair it with
+        set_databases_frozen(True).
+        )pbdoc");
+    m.def("set_databases_frozen", &set_databases_frozen,
+        R"pbdoc(
+        Freeze (or unfreeze) the reference catalogues and the magnetics cache.
+
+        While frozen, every mutating entry point — load_*, clear_*, and loading
+        into the magnetics cache — throws instead of racing, which turns "a
+        thread lazily reloaded a catalogue mid-flight" from undefined behaviour
+        into a loud, diagnosable error. Freeze after load_all_databases() and
+        after loading your part catalogue; unfreeze to change either.
+        )pbdoc",
+        py::arg("frozen"));
+    m.def("databases_frozen", &databases_frozen,
+        "True when the catalogues are frozen for parallel use.");
     m.def("read_databases", &read_databases, "Read databases from file path");
     m.def("load_mas", &load_mas, "Load a MAS (Magnetic Agnostic Structure) object");
     m.def("load_magnetic", &load_magnetic, "Load a magnetic component");
@@ -224,7 +263,8 @@ void register_database_bindings(py::module& m) {
     m.def("is_core_material_database_empty", &is_core_material_database_empty, "Check if core material database is empty");
     m.def("is_core_shape_database_empty", &is_core_shape_database_empty, "Check if core shape database is empty");
     m.def("is_wire_database_empty", &is_wire_database_empty, "Check if wire database is empty");
-    m.def("load_magnetics_from_file", &load_magnetics_from_file, "Load magnetic components from file");
+    m.def("load_magnetics_from_file", &load_magnetics_from_file, "Load magnetic components from file",
+        py::call_guard<py::gil_scoped_release>());
     m.def("clear_magnetic_cache", &clear_magnetic_cache, "Clear cached magnetic calculations");
 
     m.def("load_cores", &load_cores,
@@ -256,7 +296,8 @@ void register_database_bindings(py::module& m) {
         Returns:
             String with count of loaded magnetics.
         )pbdoc",
-        py::arg("json_text"));
+        py::arg("json_text"),
+        py::call_guard<py::gil_scoped_release>());
 
 }
 

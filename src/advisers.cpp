@@ -359,7 +359,8 @@ void register_adviser_bindings(py::module& m) {
             ...     print(f"Score: {item['scoring']}, Per filter: {item['scoringPerFilter']}")
         )pbdoc",
         py::arg("inputs_json"), py::arg("weights_json"), 
-        py::arg("max_results"), py::arg("core_mode_json"));
+        py::arg("max_results"), py::arg("core_mode_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_advised_magnetics", &calculate_advised_magnetics,
         R"pbdoc(
@@ -389,7 +390,8 @@ void register_adviser_bindings(py::module& m) {
             >>> for item in result["data"]:
             ...     print(f"Score: {item['scoring']}, Per filter: {item['scoringPerFilter']}")
         )pbdoc",
-        py::arg("inputs_json"), py::arg("max_results"), py::arg("core_mode_json"));
+        py::arg("inputs_json"), py::arg("max_results"), py::arg("core_mode_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_advised_magnetics_with_filters", &calculate_advised_magnetics_with_filters,
         R"pbdoc(
@@ -402,7 +404,8 @@ void register_adviser_bindings(py::module& m) {
         {"filter": <TitleCaseName>, "invert": bool, "log": bool,
          "strictlyRequired": bool, "weight": float}.
         )pbdoc",
-        py::arg("inputs_json"), py::arg("filter_flow_json"), py::arg("max_results"), py::arg("core_mode_json"));
+        py::arg("inputs_json"), py::arg("filter_flow_json"), py::arg("max_results"), py::arg("core_mode_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_advised_magnetics_fast", &calculate_advised_magnetics_fast,
         R"pbdoc(
@@ -489,7 +492,8 @@ void register_adviser_bindings(py::module& m) {
             Cache must be populated before calling this function.
             Raises PyOpenMagnetics.EngineError if the cache is empty.
         )pbdoc",
-        py::arg("inputs_json"), py::arg("filter_flow_json"), py::arg("max_results"));
+        py::arg("inputs_json"), py::arg("filter_flow_json"), py::arg("max_results"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_advised_sections", &calculate_advised_sections,
         "Get advised coil sections.",

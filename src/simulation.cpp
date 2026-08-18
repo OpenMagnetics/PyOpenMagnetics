@@ -423,7 +423,8 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             JSON object with simulation results including outputs.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("export_magnetic_as_subcircuit", &export_magnetic_as_subcircuit,
         R"pbdoc(
@@ -450,7 +451,8 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             Complete Mas JSON object with all fields populated.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("magnetic_autocomplete", &magnetic_autocomplete,
         R"pbdoc(
@@ -463,7 +465,8 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             Complete Magnetic JSON object with all fields populated.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("process_inputs", &process_inputs,
         R"pbdoc(

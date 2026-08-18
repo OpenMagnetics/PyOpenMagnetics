@@ -5,6 +5,10 @@
 namespace PyMKF {
 
 void load_databases(json databasesJson);
+// MKF's parallel-region contract (ABT #815).
+void load_all_databases();
+void set_databases_frozen(bool frozen);
+bool databases_frozen();
 std::string read_databases(std::string path, bool addInternalData);
 std::string load_mas(std::string key, json masJson, bool expand);
 std::string load_magnetic(std::string key, json magneticJson, bool expand);
