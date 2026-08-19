@@ -24,12 +24,14 @@ bool is_core_shape_database_empty();
 bool is_wire_database_empty();
 
 std::string load_magnetics_from_file(std::string path, bool expand);
+json load_magnetics_from_file_report(std::string path, bool expand);
 std::string clear_magnetic_cache();
 
 // Additional database functions
 json load_cores(json fileToLoadJson, bool includeToroids, bool useOnlyCoresInStock);
 void clear_loaded_cores();
 std::string load_magnetics_from_string(std::string jsonText);
+json load_magnetics_from_string_report(std::string jsonText);
 
 void register_database_bindings(py::module& m);
 

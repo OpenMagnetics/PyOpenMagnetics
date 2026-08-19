@@ -169,21 +169,150 @@ bool is_wire_database_empty() {
     return OpenMagnetics::wireDatabase.size() == 0;
 }
 
-std::string load_magnetics_from_file(std::string path, bool expand) {
-    std::ifstream in(path);
-    if (in) {
-        std::string line;
-        while (getline(in, line)) {
-            json jf = json::parse(line);
-            OpenMagnetics::Magnetic magnetic(jf);
-            if (expand) {
-                magnetic = OpenMagnetics::magnetic_autocomplete(magnetic);
+// ABT #823: everything below exists because loading a 236-record NDJSON catalogue
+// died with the bare string "bad optional access". Nothing named the file, the line,
+// the part or the field, so the only way to find the offending record was to bisect
+// the file by hand — and because records were written into the cache as they were
+// read, the first 77 stayed loaded, so a caller that did not treat the return as
+// fatal went on answering from a third of the catalogue with no sign anything was
+// missing.
+namespace {
+
+// Best-effort part number for a record that failed to become a Magnetic. Read off the
+// raw json, because whatever went wrong may have happened before the typed object
+// existed.
+std::string reference_hint(const json& recordJson) {
+    if (recordJson.is_object()) {
+        auto manufacturerInfo = recordJson.find("manufacturerInfo");
+        if (manufacturerInfo != recordJson.end() && manufacturerInfo->is_object()) {
+            auto reference = manufacturerInfo->find("reference");
+            if (reference != manufacturerInfo->end() && reference->is_string()) {
+                return reference->get<std::string>();
             }
-            std::string key = magnetic.get_manufacturer_info()->get_reference().value();
-            OpenMagnetics::magneticsCache.load(key, magnetic);
         }
     }
+    return "";
+}
+
+std::string locate(const std::string& source, size_t lineNumber, const std::string& reference) {
+    std::string location = source + ":" + std::to_string(lineNumber);
+    if (!reference.empty()) {
+        location += " (part '" + reference + "')";
+    }
+    return location;
+}
+
+// The magnetics cache is keyed by manufacturerInfo.reference. This used to be two
+// unguarded optional dereferences in a row, so a record that simply carried no
+// manufacturer info produced its own anonymous "bad optional access".
+std::string magnetic_cache_key(const OpenMagnetics::Magnetic& magnetic) {
+    if (!magnetic.get_manufacturer_info()) {
+        throw std::runtime_error("the record has no manufacturerInfo, and the magnetics cache is keyed by manufacturerInfo.reference");
+    }
+    if (!magnetic.get_manufacturer_info()->get_reference()) {
+        throw std::runtime_error("the record has no manufacturerInfo.reference, which is the key the magnetics cache stores it under");
+    }
+    return magnetic.get_manufacturer_info()->get_reference().value();
+}
+
+std::pair<std::string, OpenMagnetics::Magnetic> read_magnetic_line(const std::string& line, bool expand) {
+    json recordJson = json::parse(line);
+    OpenMagnetics::Magnetic magnetic(recordJson);
+    if (expand) {
+        magnetic = OpenMagnetics::magnetic_autocomplete(magnetic);
+    }
+    std::string key = magnetic_cache_key(magnetic);
+    return {std::move(key), std::move(magnetic)};
+}
+
+struct RejectedRecord {
+    size_t lineNumber;
+    std::string reference;
+    std::string reason;
+};
+
+// Read the whole stream before touching the cache, so a strict load is all-or-nothing
+// and a tolerant one is exact about what it dropped. Every failure is reported as
+// "<source>:<line> (part 'X'): <what actually went wrong>".
+std::vector<std::pair<std::string, OpenMagnetics::Magnetic>> stage_magnetics(std::istream& in,
+                                                                             const std::string& source,
+                                                                             bool expand,
+                                                                             bool skipInvalid,
+                                                                             std::vector<RejectedRecord>& rejected) {
+    std::vector<std::pair<std::string, OpenMagnetics::Magnetic>> staged;
+    std::string line;
+    size_t lineNumber = 0;
+    while (getline(in, line)) {
+        lineNumber++;
+        if (line.find_first_not_of(" \t\r\n") == std::string::npos) {
+            continue;
+        }
+        try {
+            staged.push_back(read_magnetic_line(line, expand));
+        }
+        catch (const std::exception& e) {
+            std::string reference;
+            try {
+                reference = reference_hint(json::parse(line));
+            }
+            catch (const std::exception&) {
+                // The line is not even json; the location alone identifies it.
+            }
+            if (!skipInvalid) {
+                throw std::runtime_error(locate(source, lineNumber, reference) + ": " + e.what());
+            }
+            rejected.push_back({lineNumber, reference, e.what()});
+        }
+    }
+    return staged;
+}
+
+size_t commit_magnetics(std::vector<std::pair<std::string, OpenMagnetics::Magnetic>>& staged) {
+    for (auto& [key, magnetic] : staged) {
+        OpenMagnetics::magneticsCache.load(key, std::move(magnetic));
+    }
+    return staged.size();
+}
+
+json rejection_report(size_t loaded, const std::vector<RejectedRecord>& rejected) {
+    json report;
+    report["loaded"] = loaded;
+    report["cacheSize"] = OpenMagnetics::magneticsCache.size();
+    report["rejected"] = json::array();
+    for (const auto& record : rejected) {
+        json entry;
+        entry["line"] = record.lineNumber;
+        entry["reference"] = record.reference;
+        entry["reason"] = record.reason;
+        report["rejected"].push_back(entry);
+    }
+    return report;
+}
+
+} // namespace
+
+std::string load_magnetics_from_file(std::string path, bool expand) {
+    std::ifstream in(path);
+    if (!in) {
+        // Used to fall through and return the cache size as if nothing had happened, so a
+        // mistyped path was indistinguishable from a catalogue that loaded fine.
+        throw std::runtime_error("load_magnetics_from_file: cannot open '" + path + "'");
+    }
+    std::vector<RejectedRecord> rejected;
+    auto staged = stage_magnetics(in, path, expand, false, rejected);
+    commit_magnetics(staged);
     return std::to_string(OpenMagnetics::magneticsCache.size());
+}
+
+json load_magnetics_from_file_report(std::string path, bool expand) {
+    std::ifstream in(path);
+    if (!in) {
+        throw std::runtime_error("load_magnetics_from_file_report: cannot open '" + path + "'");
+    }
+    std::vector<RejectedRecord> rejected;
+    auto staged = stage_magnetics(in, path, expand, true, rejected);
+    size_t loaded = commit_magnetics(staged);
+    return rejection_report(loaded, rejected);
 }
 
 std::string clear_magnetic_cache() {
@@ -214,16 +343,18 @@ void clear_loaded_cores() {
 
 std::string load_magnetics_from_string(std::string jsonText) {
     std::istringstream in(jsonText);
-    std::string line;
-    while (getline(in, line)) {
-        if (line.empty()) continue;
-        json jf = json::parse(line);
-        OpenMagnetics::Magnetic magnetic(jf);
-        magnetic = OpenMagnetics::magnetic_autocomplete(magnetic);
-        std::string key = magnetic.get_manufacturer_info()->get_reference().value();
-        OpenMagnetics::magneticsCache.load(key, magnetic);
-    }
+    std::vector<RejectedRecord> rejected;
+    auto staged = stage_magnetics(in, "<string>", true, false, rejected);
+    commit_magnetics(staged);
     return std::to_string(OpenMagnetics::magneticsCache.size());
+}
+
+json load_magnetics_from_string_report(std::string jsonText) {
+    std::istringstream in(jsonText);
+    std::vector<RejectedRecord> rejected;
+    auto staged = stage_magnetics(in, "<string>", true, true, rejected);
+    size_t loaded = commit_magnetics(staged);
+    return rejection_report(loaded, rejected);
 }
 
 void register_database_bindings(py::module& m) {
@@ -279,7 +410,48 @@ void register_database_bindings(py::module& m) {
         py::call_guard<py::gil_scoped_release>());
     m.def("is_wire_database_empty", &is_wire_database_empty, "Check if wire database is empty",
         py::call_guard<py::gil_scoped_release>());
-    m.def("load_magnetics_from_file", &load_magnetics_from_file, "Load magnetic components from file",
+    m.def("load_magnetics_from_file", &load_magnetics_from_file,
+        R"pbdoc(
+        Load a catalogue of magnetics from an NDJSON file, one magnetic per line.
+
+        All or nothing: the whole file is read and expanded before anything reaches
+        the cache, so a rejected record never leaves a partly-loaded catalogue behind
+        (ABT #823). The first record that cannot be loaded raises EngineError naming
+        the file, the line number, the part reference and the underlying reason.
+        Blank lines are skipped. Records are keyed by manufacturerInfo.reference, so
+        a record without one is an error rather than an anonymous optional access.
+
+        Use load_magnetics_from_file_report() instead when a partial catalogue is
+        acceptable and you want the list of rejected records.
+
+        Args:
+            path: Path to the NDJSON file.
+            expand: Autocomplete each magnetic (process the core, wind the coil).
+
+        Returns:
+            String with the number of magnetics in the cache after the load.
+        )pbdoc",
+        py::arg("path"), py::arg("expand"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("load_magnetics_from_file_report", &load_magnetics_from_file_report,
+        R"pbdoc(
+        Load an NDJSON catalogue, skipping records that cannot be loaded, and report them.
+
+        The tolerant counterpart of load_magnetics_from_file (ABT #823): a bad record
+        no longer aborts the batch, and the caller is told exactly which records were
+        dropped and why instead of silently running on a truncated catalogue. A file
+        that cannot be opened is still an error.
+
+        Args:
+            path: Path to the NDJSON file.
+            expand: Autocomplete each magnetic (process the core, wind the coil).
+
+        Returns:
+            {'loaded': int,          # records from this file that were cached
+             'cacheSize': int,       # magnetics in the cache after the load
+             'rejected': [{'line': int, 'reference': str, 'reason': str}, ...]}
+        )pbdoc",
+        py::arg("path"), py::arg("expand"),
         py::call_guard<py::gil_scoped_release>());
     m.def("clear_magnetic_cache", &clear_magnetic_cache, "Clear cached magnetic calculations",
         py::call_guard<py::gil_scoped_release>());
@@ -307,13 +479,33 @@ void register_database_bindings(py::module& m) {
 
     m.def("load_magnetics_from_string", &load_magnetics_from_string,
         R"pbdoc(
-        Load magnetic components from NDJSON text.
+        Load magnetic components from NDJSON text, one magnetic per line.
+
+        Same contract as load_magnetics_from_file (ABT #823): all or nothing, and the
+        first record that cannot be loaded raises EngineError naming the line number,
+        the part reference and the reason. Magnetics are always autocompleted.
 
         Args:
             json_text: NDJSON string with one magnetic per line.
 
         Returns:
-            String with count of loaded magnetics.
+            String with the number of magnetics in the cache after the load.
+        )pbdoc",
+        py::arg("json_text"),
+        py::call_guard<py::gil_scoped_release>());
+
+    m.def("load_magnetics_from_string_report", &load_magnetics_from_string_report,
+        R"pbdoc(
+        Load NDJSON text, skipping records that cannot be loaded, and report them.
+
+        The tolerant counterpart of load_magnetics_from_string (ABT #823).
+
+        Args:
+            json_text: NDJSON string with one magnetic per line.
+
+        Returns:
+            {'loaded': int, 'cacheSize': int,
+             'rejected': [{'line': int, 'reference': str, 'reason': str}, ...]}
         )pbdoc",
         py::arg("json_text"),
         py::call_guard<py::gil_scoped_release>());
