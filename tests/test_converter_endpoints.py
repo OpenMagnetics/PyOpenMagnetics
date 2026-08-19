@@ -139,13 +139,53 @@ def test_per_topology_wrappers():
 
 
 def test_invalid_topology():
-    """Test error handling for invalid topology."""
+    """An unknown topology is refused, and the error names the topology it refused.
+
+    The spec has to describe a real converter for this to test anything. The engine
+    validates the requirements before it dispatches on the topology (Kirchhoff's
+    validate_requirements runs at the top of build_tas_for, ahead of the tas_builders
+    lookup), so a degenerate payload never reaches the topology switch at all. This
+    test used to pass {"some": "data"} and assert "unknown topology", a message the
+    engine cannot produce for that input — it answers "spec: designRequirements
+    missing" — so the test had been red on main and was pinning an unreachable branch
+    (ABT #824). The assertion was right; the payload was the problem.
+    """
     import pytest
-    converter = {"some": "data"}
+    converter = {
+        "inputVoltage": {"minimum": 12, "maximum": 12},
+        "desiredInductance": 10e-6,
+        "diodeVoltageDrop": 0.7,
+        "currentRippleRatio": 0.3,
+        "operatingPoints": [{
+            "outputVoltages": [5.0],
+            "outputCurrents": [2.0],
+            "switchingFrequency": 100000,
+            "ambientTemperature": 25,
+        }],
+    }
 
     with pytest.raises(PyMKF.EngineError, match="[Uu]nknown topology"):
         PyMKF.process_converter("invalid_topology", converter)
-    print("✓ Invalid topology raises EngineError")
+
+    # An error that does not say WHICH topology it rejected cannot be acted on.
+    with pytest.raises(PyMKF.EngineError, match="invalid_topology"):
+        PyMKF.process_converter("invalid_topology", converter)
+    print("✓ Invalid topology raises EngineError naming the topology")
+
+
+def test_spec_is_validated_before_the_topology():
+    """A payload describing no converter is refused for the spec, not the topology.
+
+    Pins the ordering test_invalid_topology depends on (ABT #824): requirements are
+    validated first, so a caller with a broken spec hears about the spec even when the
+    topology is wrong too. Without this pinned, the obvious way to "fix" a red
+    test_invalid_topology is to widen its regex until it accepts either message — which
+    would quietly stop testing the topology switch, the one thing that test is named for.
+    """
+    import pytest
+    with pytest.raises(PyMKF.EngineError, match="designRequirements"):
+        PyMKF.process_converter("buck", {"some": "data"})
+    print("✓ A spec that describes no converter is refused for the spec")
 
 
 def test_llc_converter():
