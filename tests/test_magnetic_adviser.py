@@ -113,7 +113,6 @@ class TestMagneticAdviserInputTypes:
         
         assert isinstance(results, list)
 
-    @pytest.mark.xfail(reason="C++ library may have issues with transformer inputs")
     def test_with_transformer_inputs(self, transformer_inputs, reset_settings):
         """
         Test magnetic adviser with transformer (multi-winding) inputs.

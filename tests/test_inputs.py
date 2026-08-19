@@ -96,7 +96,6 @@ class TestInputsProcessing:
         assert "thd" in processed
         assert processed["thd"] > 0  # Rectangular has significant harmonics
 
-    @pytest.mark.xfail(reason="C++ library issue with transformer inputs")
     def test_transformer_inputs_with_turns_ratio(self, transformer_inputs):
         """Test processing of transformer inputs with turns ratio."""
         result = PyOpenMagnetics.process_inputs(transformer_inputs)
@@ -190,7 +189,6 @@ class TestDesignRequirements:
         result = PyOpenMagnetics.process_inputs(inductor_inputs)
         assert result["designRequirements"]["turnsRatios"] == []
 
-    @pytest.mark.xfail(reason="C++ library issue with transformer inputs")
     def test_turns_ratios_for_transformer(self, transformer_inputs):
         """Transformer should have non-empty turns ratios."""
         result = PyOpenMagnetics.process_inputs(transformer_inputs)

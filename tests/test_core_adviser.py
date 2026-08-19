@@ -81,7 +81,6 @@ class TestCoreAdviserWithDifferentInputs:
         
         assert isinstance(results, list)
 
-    @pytest.mark.xfail(reason="C++ library issue with transformer inputs")
     def test_transformer_inputs(self, transformer_inputs, balanced_weights, reset_settings):
         """Test core adviser with transformer (multi-winding) inputs."""
         processed_inputs = PyOpenMagnetics.process_inputs(transformer_inputs)
