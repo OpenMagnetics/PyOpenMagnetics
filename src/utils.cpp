@@ -276,7 +276,8 @@ void register_utils_bindings(py::module& m) {
         Returns:
             Resolved dimension value as float.
         )pbdoc",
-        py::arg("dimensionWithToleranceJson"), py::arg("preferredValue") = "Nominal");
+        py::arg("dimensionWithToleranceJson"), py::arg("preferredValue") = "Nominal",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_basic_processed_data", &calculate_basic_processed_data,
         R"pbdoc(
@@ -289,7 +290,8 @@ void register_utils_bindings(py::module& m) {
         
         Returns:
             JSON object with processed waveform characteristics.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_harmonics", &calculate_harmonics,
         R"pbdoc(
@@ -303,7 +305,8 @@ void register_utils_bindings(py::module& m) {
         
         Returns:
             JSON object with harmonic amplitudes and frequencies.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_sampled_waveform", &calculate_sampled_waveform,
         R"pbdoc(
@@ -317,7 +320,8 @@ void register_utils_bindings(py::module& m) {
         
         Returns:
             JSON object with uniformly sampled waveform.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_processed_data", &calculate_processed_data,
         R"pbdoc(
@@ -333,7 +337,8 @@ void register_utils_bindings(py::module& m) {
         Returns:
             JSON object with complete processed data.
         )pbdoc",
-        py::arg("signalDescriptorJson"), py::arg("sampledWaveformJson"), py::arg("includeDcComponent"));
+        py::arg("signalDescriptorJson"), py::arg("sampledWaveformJson"), py::arg("includeDcComponent"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_instantaneous_power", &calculate_instantaneous_power,
         R"pbdoc(
@@ -348,7 +353,8 @@ void register_utils_bindings(py::module& m) {
         
         Returns:
             JSON array of instantaneous power values.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_rms_power", &calculate_rms_power,
         R"pbdoc(
@@ -363,7 +369,8 @@ void register_utils_bindings(py::module& m) {
         
         Returns:
             RMS power value in watts.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_reflected_secondary", &calculate_reflected_secondary,
         R"pbdoc(
@@ -378,7 +385,8 @@ void register_utils_bindings(py::module& m) {
         
         Returns:
             JSON object with secondary excitation.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_reflected_primary", &calculate_reflected_primary,
         R"pbdoc(
@@ -393,7 +401,8 @@ void register_utils_bindings(py::module& m) {
 
         Returns:
             JSON object with primary excitation.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("standardize_signal_descriptor", &standardize_signal_descriptor,
         R"pbdoc(
@@ -406,7 +415,8 @@ void register_utils_bindings(py::module& m) {
         Returns:
             JSON SignalDescriptor with all fields populated.
         )pbdoc",
-        py::arg("signalDescriptorJson"), py::arg("frequency"));
+        py::arg("signalDescriptorJson"), py::arg("frequency"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("create_waveform", &create_waveform,
         R"pbdoc(
@@ -419,7 +429,8 @@ void register_utils_bindings(py::module& m) {
         Returns:
             JSON Waveform object.
         )pbdoc",
-        py::arg("processedJson"), py::arg("frequency"));
+        py::arg("processedJson"), py::arg("frequency"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_processed", &calculate_processed,
         R"pbdoc(
@@ -432,7 +443,8 @@ void register_utils_bindings(py::module& m) {
         Returns:
             JSON ProcessedWaveform object with RMS, peak, offset, etc.
         )pbdoc",
-        py::arg("harmonicsJson"), py::arg("waveformJson"));
+        py::arg("harmonicsJson"), py::arg("waveformJson"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("scale_waveform_time_to_frequency", &scale_waveform_time_to_frequency,
         R"pbdoc(
@@ -445,7 +457,8 @@ void register_utils_bindings(py::module& m) {
         Returns:
             JSON Waveform with rescaled time axis.
         )pbdoc",
-        py::arg("waveformJson"), py::arg("newFrequency"));
+        py::arg("waveformJson"), py::arg("newFrequency"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("scale_excitation_time_to_frequency", &scale_excitation_time_to_frequency,
         R"pbdoc(
@@ -458,7 +471,8 @@ void register_utils_bindings(py::module& m) {
         Returns:
             JSON OperatingPointExcitation with rescaled time axis.
         )pbdoc",
-        py::arg("excitationJson"), py::arg("newFrequency"));
+        py::arg("excitationJson"), py::arg("newFrequency"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_induced_voltage", &calculate_induced_voltage,
         R"pbdoc(
@@ -471,7 +485,8 @@ void register_utils_bindings(py::module& m) {
         Returns:
             JSON SignalDescriptor with induced voltage waveform.
         )pbdoc",
-        py::arg("excitationJson"), py::arg("magnetizingInductance"));
+        py::arg("excitationJson"), py::arg("magnetizingInductance"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_induced_current", &calculate_induced_current,
         R"pbdoc(
@@ -484,7 +499,8 @@ void register_utils_bindings(py::module& m) {
         Returns:
             JSON SignalDescriptor with induced current waveform.
         )pbdoc",
-        py::arg("excitationJson"), py::arg("magnetizingInductance"));
+        py::arg("excitationJson"), py::arg("magnetizingInductance"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("check_requirement", &check_requirement,
         R"pbdoc(
@@ -497,7 +513,8 @@ void register_utils_bindings(py::module& m) {
         Returns:
             True if the value satisfies the requirement, False otherwise.
         )pbdoc",
-        py::arg("requirementJson"), py::arg("value"));
+        py::arg("requirementJson"), py::arg("value"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("get_main_harmonic_indexes", &get_main_harmonic_indexes,
         R"pbdoc(
@@ -511,7 +528,8 @@ void register_utils_bindings(py::module& m) {
         Returns:
             JSON array of harmonic indexes.
         )pbdoc",
-        py::arg("harmonicsJson"), py::arg("threshold"), py::arg("mainHarmonicIndex"));
+        py::arg("harmonicsJson"), py::arg("threshold"), py::arg("mainHarmonicIndex"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("get_excitation_harmonic_indexes", &get_excitation_harmonic_indexes,
         R"pbdoc(
@@ -524,7 +542,8 @@ void register_utils_bindings(py::module& m) {
         Returns:
             JSON array of harmonic indexes.
         )pbdoc",
-        py::arg("excitationJson"), py::arg("threshold"));
+        py::arg("excitationJson"), py::arg("threshold"),
+        py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace PyMKF

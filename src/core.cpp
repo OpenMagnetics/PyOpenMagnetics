@@ -574,7 +574,8 @@ void register_core_bindings(py::module& m) {
         Example:
             >>> materials = PyMKF.get_core_materials()
             >>> ferroxcube = [m for m in materials if "Ferroxcube" in m["manufacturerInfo"]["name"]]
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_material_permeability", &get_material_permeability, 
         R"pbdoc(
@@ -596,7 +597,8 @@ void register_core_bindings(py::module& m) {
             >>> mu_i = PyMKF.get_material_permeability("3C95", 25, 0, 100000)
             >>> print(f"Permeability at 100kHz: {mu_i:.0f}")
         )pbdoc",
-        py::arg("material_name"), py::arg("temperature"), py::arg("magnetic_field_dc_bias"), py::arg("frequency"));
+        py::arg("material_name"), py::arg("temperature"), py::arg("magnetic_field_dc_bias"), py::arg("frequency"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_material_resistivity", &get_material_resistivity,
         R"pbdoc(
@@ -611,7 +613,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             Resistivity in Ohm·m.
         )pbdoc",
-        py::arg("material_name"), py::arg("temperature"));
+        py::arg("material_name"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_core_material_steinmetz_coefficients", &get_core_material_steinmetz_coefficients,
         R"pbdoc(
@@ -633,7 +636,8 @@ void register_core_bindings(py::module& m) {
                 - minimumFrequency, maximumFrequency: Valid range
                 - ct0, ct1, ct2: Optional temperature coefficients
         )pbdoc",
-        py::arg("material_name"), py::arg("frequency"));
+        py::arg("material_name"), py::arg("frequency"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Core shapes
     m.def("get_core_shapes", &get_core_shapes,
@@ -648,7 +652,8 @@ void register_core_bindings(py::module& m) {
         
         Returns:
             JSON array of CoreShape objects.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_core_shape_families", &get_core_shape_families,
         R"pbdoc(
@@ -659,7 +664,8 @@ void register_core_bindings(py::module& m) {
         
         Returns:
             JSON array of CoreShapeFamily strings.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
 
     // Name retrieval functions
     m.def("get_core_material_names", &get_core_material_names,
@@ -668,7 +674,8 @@ void register_core_bindings(py::module& m) {
         
         Returns:
             JSON array of material name strings.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_core_material_names_by_manufacturer", &get_core_material_names_by_manufacturer,
         R"pbdoc(
@@ -680,7 +687,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON array of material name strings from that manufacturer.
         )pbdoc",
-        py::arg("manufacturer_name"));
+        py::arg("manufacturer_name"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_core_shape_names", &get_core_shape_names,
         R"pbdoc(
@@ -692,7 +700,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON array of shape name strings (e.g., "E 42/21/15", "ETD 49").
         )pbdoc",
-        py::arg("include_toroidal"));
+        py::arg("include_toroidal"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Lookup functions
     m.def("find_core_material_by_name", &find_core_material_by_name,
@@ -705,7 +714,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON CoreMaterial object with full specification, or error.
         )pbdoc",
-        py::arg("name"));
+        py::arg("name"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("find_core_shape_by_name", &find_core_shape_by_name,
         R"pbdoc(
@@ -717,7 +727,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON CoreShape object with full dimensional data, or error.
         )pbdoc",
-        py::arg("name"));
+        py::arg("name"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Core calculations
     m.def("calculate_core_data", &calculate_core_data,
@@ -755,7 +766,8 @@ void register_core_bindings(py::module& m) {
             >>> core = PyMKF.calculate_core_data(core_data, False)
             >>> print(f"Ae = {core['processedDescription']['effectiveParameters']['effectiveArea']*1e6:.1f} mm²")
         )pbdoc",
-        py::arg("core_data_json"), py::arg("include_material_data"));
+        py::arg("core_data_json"), py::arg("include_material_data"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_core_processed_description", &calculate_core_processed_description,
         R"pbdoc(
@@ -770,7 +782,8 @@ void register_core_bindings(py::module& m) {
             JSON CoreProcessedDescription with effectiveParameters,
             windingWindows, and columns.
         )pbdoc",
-        py::arg("core_data_json"));
+        py::arg("core_data_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_core_geometrical_description", &calculate_core_geometrical_description,
         R"pbdoc(
@@ -784,7 +797,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON array of CoreGeometricalDescriptionElement objects.
         )pbdoc",
-        py::arg("core_data_json"));
+        py::arg("core_data_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_core_gapping", &calculate_core_gapping,
         R"pbdoc(
@@ -798,7 +812,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON array of processed CoreGap objects.
         )pbdoc",
-        py::arg("core_data_json"));
+        py::arg("core_data_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("load_core_data", &load_core_data,
         R"pbdoc(
@@ -810,7 +825,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON array of processed Core objects.
         )pbdoc",
-        py::arg("cores_json"));
+        py::arg("cores_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_material_data", &get_material_data,
         R"pbdoc(
@@ -822,7 +838,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON CoreMaterial object.
         )pbdoc",
-        py::arg("material_name"));
+        py::arg("material_name"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_core_temperature_dependant_parameters", &get_core_temperature_dependant_parameters,
         R"pbdoc(
@@ -844,7 +861,8 @@ void register_core_bindings(py::module& m) {
                 - permeance: Inverse reluctance in Wb/A
                 - resistivity: Core resistivity in Ohm·m
         )pbdoc",
-        py::arg("core_data"), py::arg("temperature"));
+        py::arg("core_data"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_shape_data", &calculate_shape_data,
         R"pbdoc(
@@ -858,7 +876,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON Core object with processed dimensions.
         )pbdoc",
-        py::arg("shape_json"));
+        py::arg("shape_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_shape_data", &get_shape_data,
         R"pbdoc(
@@ -870,7 +889,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON CoreShape object.
         )pbdoc",
-        py::arg("shape_name"));
+        py::arg("shape_name"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Availability queries
     m.def("get_available_shape_families", &get_available_shape_families,
@@ -879,7 +899,8 @@ void register_core_bindings(py::module& m) {
         
         Returns:
             List of family name strings.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_available_core_materials", &get_available_core_materials,
         R"pbdoc(
@@ -891,7 +912,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             List of material name strings.
         )pbdoc",
-        py::arg("manufacturer"));
+        py::arg("manufacturer"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_available_core_manufacturers", &get_available_core_manufacturers,
         R"pbdoc(
@@ -899,7 +921,8 @@ void register_core_bindings(py::module& m) {
         
         Returns:
             List of manufacturer name strings (TDK, Ferroxcube, Fair-Rite, etc.).
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_available_core_shape_families", &get_available_core_shape_families,
         R"pbdoc(
@@ -907,7 +930,8 @@ void register_core_bindings(py::module& m) {
         
         Returns:
             List of family name strings.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_available_core_shapes", &get_available_core_shapes,
         R"pbdoc(
@@ -915,7 +939,8 @@ void register_core_bindings(py::module& m) {
         
         Returns:
             List of shape name strings.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_available_cores", &get_available_cores,
         R"pbdoc(
@@ -926,7 +951,8 @@ void register_core_bindings(py::module& m) {
         
         Returns:
             JSON array of Core objects.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
 
     // Gap and reluctance
     m.def("calculate_gap_reluctance", &calculate_gap_reluctance,
@@ -951,7 +977,8 @@ void register_core_bindings(py::module& m) {
                 - reluctance: Gap reluctance in A/Wb
                 - fringingFactor: Fringing flux correction factor
         )pbdoc",
-        py::arg("core_gap_data"), py::arg("model_name_string"));
+        py::arg("core_gap_data"), py::arg("model_name_string"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_gap_reluctance_model_information", &get_gap_reluctance_model_information,
         R"pbdoc(
@@ -963,7 +990,8 @@ void register_core_bindings(py::module& m) {
                 - errors: Typical error percentages
                 - internal_links: OpenMagnetics documentation links
                 - external_links: Academic reference links
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_inductance_from_number_turns_and_gapping", &calculate_inductance_from_number_turns_and_gapping,
         R"pbdoc(
@@ -980,7 +1008,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             Magnetizing inductance in Henries.
         )pbdoc",
-        py::arg("core_data"), py::arg("coil_data"), py::arg("operating_point_data"), py::arg("models_data"));
+        py::arg("core_data"), py::arg("coil_data"), py::arg("operating_point_data"), py::arg("models_data"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_number_turns_from_gapping_and_inductance", &calculate_number_turns_from_gapping_and_inductance,
         R"pbdoc(
@@ -997,7 +1026,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             Required number of turns (may be non-integer).
         )pbdoc",
-        py::arg("core_data"), py::arg("coil_data"), py::arg("inputs_data"), py::arg("models_data"));
+        py::arg("core_data"), py::arg("coil_data"), py::arg("inputs_data"), py::arg("models_data"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Legacy 3-argument overload (no coil_data) registered under the SAME name:
     // pybind dispatches by arity, so existing 3-arg callers keep working while
@@ -1018,7 +1048,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             Required number of turns (may be non-integer).
         )pbdoc",
-        py::arg("core_data"), py::arg("inputs_data"), py::arg("models_data"));
+        py::arg("core_data"), py::arg("inputs_data"), py::arg("models_data"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_gapping_from_number_turns_and_inductance", &calculate_gapping_from_number_turns_and_inductance,
         R"pbdoc(
@@ -1038,7 +1069,8 @@ void register_core_bindings(py::module& m) {
             JSON Core object with updated gapping configuration.
         )pbdoc",
         py::arg("core_data"), py::arg("coil_data"), py::arg("inputs_data"),
-        py::arg("gapping_type_json"), py::arg("decimals"), py::arg("models_data"));
+        py::arg("gapping_type_json"), py::arg("decimals"), py::arg("models_data"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Additional core functions
     m.def("calculate_core_maximum_magnetic_energy", &calculate_core_maximum_magnetic_energy,
@@ -1054,7 +1086,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             Maximum storable magnetic energy in Joules.
         )pbdoc",
-        py::arg("core_data_json"), py::arg("operating_point_json"));
+        py::arg("core_data_json"), py::arg("operating_point_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_saturation_current_at_operating_point",
         &calculate_saturation_current_at_operating_point,
@@ -1079,7 +1112,8 @@ void register_core_bindings(py::module& m) {
             Saturation current in Amperes.
         )pbdoc",
         py::arg("magnetic_json"), py::arg("operating_point_json"),
-        py::arg("temperature"));
+        py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_peak_winding_current",
         &calculate_peak_winding_current,
@@ -1113,7 +1147,8 @@ void register_core_bindings(py::module& m) {
             Peak magnetizing current in Amperes.
         )pbdoc",
         py::arg("magnetic_json"), py::arg("operating_point_json"),
-        py::arg("winding_index") = 0);
+        py::arg("winding_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_saturation_current", &calculate_saturation_current,
         R"pbdoc(
@@ -1128,7 +1163,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             Saturation current in Amperes.
         )pbdoc",
-        py::arg("magnetic_json"), py::arg("temperature"));
+        py::arg("magnetic_json"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_temperature_from_core_thermal_resistance", &calculate_temperature_from_core_thermal_resistance,
         R"pbdoc(
@@ -1143,7 +1179,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             Estimated core temperature in Celsius.
         )pbdoc",
-        py::arg("core_json"), py::arg("total_losses"));
+        py::arg("core_json"), py::arg("total_losses"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("get_available_core_shapes_by_family", &get_available_core_shapes_by_family,
         R"pbdoc(
@@ -1155,7 +1192,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON array of shape name strings in that family.
         )pbdoc",
-        py::arg("family_string"));
+        py::arg("family_string"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("get_available_core_shapes_by_manufacturer", &get_available_core_shapes_by_manufacturer,
         R"pbdoc(
@@ -1167,7 +1205,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON array of shape name strings from that manufacturer.
         )pbdoc",
-        py::arg("manufacturer"));
+        py::arg("manufacturer"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("get_shape_family_dimensions", &get_shape_family_dimensions,
         R"pbdoc(
@@ -1180,7 +1219,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON array of dimension name strings.
         )pbdoc",
-        py::arg("family_string"), py::arg("family_subtype"));
+        py::arg("family_string"), py::arg("family_subtype"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("get_shape_family_subtypes", &get_shape_family_subtypes,
         R"pbdoc(
@@ -1192,7 +1232,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON array of subtype strings.
         )pbdoc",
-        py::arg("family_string"));
+        py::arg("family_string"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("get_available_core_filters", &get_available_core_filters,
         R"pbdoc(
@@ -1200,7 +1241,8 @@ void register_core_bindings(py::module& m) {
 
         Returns:
             List of filter name strings.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("get_maximum_dimensions", &get_maximum_dimensions,
         R"pbdoc(
@@ -1212,7 +1254,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             List of maximum dimensions in meters.
         )pbdoc",
-        py::arg("magnetic_json"));
+        py::arg("magnetic_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_core_data_from_shape", &calculate_core_data_from_shape,
         R"pbdoc(
@@ -1227,7 +1270,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON Core object with processed dimensions.
         )pbdoc",
-        py::arg("shape_json"));
+        py::arg("shape_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_complex_permeability", &calculate_complex_permeability,
         R"pbdoc(
@@ -1240,7 +1284,8 @@ void register_core_bindings(py::module& m) {
         Returns:
             JSON object with real and imaginary components.
         )pbdoc",
-        py::arg("material_json"), py::arg("frequency"));
+        py::arg("material_json"), py::arg("frequency"),
+        py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace PyMKF

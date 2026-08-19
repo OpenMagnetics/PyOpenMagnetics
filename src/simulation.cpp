@@ -438,7 +438,8 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             String containing the subcircuit definition.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("mas_autocomplete", &mas_autocomplete,
         R"pbdoc(
@@ -480,7 +481,8 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             ProcessedWaveform inputs JSON with calculated harmonics and processed data.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("extract_operating_point", &extract_operating_point,
         R"pbdoc(
@@ -497,7 +499,8 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             JSON object representing the extracted operating point.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("extract_map_column_names", &extract_map_column_names,
         R"pbdoc(
@@ -513,7 +516,8 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             JSON array mapping signal types to column names.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("extract_column_names", &extract_column_names,
         R"pbdoc(
@@ -524,7 +528,8 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             JSON array of column name strings.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_inductance_matrix", &calculate_inductance_matrix,
         R"pbdoc(
@@ -540,7 +545,8 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             JSON object with the inductance matrix at the specified frequency.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_leakage_inductance", &calculate_leakage_inductance,
         R"pbdoc(
@@ -555,7 +561,8 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             JSON object with leakage inductance values to each winding.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_dc_resistance_per_winding", &calculate_dc_resistance_per_winding,
         R"pbdoc(
@@ -570,7 +577,8 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             JSON array with DC resistance value for each winding in Ohms.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_resistance_matrix", &calculate_resistance_matrix,
         R"pbdoc(
@@ -587,7 +595,8 @@ void register_simulation_bindings(py::module& m) {
         
         Returns:
             JSON object with resistance matrix (magnitude and frequency).
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_stray_capacitance", &calculate_stray_capacitance,
         R"pbdoc(
@@ -604,7 +613,8 @@ void register_simulation_bindings(py::module& m) {
         Returns:
             JSON object with capacitance values including capacitance among turns,
             capacitance among windings, and Maxwell capacitance matrix.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_maxwell_capacitance_matrix", &calculate_maxwell_capacitance_matrix,
         R"pbdoc(
@@ -620,7 +630,8 @@ void register_simulation_bindings(py::module& m) {
 
         Returns:
             JSON array containing the Maxwell capacitance matrix.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_impedance_over_frequency", &sweep_impedance_over_frequency,
         py::arg("magnetic_json"),
@@ -629,7 +640,8 @@ void register_simulation_bindings(py::module& m) {
         py::arg("number_elements"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep impedance over a frequency range.");
+        "Sweep impedance over a frequency range.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_common_mode_impedance_over_frequency", &sweep_common_mode_impedance_over_frequency,
         py::arg("magnetic_json"),
@@ -638,7 +650,8 @@ void register_simulation_bindings(py::module& m) {
         py::arg("number_elements"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep common-mode impedance (all windings driven in parallel — the CMC datasheet CM measurement; magnetizing tank only, no leakage resonance) over a frequency range.");
+        "Sweep common-mode impedance (all windings driven in parallel — the CMC datasheet CM measurement; magnetizing tank only, no leakage resonance) over a frequency range.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_differential_mode_impedance_over_frequency", &sweep_differential_mode_impedance_over_frequency,
         py::arg("magnetic_json"),
@@ -647,7 +660,8 @@ void register_simulation_bindings(py::module& m) {
         py::arg("number_elements"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep differential-mode impedance (leakage + winding R + inter-winding C) over a frequency range.");
+        "Sweep differential-mode impedance (leakage + winding R + inter-winding C) over a frequency range.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_q_factor_over_frequency", &sweep_q_factor_over_frequency,
         py::arg("magnetic_json"),
@@ -656,7 +670,8 @@ void register_simulation_bindings(py::module& m) {
         py::arg("number_elements"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep Q factor over a frequency range.");
+        "Sweep Q factor over a frequency range.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_winding_resistance_over_frequency", &sweep_winding_resistance_over_frequency,
         py::arg("magnetic_json"),
@@ -667,7 +682,8 @@ void register_simulation_bindings(py::module& m) {
         py::arg("temperature"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep winding resistance over a frequency range.");
+        "Sweep winding resistance over a frequency range.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_resistance_over_frequency", &sweep_resistance_over_frequency,
         py::arg("magnetic_json"),
@@ -677,7 +693,8 @@ void register_simulation_bindings(py::module& m) {
         py::arg("temperature"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep total resistance over a frequency range.");
+        "Sweep total resistance over a frequency range.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_magnetizing_inductance_over_frequency", &sweep_magnetizing_inductance_over_frequency,
         py::arg("magnetic_json"),
@@ -687,7 +704,8 @@ void register_simulation_bindings(py::module& m) {
         py::arg("temperature"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep magnetizing inductance over a frequency range.");
+        "Sweep magnetizing inductance over a frequency range.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_magnetizing_inductance_over_temperature", &sweep_magnetizing_inductance_over_temperature,
         py::arg("magnetic_json"),
@@ -697,7 +715,8 @@ void register_simulation_bindings(py::module& m) {
         py::arg("frequency"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep magnetizing inductance over a temperature range.");
+        "Sweep magnetizing inductance over a temperature range.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_magnetizing_inductance_over_dc_bias", &sweep_magnetizing_inductance_over_dc_bias,
         py::arg("magnetic_json"),
@@ -707,7 +726,8 @@ void register_simulation_bindings(py::module& m) {
         py::arg("temperature"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep magnetizing inductance over DC bias current.");
+        "Sweep magnetizing inductance over DC bias current.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_core_losses_over_frequency", &sweep_core_losses_over_frequency,
         py::arg("magnetic_json"),
@@ -718,7 +738,8 @@ void register_simulation_bindings(py::module& m) {
         py::arg("temperature"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep core losses over a frequency range.");
+        "Sweep core losses over a frequency range.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_winding_losses_over_frequency", &sweep_winding_losses_over_frequency,
         py::arg("magnetic_json"),
@@ -729,35 +750,41 @@ void register_simulation_bindings(py::module& m) {
         py::arg("temperature"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep winding losses over a frequency range.");
+        "Sweep winding losses over a frequency range.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_coupling_coefficient_matrix", &calculate_coupling_coefficient_matrix,
         py::arg("magnetic_json"),
         py::arg("frequency"),
         py::arg("models_data"),
-        "Calculate the coupling coefficient matrix for a magnetic component.");
+        "Calculate the coupling coefficient matrix for a magnetic component.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_leakage_inductance_matrix", &calculate_leakage_inductance_matrix,
         py::arg("magnetic_json"),
         py::arg("frequency"),
         py::arg("models_data"),
-        "Calculate the leakage inductance matrix for a magnetic component.");
+        "Calculate the leakage inductance matrix for a magnetic component.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_capacitance_matrix", &calculate_capacitance_matrix,
         py::arg("coil_json"),
         py::arg("models_data"),
-        "Calculate the capacitance matrix for a coil.");
+        "Calculate the capacitance matrix for a coil.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_capacitance_models_between_windings", &calculate_capacitance_models_between_windings,
         py::arg("energy"),
         py::arg("voltage_drop"),
         py::arg("relative_turns_ratio"),
-        "Calculate six-capacitor and tripole capacitance models between windings.");
+        "Calculate six-capacitor and tripole capacitance models between windings.",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("export_magnetic_as_symbol", &export_magnetic_as_symbol,
         py::arg("magnetic_json"),
         py::arg("inputs_json"),
-        "Export a magnetic component as a circuit simulator symbol.");
+        "Export a magnetic component as a circuit simulator symbol.",
+        py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace PyMKF

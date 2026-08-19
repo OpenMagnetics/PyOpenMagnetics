@@ -394,7 +394,8 @@ void register_wire_bindings(py::module& m) {
         
         Returns:
             JSON array of Wire objects.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_materials", &get_wire_materials,
         R"pbdoc(
@@ -407,7 +408,8 @@ void register_wire_bindings(py::module& m) {
         
         Returns:
             JSON array of WireMaterial objects (copper, aluminum, etc.).
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_names", &get_wire_names,
         R"pbdoc(
@@ -415,7 +417,8 @@ void register_wire_bindings(py::module& m) {
         
         Returns:
             JSON array of wire name strings.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_material_names", &get_wire_material_names,
         R"pbdoc(
@@ -423,7 +426,8 @@ void register_wire_bindings(py::module& m) {
         
         Returns:
             JSON array of material name strings.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
 
     // Lookup functions
     m.def("find_wire_by_name", &find_wire_by_name,
@@ -436,7 +440,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON Wire object with full specification.
         )pbdoc",
-        py::arg("name"));
+        py::arg("name"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("find_wire_material_by_name", &find_wire_material_by_name,
         R"pbdoc(
@@ -448,7 +453,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON WireMaterial object.
         )pbdoc",
-        py::arg("name"));
+        py::arg("name"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("find_wire_by_dimension", &find_wire_by_dimension,
         R"pbdoc(
@@ -464,7 +470,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON Wire object matching criteria.
         )pbdoc",
-        py::arg("dimension"), py::arg("wire_type_json"), py::arg("wire_standard_json"));
+        py::arg("dimension"), py::arg("wire_type_json"), py::arg("wire_standard_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Wire data functions
     m.def("get_wire_data", &get_wire_data,
@@ -479,7 +486,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON Wire object with complete specification.
         )pbdoc",
-        py::arg("winding_data_json"));
+        py::arg("winding_data_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_data_by_name", &get_wire_data_by_name,
         R"pbdoc(
@@ -491,7 +499,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON Wire object.
         )pbdoc",
-        py::arg("name"));
+        py::arg("name"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_data_by_standard_name", &get_wire_data_by_standard_name,
         R"pbdoc(
@@ -503,7 +512,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON Wire object.
         )pbdoc",
-        py::arg("standard_name"));
+        py::arg("standard_name"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_strand_by_standard_name", &get_strand_by_standard_name,
         R"pbdoc(
@@ -515,7 +525,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON Wire object for individual strand.
         )pbdoc",
-        py::arg("standard_name"));
+        py::arg("standard_name"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_conducting_diameter_by_standard_name", &get_wire_conducting_diameter_by_standard_name,
         R"pbdoc(
@@ -527,7 +538,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             Conducting diameter in meters.
         )pbdoc",
-        py::arg("standard_name"));
+        py::arg("standard_name"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Wire dimensions
     m.def("get_wire_outer_width_rectangular", &get_wire_outer_width_rectangular,
@@ -542,7 +554,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             Outer width in meters.
         )pbdoc",
-        py::arg("conducting_width"), py::arg("grade"), py::arg("wire_standard_json"));
+        py::arg("conducting_width"), py::arg("grade"), py::arg("wire_standard_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_outer_height_rectangular", &get_wire_outer_height_rectangular,
         R"pbdoc(
@@ -556,7 +569,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             Outer height in meters.
         )pbdoc",
-        py::arg("conducting_height"), py::arg("grade"), py::arg("wire_standard_json"));
+        py::arg("conducting_height"), py::arg("grade"), py::arg("wire_standard_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_outer_diameter_bare_litz", &get_wire_outer_diameter_bare_litz,
         R"pbdoc(
@@ -571,7 +585,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             Bundle diameter in meters.
         )pbdoc",
-        py::arg("conducting_diameter"), py::arg("number_conductors"), py::arg("grade"), py::arg("wire_standard_json"));
+        py::arg("conducting_diameter"), py::arg("number_conductors"), py::arg("grade"), py::arg("wire_standard_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_outer_diameter_served_litz", &get_wire_outer_diameter_served_litz,
         R"pbdoc(
@@ -587,7 +602,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             Served diameter in meters.
         )pbdoc",
-        py::arg("conducting_diameter"), py::arg("number_conductors"), py::arg("grade"), py::arg("number_layers"), py::arg("wire_standard_json"));
+        py::arg("conducting_diameter"), py::arg("number_conductors"), py::arg("grade"), py::arg("number_layers"), py::arg("wire_standard_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_outer_diameter_insulated_litz", &get_wire_outer_diameter_insulated_litz,
         R"pbdoc(
@@ -604,7 +620,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             Insulated diameter in meters.
         )pbdoc",
-        py::arg("conducting_diameter"), py::arg("number_conductors"), py::arg("number_layers"), py::arg("thickness_layers"), py::arg("grade"), py::arg("wire_standard_json"));
+        py::arg("conducting_diameter"), py::arg("number_conductors"), py::arg("number_layers"), py::arg("thickness_layers"), py::arg("grade"), py::arg("wire_standard_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_outer_diameter_enamelled_round", &get_wire_outer_diameter_enamelled_round,
         R"pbdoc(
@@ -620,7 +637,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             Outer diameter in meters.
         )pbdoc",
-        py::arg("conducting_diameter"), py::arg("grade"), py::arg("wire_standard_json"));
+        py::arg("conducting_diameter"), py::arg("grade"), py::arg("wire_standard_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_outer_diameter_insulated_round", &get_wire_outer_diameter_insulated_round,
         R"pbdoc(
@@ -637,7 +655,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             Outer diameter in meters.
         )pbdoc",
-        py::arg("conducting_diameter"), py::arg("number_layers"), py::arg("thickness_layers"), py::arg("wire_standard_json"));
+        py::arg("conducting_diameter"), py::arg("number_layers"), py::arg("thickness_layers"), py::arg("wire_standard_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_outer_dimensions", &get_outer_dimensions,
         R"pbdoc(
@@ -651,7 +670,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON array of dimensions [width, height] or [diameter] in meters.
         )pbdoc",
-        py::arg("wire_json"));
+        py::arg("wire_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Wire utilities
     m.def("get_equivalent_wire", &get_equivalent_wire,
@@ -668,7 +688,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON Wire object representing equivalent.
         )pbdoc",
-        py::arg("old_wire_json"), py::arg("new_wire_type_json"), py::arg("effective_frequency"));
+        py::arg("old_wire_json"), py::arg("new_wire_type_json"), py::arg("effective_frequency"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_coating", &get_coating,
         R"pbdoc(
@@ -680,7 +701,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON WireCoating object.
         )pbdoc",
-        py::arg("wire_json"));
+        py::arg("wire_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_coating_label", &get_coating_label,
         R"pbdoc(
@@ -692,7 +714,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             Coating label string (e.g., "Grade 1", "Triple Insulated").
         )pbdoc",
-        py::arg("wire_json"));
+        py::arg("wire_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_wire_coating_by_label", &get_wire_coating_by_label,
         R"pbdoc(
@@ -704,7 +727,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON WireCoating object.
         )pbdoc",
-        py::arg("label"));
+        py::arg("label"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_coating_labels_by_type", &get_coating_labels_by_type,
         R"pbdoc(
@@ -716,7 +740,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             List of available coating label strings.
         )pbdoc",
-        py::arg("wire_type_json"));
+        py::arg("wire_type_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_coating_thickness", &get_coating_thickness,
         R"pbdoc(
@@ -728,7 +753,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             Coating thickness in meters.
         )pbdoc",
-        py::arg("wire_json"));
+        py::arg("wire_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_coating_relative_permittivity", &get_coating_relative_permittivity,
         R"pbdoc(
@@ -742,7 +768,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             Relative permittivity (dimensionless).
         )pbdoc",
-        py::arg("wire_json"));
+        py::arg("wire_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_coating_insulation_material", &get_coating_insulation_material,
         R"pbdoc(
@@ -754,7 +781,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON InsulationMaterial object.
         )pbdoc",
-        py::arg("wire_json"));
+        py::arg("wire_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Availability queries
     m.def("get_available_wires", &get_available_wires,
@@ -763,7 +791,8 @@ void register_wire_bindings(py::module& m) {
         
         Returns:
             List of wire name strings.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_unique_wire_diameters", &get_unique_wire_diameters,
         R"pbdoc(
@@ -777,7 +806,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             List of standard size designation strings.
         )pbdoc",
-        py::arg("wire_standard_json"));
+        py::arg("wire_standard_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_available_wire_types", &get_available_wire_types,
         R"pbdoc(
@@ -785,7 +815,8 @@ void register_wire_bindings(py::module& m) {
         
         Returns:
             List of type strings: "round", "litz", "rectangular", "foil".
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_available_wire_standards", &get_available_wire_standards,
         R"pbdoc(
@@ -793,7 +824,8 @@ void register_wire_bindings(py::module& m) {
 
         Returns:
             List of standard strings: "IEC 60317", "NEMA MW 1000", etc.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("get_planar_thicknesses", &get_planar_thicknesses,
         R"pbdoc(
@@ -801,7 +833,8 @@ void register_wire_bindings(py::module& m) {
 
         Returns:
             List of standard name strings for available planar wires.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("get_planar_wire_by_standard_name", &get_planar_wire_by_standard_name,
         R"pbdoc(
@@ -813,7 +846,8 @@ void register_wire_bindings(py::module& m) {
         Returns:
             JSON Wire object or error message if not found.
         )pbdoc",
-        py::arg("standard_name"));
+        py::arg("standard_name"),
+        py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace PyMKF

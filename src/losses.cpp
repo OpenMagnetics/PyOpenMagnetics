@@ -314,7 +314,8 @@ void register_losses_bindings(py::module& m) {
             >>> losses = PyMKF.calculate_core_losses(core, coil, inputs, models)
             >>> print(f"Core losses: {losses['coreLosses']:.2f} W")
         )pbdoc",
-        py::arg("core_data"), py::arg("coil_data"), py::arg("inputs_data"), py::arg("models_data"));
+        py::arg("core_data"), py::arg("coil_data"), py::arg("inputs_data"), py::arg("models_data"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_core_losses_model_information", &get_core_losses_model_information,
         R"pbdoc(
@@ -334,7 +335,8 @@ void register_losses_bindings(py::module& m) {
                 - external_links: Links to academic references
                 - available_models: Models valid for the given material
         )pbdoc",
-        py::arg("material"));
+        py::arg("material"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_steinmetz_coefficients", &calculate_steinmetz_coefficients,
         R"pbdoc(
@@ -355,7 +357,8 @@ void register_losses_bindings(py::module& m) {
             JSON array of SteinmetzCoreLossesMethodRangeDatum with fitted
             coefficients (k, alpha, beta) for each frequency range.
         )pbdoc",
-        py::arg("data_json"), py::arg("ranges_json"));
+        py::arg("data_json"), py::arg("ranges_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_steinmetz_coefficients_with_error", &calculate_steinmetz_coefficients_with_error,
         R"pbdoc(
@@ -372,7 +375,8 @@ void register_losses_bindings(py::module& m) {
                 - coefficientsPerRange: Fitted Steinmetz coefficients
                 - errorPerRange: RMS fitting error for each range
         )pbdoc",
-        py::arg("data_json"), py::arg("ranges_json"));
+        py::arg("data_json"), py::arg("ranges_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Winding losses
     m.def("calculate_winding_losses", &calculate_winding_losses,
@@ -397,7 +401,8 @@ void register_losses_bindings(py::module& m) {
                 - skinEffectLosses: High-frequency skin losses
                 - proximityEffectLosses: Proximity effect losses
         )pbdoc",
-        py::arg("magnetic_json"), py::arg("operating_point_json"), py::arg("temperature"));
+        py::arg("magnetic_json"), py::arg("operating_point_json"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_ohmic_losses", &calculate_ohmic_losses,
         R"pbdoc(
@@ -413,7 +418,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             JSON WindingLossesOutput with ohmicLosses field populated.
         )pbdoc",
-        py::arg("coil_json"), py::arg("operating_point_json"), py::arg("temperature"));
+        py::arg("coil_json"), py::arg("operating_point_json"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_magnetic_field_strength_field", &calculate_magnetic_field_strength_field,
         R"pbdoc(
@@ -430,7 +436,8 @@ void register_losses_bindings(py::module& m) {
             JSON WindingWindowMagneticStrengthFieldOutput with field data
             at each spatial point and frequency harmonic.
         )pbdoc",
-        py::arg("operating_point_json"), py::arg("magnetic_json"));
+        py::arg("operating_point_json"), py::arg("magnetic_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_proximity_effect_losses", &calculate_proximity_effect_losses,
         R"pbdoc(
@@ -450,7 +457,8 @@ void register_losses_bindings(py::module& m) {
             Updated JSON WindingLossesOutput with proximityEffectLosses added.
         )pbdoc",
         py::arg("coil_json"), py::arg("temperature"), 
-        py::arg("winding_losses_output_json"), py::arg("field_output_json"));
+        py::arg("winding_losses_output_json"), py::arg("field_output_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_skin_effect_losses", &calculate_skin_effect_losses,
         R"pbdoc(
@@ -467,7 +475,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             Updated JSON WindingLossesOutput with skinEffectLosses added.
         )pbdoc",
-        py::arg("coil_json"), py::arg("winding_losses_output_json"), py::arg("temperature"));
+        py::arg("coil_json"), py::arg("winding_losses_output_json"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_skin_effect_losses_per_meter", &calculate_skin_effect_losses_per_meter,
         R"pbdoc(
@@ -484,7 +493,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             JSON object with skin effect loss power per meter in W/m.
         )pbdoc",
-        py::arg("wire_json"), py::arg("current_json"), py::arg("temperature"), py::arg("current_divider"));
+        py::arg("wire_json"), py::arg("current_json"), py::arg("temperature"), py::arg("current_divider"),
+        py::call_guard<py::gil_scoped_release>());
 
     // DC resistance and losses
     m.def("calculate_dc_resistance_per_meter", &calculate_dc_resistance_per_meter,
@@ -498,7 +508,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             DC resistance in Ohms per meter.
         )pbdoc",
-        py::arg("wire_json"), py::arg("temperature"));
+        py::arg("wire_json"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_dc_losses_per_meter", &calculate_dc_losses_per_meter,
         R"pbdoc(
@@ -512,7 +523,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             DC power loss in Watts per meter.
         )pbdoc",
-        py::arg("wire_json"), py::arg("current_json"), py::arg("temperature"));
+        py::arg("wire_json"), py::arg("current_json"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_skin_ac_losses_per_meter", &calculate_skin_ac_losses_per_meter,
         R"pbdoc(
@@ -526,7 +538,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             AC skin effect power loss in Watts per meter.
         )pbdoc",
-        py::arg("wire_json"), py::arg("current_json"), py::arg("temperature"));
+        py::arg("wire_json"), py::arg("current_json"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_skin_ac_factor", &calculate_skin_ac_factor,
         R"pbdoc(
@@ -543,7 +556,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             AC factor (dimensionless ratio >= 1.0).
         )pbdoc",
-        py::arg("wire_json"), py::arg("current_json"), py::arg("temperature"));
+        py::arg("wire_json"), py::arg("current_json"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_skin_ac_resistance_per_meter", &calculate_skin_ac_resistance_per_meter,
         R"pbdoc(
@@ -559,7 +573,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             Total AC resistance in Ohms per meter.
         )pbdoc",
-        py::arg("wire_json"), py::arg("current_json"), py::arg("temperature"));
+        py::arg("wire_json"), py::arg("current_json"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_effective_current_density", &calculate_effective_current_density,
         R"pbdoc(
@@ -575,7 +590,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             Effective current density in A/m².
         )pbdoc",
-        py::arg("wire_json"), py::arg("current_json"), py::arg("temperature"));
+        py::arg("wire_json"), py::arg("current_json"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_effective_skin_depth", &calculate_effective_skin_depth,
         R"pbdoc(
@@ -592,7 +608,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             Skin depth in meters, or -1 if effective frequency not available.
         )pbdoc",
-        py::arg("material_name"), py::arg("current_json"), py::arg("temperature"));
+        py::arg("material_name"), py::arg("current_json"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("get_available_core_losses_methods", &get_available_core_losses_methods,
         R"pbdoc(
@@ -604,7 +621,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             JSON array of available core losses method names.
         )pbdoc",
-        py::arg("magnetic_json"));
+        py::arg("magnetic_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_filling_factor", &calculate_filling_factor,
         R"pbdoc(
@@ -616,7 +634,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             JSON object with filling factor data.
         )pbdoc",
-        py::arg("coil_json"));
+        py::arg("coil_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_ac_resistance_coefficients_per_winding", &calculate_ac_resistance_coefficients_per_winding,
         R"pbdoc(
@@ -630,7 +649,8 @@ void register_losses_bindings(py::module& m) {
         Returns:
             JSON array of AC resistance factors per winding.
         )pbdoc",
-        py::arg("magnetic_json"), py::arg("temperature"), py::arg("frequency"));
+        py::arg("magnetic_json"), py::arg("temperature"), py::arg("frequency"),
+        py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace PyMKF

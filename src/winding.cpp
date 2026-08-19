@@ -568,7 +568,8 @@ void register_winding_bindings(py::module& m) {
             >>> result = PyMKF.wind(coil, 2, [0.5, 0.5], [0, 1], [[0.001, 0.001]])
         )pbdoc",
         py::arg("coil_json"), py::arg("repetitions"), py::arg("proportion_per_winding_json"),
-        py::arg("pattern_json"), py::arg("margin_pairs_json"));
+        py::arg("pattern_json"), py::arg("margin_pairs_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("wind_planar", &wind_planar,
         R"pbdoc(
@@ -588,7 +589,8 @@ void register_winding_bindings(py::module& m) {
             JSON Coil object with planar winding arrangement.
         )pbdoc",
         py::arg("coil_json"), py::arg("stack_up_json"), py::arg("border_to_wire_distance"),
-        py::arg("wire_to_wire_distance_json"), py::arg("insulation_thickness_json"), py::arg("core_to_layer_distance"));
+        py::arg("wire_to_wire_distance_json"), py::arg("insulation_thickness_json"), py::arg("core_to_layer_distance"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("wind_by_sections", &wind_by_sections,
         R"pbdoc(
@@ -607,7 +609,8 @@ void register_winding_bindings(py::module& m) {
             JSON Coil with sectionsDescription populated.
         )pbdoc",
         py::arg("coil_json"), py::arg("repetitions"), py::arg("proportion_per_winding_json"),
-        py::arg("pattern_json"), py::arg("insulation_thickness"));
+        py::arg("pattern_json"), py::arg("insulation_thickness"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("wind_by_layers", &wind_by_layers,
         R"pbdoc(
@@ -623,7 +626,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             JSON Coil with layersDescription populated.
         )pbdoc",
-        py::arg("coil_json"), py::arg("insulation_layers_json"), py::arg("insulation_thickness"));
+        py::arg("coil_json"), py::arg("insulation_layers_json"), py::arg("insulation_thickness"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("wind_by_turns", &wind_by_turns,
         R"pbdoc(
@@ -637,7 +641,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             JSON Coil with turnsDescription populated.
         )pbdoc",
-        py::arg("coil_json"));
+        py::arg("coil_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("delimit_and_compact", &delimit_and_compact,
         R"pbdoc(
@@ -651,7 +656,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             JSON Coil with optimized turn positions.
         )pbdoc",
-        py::arg("coil_json"));
+        py::arg("coil_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Layer and section functions
     m.def("get_layers_by_winding_index", &get_layers_by_winding_index,
@@ -665,7 +671,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             JSON array of Layer objects for that winding.
         )pbdoc",
-        py::arg("coil_json"), py::arg("winding_index"));
+        py::arg("coil_json"), py::arg("winding_index"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_layers_by_section", &get_layers_by_section,
         R"pbdoc(
@@ -678,7 +685,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             JSON array of Layer objects in that section.
         )pbdoc",
-        py::arg("coil_json"), py::arg("section_name"));
+        py::arg("coil_json"), py::arg("section_name"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_sections_description_conduction", &get_sections_description_conduction,
         R"pbdoc(
@@ -690,7 +698,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             JSON array of Section objects with type "conduction".
         )pbdoc",
-        py::arg("coil_json"));
+        py::arg("coil_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("are_sections_and_layers_fitting", &are_sections_and_layers_fitting,
         R"pbdoc(
@@ -702,7 +711,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             True if everything fits, False otherwise.
         )pbdoc",
-        py::arg("coil_json"));
+        py::arg("coil_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("add_margin_to_section_by_index", &add_margin_to_section_by_index,
         R"pbdoc(
@@ -718,7 +728,8 @@ void register_winding_bindings(py::module& m) {
             Updated JSON Coil with margin added.
         )pbdoc",
         py::arg("coil_json"), py::arg("section_index"), 
-        py::arg("top_or_left_margin"), py::arg("bottom_or_right_margin"));
+        py::arg("top_or_left_margin"), py::arg("bottom_or_right_margin"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Winding orientation and alignment
     m.def("get_available_winding_orientations", &get_available_winding_orientations,
@@ -727,7 +738,8 @@ void register_winding_bindings(py::module& m) {
         
         Returns:
             List of orientation strings: "contiguous", "overlapping".
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_available_coil_alignments", &get_available_coil_alignments,
         R"pbdoc(
@@ -735,7 +747,8 @@ void register_winding_bindings(py::module& m) {
         
         Returns:
             List of alignment strings: "inner or top", "outer or bottom", "spread", "centered".
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
 
     // Number of turns
     m.def("calculate_number_turns", &calculate_number_turns,
@@ -752,7 +765,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             List of integer turns for each winding [primary, secondary, ...].
         )pbdoc",
-        py::arg("number_turns_primary"), py::arg("design_requirements_json"));
+        py::arg("number_turns_primary"), py::arg("design_requirements_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     // Insulation
     m.def("get_insulation_materials", &get_insulation_materials,
@@ -762,7 +776,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             JSON array of InsulationMaterial objects with dielectric
             properties, thickness, and temperature ratings.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_insulation_material_names", &get_insulation_material_names,
         R"pbdoc(
@@ -770,7 +785,8 @@ void register_winding_bindings(py::module& m) {
         
         Returns:
             JSON array of material name strings.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("find_insulation_material_by_name", &find_insulation_material_by_name,
         R"pbdoc(
@@ -782,7 +798,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             JSON InsulationMaterial object.
         )pbdoc",
-        py::arg("name"));
+        py::arg("name"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_insulation", &calculate_insulation,
         R"pbdoc(
@@ -807,7 +824,8 @@ void register_winding_bindings(py::module& m) {
                 - distanceThroughInsulation: Solid insulation in meters
                 - errorMessage: Empty if successful, error description otherwise
         )pbdoc",
-        py::arg("inputs_json"));
+        py::arg("inputs_json"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_insulation_layer_insulation_material", &get_insulation_layer_insulation_material,
         R"pbdoc(
@@ -820,7 +838,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             JSON InsulationMaterial object.
         )pbdoc",
-        py::arg("coil_json"), py::arg("layer_name"));
+        py::arg("coil_json"), py::arg("layer_name"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("get_isolation_side_from_index", &get_isolation_side_from_index,
         R"pbdoc(
@@ -834,7 +853,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             JSON IsolationSide string ("Primary", "Secondary", etc.).
         )pbdoc",
-        py::arg("index"));
+        py::arg("index"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("set_interlayer_insulation", &set_interlayer_insulation,
         R"pbdoc(
@@ -847,7 +867,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             Updated JSON Coil with interlayer insulation applied.
         )pbdoc",
-        py::arg("coil_json"), py::arg("layer_thickness"));
+        py::arg("coil_json"), py::arg("layer_thickness"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("set_intersection_insulation", &set_intersection_insulation,
         R"pbdoc(
@@ -861,7 +882,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             Updated JSON Coil with intersection insulation applied.
         )pbdoc",
-        py::arg("coil_json"), py::arg("layer_thickness"), py::arg("number_insulation_layers"));
+        py::arg("coil_json"), py::arg("layer_thickness"), py::arg("number_insulation_layers"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("get_solid_insulation_requirements_for_wires", &get_solid_insulation_requirements_for_wires,
         R"pbdoc(
@@ -875,7 +897,8 @@ void register_winding_bindings(py::module& m) {
         Returns:
             JSON array of solid insulation requirements for each wire pair.
         )pbdoc",
-        py::arg("inputs_json"), py::arg("pattern_json"), py::arg("repetitions"));
+        py::arg("inputs_json"), py::arg("pattern_json"), py::arg("repetitions"),
+        py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace PyMKF

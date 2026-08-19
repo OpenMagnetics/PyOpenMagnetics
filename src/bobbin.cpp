@@ -111,12 +111,18 @@ json create_simple_bobbin_from_core_with_custom_thicknesses(json coreJson, doubl
 }
 
 void register_bobbin_bindings(py::module& m) {
-    m.def("get_bobbins", &get_bobbins, "Retrieve all available bobbins as JSON objects");
-    m.def("get_bobbin_names", &get_bobbin_names, "Retrieve list of all bobbin names");
-    m.def("find_bobbin_by_name", &find_bobbin_by_name, "Find bobbin data by name");
-    m.def("create_basic_bobbin", &create_basic_bobbin, "Create a basic bobbin from core data");
-    m.def("create_basic_bobbin_by_thickness", &create_basic_bobbin_by_thickness, "Create a basic bobbin with specified thickness");
-    m.def("calculate_bobbin_data", &calculate_bobbin_data, "Calculate bobbin specifications");
+    m.def("get_bobbins", &get_bobbins, "Retrieve all available bobbins as JSON objects",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("get_bobbin_names", &get_bobbin_names, "Retrieve list of all bobbin names",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("find_bobbin_by_name", &find_bobbin_by_name, "Find bobbin data by name",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("create_basic_bobbin", &create_basic_bobbin, "Create a basic bobbin from core data",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("create_basic_bobbin_by_thickness", &create_basic_bobbin_by_thickness, "Create a basic bobbin with specified thickness",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("calculate_bobbin_data", &calculate_bobbin_data, "Calculate bobbin specifications",
+        py::call_guard<py::gil_scoped_release>());
     m.def("process_bobbin", &process_bobbin,
         R"pbdoc(
         Process a bobbin's functionalDescription into its processedDescription
@@ -131,8 +137,10 @@ void register_bobbin_bindings(py::module& m) {
         Returns:
             JSON Bobbin object with processedDescription filled in.
         )pbdoc",
-        py::arg("bobbin_json"));
-    m.def("check_if_fits", &check_if_fits, "Check if winding fits in available space");
+        py::arg("bobbin_json"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("check_if_fits", &check_if_fits, "Check if winding fits in available space",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("create_simple_bobbin_from_core", &create_simple_bobbin_from_core,
         R"pbdoc(
@@ -144,7 +152,8 @@ void register_bobbin_bindings(py::module& m) {
         Returns:
             JSON Bobbin object.
         )pbdoc",
-        py::arg("core_json"));
+        py::arg("core_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("create_simple_bobbin_from_core_with_custom_thickness", &create_simple_bobbin_from_core_with_custom_thickness,
         R"pbdoc(
@@ -157,7 +166,8 @@ void register_bobbin_bindings(py::module& m) {
         Returns:
             JSON Bobbin object.
         )pbdoc",
-        py::arg("core_json"), py::arg("thickness"));
+        py::arg("core_json"), py::arg("thickness"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("create_simple_bobbin_from_core_with_custom_thicknesses", &create_simple_bobbin_from_core_with_custom_thicknesses,
         R"pbdoc(
@@ -171,7 +181,8 @@ void register_bobbin_bindings(py::module& m) {
         Returns:
             JSON Bobbin object.
         )pbdoc",
-        py::arg("core_json"), py::arg("wall_thickness"), py::arg("column_thickness"));
+        py::arg("core_json"), py::arg("wall_thickness"), py::arg("column_thickness"),
+        py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace PyMKF

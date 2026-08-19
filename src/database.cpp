@@ -227,7 +227,8 @@ std::string load_magnetics_from_string(std::string jsonText) {
 }
 
 void register_database_bindings(py::module& m) {
-    m.def("load_databases", &load_databases, "Load all databases from JSON");
+    m.def("load_databases", &load_databases, "Load all databases from JSON",
+        py::call_guard<py::gil_scoped_release>());
     m.def("load_all_databases", &load_all_databases,
         R"pbdoc(
         Force-load every reference catalogue (cores, shapes, materials, wires,
@@ -237,7 +238,8 @@ void register_database_bindings(py::module& m) {
         the catalogues lazy-load with an unsynchronised "if empty, load" check,
         so a first touch inside a parallel region is a data race. Pair it with
         set_databases_frozen(True).
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
     m.def("set_databases_frozen", &set_databases_frozen,
         R"pbdoc(
         Freeze (or unfreeze) the reference catalogues and the magnetics cache.
@@ -248,24 +250,39 @@ void register_database_bindings(py::module& m) {
         into a loud, diagnosable error. Freeze after load_all_databases() and
         after loading your part catalogue; unfreeze to change either.
         )pbdoc",
-        py::arg("frozen"));
+        py::arg("frozen"),
+        py::call_guard<py::gil_scoped_release>());
     m.def("databases_frozen", &databases_frozen,
-        "True when the catalogues are frozen for parallel use.");
-    m.def("read_databases", &read_databases, "Read databases from file path");
-    m.def("load_mas", &load_mas, "Load a MAS (Magnetic Agnostic Structure) object");
-    m.def("load_magnetic", &load_magnetic, "Load a magnetic component");
-    m.def("load_magnetics", &load_magnetics, "Load multiple magnetic components");
-    m.def("read_mas", &read_mas, "Read a MAS object by key");
-    m.def("load_core_materials", &load_core_materials, "Load core materials into database");
-    m.def("load_core_shapes", &load_core_shapes, "Load core shapes into database");
-    m.def("load_wires", &load_wires, "Load wires into database");
-    m.def("clear_databases", &clear_databases, "Clear all loaded databases");
-    m.def("is_core_material_database_empty", &is_core_material_database_empty, "Check if core material database is empty");
-    m.def("is_core_shape_database_empty", &is_core_shape_database_empty, "Check if core shape database is empty");
-    m.def("is_wire_database_empty", &is_wire_database_empty, "Check if wire database is empty");
+        "True when the catalogues are frozen for parallel use.",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("read_databases", &read_databases, "Read databases from file path",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("load_mas", &load_mas, "Load a MAS (Magnetic Agnostic Structure) object",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("load_magnetic", &load_magnetic, "Load a magnetic component",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("load_magnetics", &load_magnetics, "Load multiple magnetic components",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("read_mas", &read_mas, "Read a MAS object by key",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("load_core_materials", &load_core_materials, "Load core materials into database",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("load_core_shapes", &load_core_shapes, "Load core shapes into database",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("load_wires", &load_wires, "Load wires into database",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("clear_databases", &clear_databases, "Clear all loaded databases",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("is_core_material_database_empty", &is_core_material_database_empty, "Check if core material database is empty",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("is_core_shape_database_empty", &is_core_shape_database_empty, "Check if core shape database is empty",
+        py::call_guard<py::gil_scoped_release>());
+    m.def("is_wire_database_empty", &is_wire_database_empty, "Check if wire database is empty",
+        py::call_guard<py::gil_scoped_release>());
     m.def("load_magnetics_from_file", &load_magnetics_from_file, "Load magnetic components from file",
         py::call_guard<py::gil_scoped_release>());
-    m.def("clear_magnetic_cache", &clear_magnetic_cache, "Clear cached magnetic calculations");
+    m.def("clear_magnetic_cache", &clear_magnetic_cache, "Clear cached magnetic calculations",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("load_cores", &load_cores,
         R"pbdoc(
@@ -279,12 +296,14 @@ void register_database_bindings(py::module& m) {
         Returns:
             JSON object with count of loaded cores.
         )pbdoc",
-        py::arg("file_to_load_json"), py::arg("include_toroids"), py::arg("use_only_cores_in_stock"));
+        py::arg("file_to_load_json"), py::arg("include_toroids"), py::arg("use_only_cores_in_stock"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("clear_loaded_cores", &clear_loaded_cores,
         R"pbdoc(
         Clear all loaded cores from the database.
-        )pbdoc");
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("load_magnetics_from_string", &load_magnetics_from_string,
         R"pbdoc(

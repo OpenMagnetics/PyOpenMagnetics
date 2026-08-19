@@ -124,7 +124,8 @@ void register_crossref_bindings(py::module& m) {
         )pbdoc",
         py::arg("reference_core_json"), py::arg("inputs_json"),
         py::arg("reference_number_turns"), py::arg("weights_json") = json::object(),
-        py::arg("max_results") = 10);
+        py::arg("max_results") = 10,
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_cross_referenced_core_material", &calculate_cross_referenced_core_material,
         R"pbdoc(
@@ -144,7 +145,8 @@ void register_crossref_bindings(py::module& m) {
             Raises PyOpenMagnetics.EngineError on failure.
         )pbdoc",
         py::arg("reference_core_material_json"), py::arg("temperature"),
-        py::arg("weights_json") = json::object(), py::arg("max_results") = 10);
+        py::arg("weights_json") = json::object(), py::arg("max_results") = 10,
+        py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace PyMKF

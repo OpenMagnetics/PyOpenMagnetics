@@ -437,7 +437,8 @@ void register_adviser_bindings(py::module& m) {
             >>> for item in result["data"]:
             ...     print(f"Total losses: {item['scoring']} W")
         )pbdoc",
-        py::arg("inputs_json"), py::arg("max_results"), py::arg("core_mode_json"));
+        py::arg("inputs_json"), py::arg("max_results"), py::arg("core_mode_json"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_advised_magnetics_from_catalog", &calculate_advised_magnetics_from_catalog,
         R"pbdoc(
@@ -465,7 +466,8 @@ void register_adviser_bindings(py::module& m) {
             >>> for item in result["data"]:
             ...     print(f"Score: {item['scoring']}, Per filter: {item['scoringPerFilter']}")
         )pbdoc",
-        py::arg("inputs_json"), py::arg("catalog_json"), py::arg("max_results"));
+        py::arg("inputs_json"), py::arg("catalog_json"), py::arg("max_results"),
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("calculate_advised_magnetics_from_cache", &calculate_advised_magnetics_from_cache,
         R"pbdoc(
@@ -497,17 +499,20 @@ void register_adviser_bindings(py::module& m) {
 
     m.def("calculate_advised_sections", &calculate_advised_sections,
         "Get advised coil sections.",
-        py::arg("mas"), py::arg("pattern"), py::arg("repetitions"));
+        py::arg("mas"), py::arg("pattern"), py::arg("repetitions"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_advised_coil", &calculate_advised_coil,
         "Get full coil design advice.",
-        py::arg("mas"));
+        py::arg("mas"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_advised_wires", &calculate_advised_wires,
         "Get wire selection advice.",
         py::arg("winding"), py::arg("section"), py::arg("current"),
         py::arg("solid_insulation_requirements"), py::arg("temperature"), py::arg("number_sections"),
-        py::arg("max_results"), py::arg("use_planar_wires") = false);
+        py::arg("max_results"), py::arg("use_planar_wires") = false,
+        py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace PyMKF

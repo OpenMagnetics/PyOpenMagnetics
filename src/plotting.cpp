@@ -362,7 +362,8 @@ void register_plotting_bindings(py::module& m) {
             - svg: SVG string content of the visualization
             - error: Error message if success is false
         )pbdoc",
-        py::arg("magneticJson"), py::arg("outputPath") = "");
+        py::arg("magneticJson"), py::arg("outputPath") = "",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("plot_magnetic", &plot_magnetic,
         R"pbdoc(
@@ -380,7 +381,8 @@ void register_plotting_bindings(py::module& m) {
             - svg: SVG string content of the visualization
             - error: Error message if success is false
         )pbdoc",
-        py::arg("magneticJson"), py::arg("outputPath") = "");
+        py::arg("magneticJson"), py::arg("outputPath") = "",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("plot_magnetic_field", &plot_magnetic_field,
         R"pbdoc(
@@ -400,7 +402,8 @@ void register_plotting_bindings(py::module& m) {
             - svg: SVG string content of the field visualization
             - error: Error message if success is false
         )pbdoc",
-        py::arg("magneticJson"), py::arg("operatingPointJson"), py::arg("outputPath") = "");
+        py::arg("magneticJson"), py::arg("operatingPointJson"), py::arg("outputPath") = "",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("plot_electric_field", &plot_electric_field,
         R"pbdoc(
@@ -420,7 +423,8 @@ void register_plotting_bindings(py::module& m) {
             - svg: SVG string content of the field visualization
             - error: Error message if success is false
         )pbdoc",
-        py::arg("magneticJson"), py::arg("operatingPointJson"), py::arg("outputPath") = "");
+        py::arg("magneticJson"), py::arg("operatingPointJson"), py::arg("outputPath") = "",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("plot_wire", &plot_wire,
         R"pbdoc(
@@ -439,7 +443,8 @@ void register_plotting_bindings(py::module& m) {
             - svg: SVG string content of the wire visualization
             - error: Error message if success is false
         )pbdoc",
-        py::arg("wireDataJson"), py::arg("outputPath") = "");
+        py::arg("wireDataJson"), py::arg("outputPath") = "",
+        py::call_guard<py::gil_scoped_release>());
     
     m.def("plot_bobbin", &plot_bobbin,
         R"pbdoc(
@@ -455,7 +460,8 @@ void register_plotting_bindings(py::module& m) {
             - svg: SVG string content of the bobbin visualization
             - error: Error message if success is false
         )pbdoc",
-        py::arg("magneticJson"), py::arg("outputPath") = "");
+        py::arg("magneticJson"), py::arg("outputPath") = "",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("plot_sections", &plot_sections,
         R"pbdoc(
@@ -470,7 +476,8 @@ void register_plotting_bindings(py::module& m) {
         Returns:
             JSON object with success and svg fields.
         )pbdoc",
-        py::arg("magneticJson"), py::arg("outputPath") = "");
+        py::arg("magneticJson"), py::arg("outputPath") = "",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("plot_layers", &plot_layers,
         R"pbdoc(
@@ -485,7 +492,8 @@ void register_plotting_bindings(py::module& m) {
         Returns:
             JSON object with success and svg fields.
         )pbdoc",
-        py::arg("magneticJson"), py::arg("outputPath") = "");
+        py::arg("magneticJson"), py::arg("outputPath") = "",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("plot_turns", &plot_turns,
         R"pbdoc(
@@ -501,7 +509,8 @@ void register_plotting_bindings(py::module& m) {
         Returns:
             JSON object with success and svg fields.
         )pbdoc",
-        py::arg("magneticJson"), py::arg("outputPath") = "");
+        py::arg("magneticJson"), py::arg("outputPath") = "",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("plot_wire_losses", &plot_wire_losses,
         R"pbdoc(
@@ -517,7 +526,8 @@ void register_plotting_bindings(py::module& m) {
         Returns:
             JSON object with success and svg fields.
         )pbdoc",
-        py::arg("magneticJson"), py::arg("operatingPointJson"), py::arg("outputPath") = "");
+        py::arg("magneticJson"), py::arg("operatingPointJson"), py::arg("outputPath") = "",
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("plot_temperature_field", &plot_temperature_field,
         R"pbdoc(
@@ -537,7 +547,8 @@ void register_plotting_bindings(py::module& m) {
             JSON object with success and svg fields.
         )pbdoc",
         py::arg("magneticJson"), py::arg("operatingPointJson"),
-        py::arg("textColor"), py::arg("bgColor"), py::arg("outputPath") = "");
+        py::arg("textColor"), py::arg("bgColor"), py::arg("outputPath") = "",
+        py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace PyMKF} // namespace PyMKF

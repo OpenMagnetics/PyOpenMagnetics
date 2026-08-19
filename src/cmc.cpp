@@ -58,12 +58,14 @@ void register_cmc_bindings(py::module& m) {
         "numberOfWindings, and an impedance/insertion-loss/noise spec). Mirrors "
         "the WASM `calculate_cmc_inputs` used by el-choker's CMC wizard. "
         "Delegates to Kirchhoff api::design_cmc.",
-        py::arg("cmc_inputs"));
+        py::arg("cmc_inputs"),
+        py::call_guard<py::gil_scoped_release>());
     m.def("calculate_advanced_cmc_inputs", &calculate_advanced_cmc_inputs,
         "Advanced-mode CMC inputs builder (user supplies `desiredInductance` + "
         "`designFrequency` directly rather than a spec). Delegates to Kirchhoff "
         "api::design_cmc.",
-        py::arg("cmc_inputs"));
+        py::arg("cmc_inputs"),
+        py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace PyMKF

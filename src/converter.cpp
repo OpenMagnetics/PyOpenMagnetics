@@ -534,33 +534,54 @@ json generate_pfc_ngspice_circuit(json inputsJson, double /*dcResistance*/, doub
 void register_converter_bindings(py::module& m) {
     m.def("process_converter", &process_converter,
         "Process a converter topology specification to MAS Inputs (via Kirchhoff design_magnetic_inputs).",
-        py::arg("topology_name"), py::arg("converter_json"), py::arg("use_ngspice") = true);
+        py::arg("topology_name"), py::arg("converter_json"), py::arg("use_ngspice") = true,
+        py::call_guard<py::gil_scoped_release>());
     m.def("design_magnetics_from_converter", &design_magnetics_from_converter,
         "Design requirements (MAS Inputs) from a converter spec via Kirchhoff; feed the magnetic adviser.",
         py::arg("topology_name"), py::arg("converter_json"),
         py::arg("max_results") = 1, py::arg("core_mode_json") = "available cores",
-        py::arg("use_ngspice") = true, py::arg("weights_json") = nullptr, py::arg("fast") = false);
+        py::arg("use_ngspice") = true, py::arg("weights_json") = nullptr, py::arg("fast") = false,
+        py::call_guard<py::gil_scoped_release>());
 
-    m.def("process_flyback", &process_flyback, "Process Flyback converter.", py::arg("flyback"));
-    m.def("process_buck", &process_buck, "Process Buck converter.", py::arg("buck"));
-    m.def("process_boost", &process_boost, "Process Boost converter.", py::arg("boost"));
-    m.def("process_single_switch_forward", &process_single_switch_forward, "Process Single-Switch Forward.", py::arg("forward"));
-    m.def("process_two_switch_forward", &process_two_switch_forward, "Process Two-Switch Forward.", py::arg("forward"));
-    m.def("process_active_clamp_forward", &process_active_clamp_forward, "Process Active Clamp Forward.", py::arg("forward"));
-    m.def("process_push_pull", &process_push_pull, "Process Push-Pull converter.", py::arg("push_pull"));
-    m.def("process_isolated_buck", &process_isolated_buck, "Process Isolated Buck.", py::arg("isolated_buck"));
-    m.def("process_isolated_buck_boost", &process_isolated_buck_boost, "Process Isolated Buck-Boost.", py::arg("isolated_buck_boost"));
+    m.def("process_flyback", &process_flyback, "Process Flyback converter.", py::arg("flyback"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_buck", &process_buck, "Process Buck converter.", py::arg("buck"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_boost", &process_boost, "Process Boost converter.", py::arg("boost"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_single_switch_forward", &process_single_switch_forward, "Process Single-Switch Forward.", py::arg("forward"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_two_switch_forward", &process_two_switch_forward, "Process Two-Switch Forward.", py::arg("forward"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_active_clamp_forward", &process_active_clamp_forward, "Process Active Clamp Forward.", py::arg("forward"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_push_pull", &process_push_pull, "Process Push-Pull converter.", py::arg("push_pull"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_isolated_buck", &process_isolated_buck, "Process Isolated Buck.", py::arg("isolated_buck"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_isolated_buck_boost", &process_isolated_buck_boost, "Process Isolated Buck-Boost.", py::arg("isolated_buck_boost"),
+        py::call_guard<py::gil_scoped_release>());
     m.def("process_current_transformer", &process_current_transformer, "Process Current Transformer.",
-        py::arg("ct"), py::arg("turns_ratio"), py::arg("secondary_resistance") = 0.0);
-    m.def("process_cuk", &process_cuk, "Process Cuk converter.", py::arg("cuk"));
-    m.def("process_sepic", &process_sepic, "Process SEPIC converter.", py::arg("sepic"));
-    m.def("process_zeta", &process_zeta, "Process Zeta converter.", py::arg("zeta"));
-    m.def("process_four_switch_buck_boost", &process_four_switch_buck_boost, "Process Four-Switch Buck-Boost converter.", py::arg("converter"));
-    m.def("process_asymmetric_half_bridge", &process_asymmetric_half_bridge, "Process Asymmetric Half-Bridge converter.", py::arg("converter"));
-    m.def("process_weinberg", &process_weinberg, "Process Weinberg converter.", py::arg("converter"));
-    m.def("process_vienna", &process_vienna, "Process Vienna Rectifier converter.", py::arg("converter"));
-    m.def("process_clllc", &process_clllc, "Process CLLLC Resonant converter.", py::arg("converter"));
-    m.def("process_src", &process_src, "Process Series Resonant converter (SRC).", py::arg("converter"));
+        py::arg("ct"), py::arg("turns_ratio"), py::arg("secondary_resistance") = 0.0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_cuk", &process_cuk, "Process Cuk converter.", py::arg("cuk"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_sepic", &process_sepic, "Process SEPIC converter.", py::arg("sepic"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_zeta", &process_zeta, "Process Zeta converter.", py::arg("zeta"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_four_switch_buck_boost", &process_four_switch_buck_boost, "Process Four-Switch Buck-Boost converter.", py::arg("converter"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_asymmetric_half_bridge", &process_asymmetric_half_bridge, "Process Asymmetric Half-Bridge converter.", py::arg("converter"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_weinberg", &process_weinberg, "Process Weinberg converter.", py::arg("converter"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_vienna", &process_vienna, "Process Vienna Rectifier converter.", py::arg("converter"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_clllc", &process_clllc, "Process CLLLC Resonant converter.", py::arg("converter"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("process_src", &process_src, "Process Series Resonant converter (SRC).", py::arg("converter"),
+        py::call_guard<py::gil_scoped_release>());
 
     m.def("generate_ngspice_circuit", &generate_ngspice_circuit,
         "Return the ngspice SPICE deck for a converter SPEC (Kirchhoff design_tas + generate_ngspice_circuit). "
@@ -569,13 +590,15 @@ void register_converter_bindings(py::module& m) {
         py::arg("turns_ratios"), py::arg("magnetizing_inductance"),
         py::arg("vin_index") = 0, py::arg("op_index") = 0,
         py::arg("bridge_simulation_mode") = std::string(""),
-        py::arg("spice_config") = nlohmann::json::object());
+        py::arg("spice_config") = nlohmann::json::object(),
+        py::call_guard<py::gil_scoped_release>());
     m.def("get_extra_components_inputs", &get_extra_components_inputs,
         "Extra-component design requirements (resonant tank, snubbers). Carried inside Kirchhoff's TAS.",
         py::arg("topology_name"), py::arg("converter_json"),
-        py::arg("mode") = "IDEAL", py::arg("magnetic_json") = nullptr);
+        py::arg("mode") = "IDEAL", py::arg("magnetic_json") = nullptr,
+        py::call_guard<py::gil_scoped_release>());
 
-    #define BIND_CONVERTER_ALIAS(fn) m.def(#fn, &fn, "Topology inputs builder (WASM parity alias).", py::arg("inputs"))
+    #define BIND_CONVERTER_ALIAS(fn) m.def(#fn, &fn, "Topology inputs builder (WASM parity alias).", py::arg("inputs"), py::call_guard<py::gil_scoped_release>())
     BIND_CONVERTER_ALIAS(calculate_flyback_inputs);
     BIND_CONVERTER_ALIAS(calculate_advanced_flyback_inputs);
     BIND_CONVERTER_ALIAS(calculate_buck_inputs);
@@ -626,71 +649,104 @@ void register_converter_bindings(py::module& m) {
     #undef BIND_CONVERTER_ALIAS
 
     // DMC (design + sims). CMC design is in cmc.cpp; CMC sims are below.
-    m.def("calculate_dmc_inputs", &calculate_dmc_inputs, "Build MAS Inputs for a DMC (Kirchhoff design_dmc).", py::arg("dmc_inputs"));
+    m.def("calculate_dmc_inputs", &calculate_dmc_inputs, "Build MAS Inputs for a DMC (Kirchhoff design_dmc).", py::arg("dmc_inputs"),
+        py::call_guard<py::gil_scoped_release>());
     m.def("verify_dmc_attenuation", &verify_dmc_attenuation, "Verify a DMC + capacitor meets the attenuation spec.",
-        py::arg("dmc_inputs"), py::arg("inductance"), py::arg("capacitance") = 0.0);
-    m.def("propose_dmc_design", &propose_dmc_design, "Propose a DMC L/C pair satisfying the spec.", py::arg("dmc_inputs"));
-    m.def("simulate_dmc_waveforms", &simulate_dmc_waveforms, "Simulate DMC time-domain waveforms.", py::arg("dmc_inputs"), py::arg("inductance"));
-    m.def("generate_dmc_ngspice_circuit", &generate_dmc_ngspice_circuit, "DMC ngspice deck/sim.", py::arg("dmc_inputs"));
+        py::arg("dmc_inputs"), py::arg("inductance"), py::arg("capacitance") = 0.0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("propose_dmc_design", &propose_dmc_design, "Propose a DMC L/C pair satisfying the spec.", py::arg("dmc_inputs"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_dmc_waveforms", &simulate_dmc_waveforms, "Simulate DMC time-domain waveforms.", py::arg("dmc_inputs"), py::arg("inductance"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_dmc_ngspice_circuit", &generate_dmc_ngspice_circuit, "DMC ngspice deck/sim.", py::arg("dmc_inputs"),
+        py::call_guard<py::gil_scoped_release>());
 
     // CMC ngspice sims (design lives in cmc.cpp).
-    m.def("generate_cmc_ngspice_circuit", &generate_cmc_ngspice_circuit, "CMC ngspice deck/sim.", py::arg("cmc_inputs"));
-    m.def("simulate_cmc_lisn_waveforms", &simulate_cmc_lisn_waveforms, "CISPR LISN test sim for a CMC.", py::arg("cmc_inputs"), py::arg("inductance"));
+    m.def("generate_cmc_ngspice_circuit", &generate_cmc_ngspice_circuit, "CMC ngspice deck/sim.", py::arg("cmc_inputs"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_cmc_lisn_waveforms", &simulate_cmc_lisn_waveforms, "CISPR LISN test sim for a CMC.", py::arg("cmc_inputs"), py::arg("inductance"),
+        py::call_guard<py::gil_scoped_release>());
     m.def("simulate_cmc_ideal_waveforms", &simulate_cmc_ideal_waveforms, "CMC operating-point sim (line + switching noise).",
-        py::arg("cmc_inputs"), py::arg("inductance"), py::arg("parasitic_capacitance_pF") = 10.0, py::arg("dvdt_V_per_ns") = 50.0);
+        py::arg("cmc_inputs"), py::arg("inductance"), py::arg("parasitic_capacitance_pF") = 10.0, py::arg("dvdt_V_per_ns") = 50.0,
+        py::call_guard<py::gil_scoped_release>());
 
     // simulate_<topo>_ideal_waveforms
-    m.def("simulate_flyback_ideal_waveforms", &simulate_flyback_ideal_waveforms, "Simulate Flyback ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_flyback_with_magnetic", &simulate_flyback_with_magnetic, "Simulate Flyback with a pre-built magnetic.", py::arg("inputs"), py::arg("magnetic"));
-    m.def("simulate_buck_ideal_waveforms", &simulate_buck_ideal_waveforms, "Simulate Buck ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_boost_ideal_waveforms", &simulate_boost_ideal_waveforms, "Simulate Boost ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_sepic_ideal_waveforms", &simulate_sepic_ideal_waveforms, "Simulate SEPIC ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_cuk_ideal_waveforms", &simulate_cuk_ideal_waveforms, "Simulate Cuk ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_zeta_ideal_waveforms", &simulate_zeta_ideal_waveforms, "Simulate Zeta ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_four_switch_buck_boost_ideal_waveforms", &simulate_four_switch_buck_boost_ideal_waveforms, "Simulate Four-Switch Buck-Boost ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_forward_ideal_waveforms", &simulate_forward_ideal_waveforms, "Simulate Single-Switch Forward ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_two_switch_forward_ideal_waveforms", &simulate_two_switch_forward_ideal_waveforms, "Simulate Two-Switch Forward ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_active_clamp_forward_ideal_waveforms", &simulate_active_clamp_forward_ideal_waveforms, "Simulate Active-Clamp Forward ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_push_pull_ideal_waveforms", &simulate_push_pull_ideal_waveforms, "Simulate Push-Pull ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_isolated_buck_ideal_waveforms", &simulate_isolated_buck_ideal_waveforms, "Simulate Isolated Buck ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_isolated_buck_boost_ideal_waveforms", &simulate_isolated_buck_boost_ideal_waveforms, "Simulate Isolated Buck-Boost ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_weinberg_ideal_waveforms", &simulate_weinberg_ideal_waveforms, "Simulate Weinberg ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_llc_ideal_waveforms", &simulate_llc_ideal_waveforms, "Simulate LLC ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_cllc_ideal_waveforms", &simulate_cllc_ideal_waveforms, "Simulate CLLC ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_clllc_ideal_waveforms", &simulate_clllc_ideal_waveforms, "Simulate CLLLC ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_src_ideal_waveforms", &simulate_src_ideal_waveforms, "Simulate SRC ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_dab_ideal_waveforms", &simulate_dab_ideal_waveforms, "Simulate DAB ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_psfb_ideal_waveforms", &simulate_psfb_ideal_waveforms, "Simulate PSFB ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_pshb_ideal_waveforms", &simulate_pshb_ideal_waveforms, "Simulate PSHB ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_ahb_ideal_waveforms", &simulate_ahb_ideal_waveforms, "Simulate Asymmetric Half-Bridge ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_vienna_ideal_waveforms", &simulate_vienna_ideal_waveforms, "Simulate Vienna Rectifier ideal waveforms.", py::arg("inputs"));
-    m.def("simulate_pfc_waveforms", &simulate_pfc_waveforms, "Simulate PFC waveforms.", py::arg("inputs"));
+    m.def("simulate_flyback_ideal_waveforms", &simulate_flyback_ideal_waveforms, "Simulate Flyback ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_flyback_with_magnetic", &simulate_flyback_with_magnetic, "Simulate Flyback with a pre-built magnetic.", py::arg("inputs"), py::arg("magnetic"),
+        py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_buck_ideal_waveforms", &simulate_buck_ideal_waveforms, "Simulate Buck ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_boost_ideal_waveforms", &simulate_boost_ideal_waveforms, "Simulate Boost ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_sepic_ideal_waveforms", &simulate_sepic_ideal_waveforms, "Simulate SEPIC ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_cuk_ideal_waveforms", &simulate_cuk_ideal_waveforms, "Simulate Cuk ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_zeta_ideal_waveforms", &simulate_zeta_ideal_waveforms, "Simulate Zeta ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_four_switch_buck_boost_ideal_waveforms", &simulate_four_switch_buck_boost_ideal_waveforms, "Simulate Four-Switch Buck-Boost ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_forward_ideal_waveforms", &simulate_forward_ideal_waveforms, "Simulate Single-Switch Forward ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_two_switch_forward_ideal_waveforms", &simulate_two_switch_forward_ideal_waveforms, "Simulate Two-Switch Forward ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_active_clamp_forward_ideal_waveforms", &simulate_active_clamp_forward_ideal_waveforms, "Simulate Active-Clamp Forward ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_push_pull_ideal_waveforms", &simulate_push_pull_ideal_waveforms, "Simulate Push-Pull ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_isolated_buck_ideal_waveforms", &simulate_isolated_buck_ideal_waveforms, "Simulate Isolated Buck ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_isolated_buck_boost_ideal_waveforms", &simulate_isolated_buck_boost_ideal_waveforms, "Simulate Isolated Buck-Boost ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_weinberg_ideal_waveforms", &simulate_weinberg_ideal_waveforms, "Simulate Weinberg ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_llc_ideal_waveforms", &simulate_llc_ideal_waveforms, "Simulate LLC ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_cllc_ideal_waveforms", &simulate_cllc_ideal_waveforms, "Simulate CLLC ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_clllc_ideal_waveforms", &simulate_clllc_ideal_waveforms, "Simulate CLLLC ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_src_ideal_waveforms", &simulate_src_ideal_waveforms, "Simulate SRC ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_dab_ideal_waveforms", &simulate_dab_ideal_waveforms, "Simulate DAB ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_psfb_ideal_waveforms", &simulate_psfb_ideal_waveforms, "Simulate PSFB ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_pshb_ideal_waveforms", &simulate_pshb_ideal_waveforms, "Simulate PSHB ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_ahb_ideal_waveforms", &simulate_ahb_ideal_waveforms, "Simulate Asymmetric Half-Bridge ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_vienna_ideal_waveforms", &simulate_vienna_ideal_waveforms, "Simulate Vienna Rectifier ideal waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
+    m.def("simulate_pfc_waveforms", &simulate_pfc_waveforms, "Simulate PFC waveforms.", py::arg("inputs"), py::call_guard<py::gil_scoped_release>());
 
     // generate_<topo>_ngspice_circuit
-    m.def("generate_flyback_ngspice_circuit", &generate_flyback_ngspice_circuit, "Generate Flyback ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_buck_ngspice_circuit", &generate_buck_ngspice_circuit, "Generate Buck ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_boost_ngspice_circuit", &generate_boost_ngspice_circuit, "Generate Boost ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_sepic_ngspice_circuit", &generate_sepic_ngspice_circuit, "Generate SEPIC ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_forward_ngspice_circuit", &generate_forward_ngspice_circuit, "Generate Single-Switch Forward ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_two_switch_forward_ngspice_circuit", &generate_two_switch_forward_ngspice_circuit, "Generate Two-Switch Forward ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_active_clamp_forward_ngspice_circuit", &generate_active_clamp_forward_ngspice_circuit, "Generate Active-Clamp Forward ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_push_pull_ngspice_circuit", &generate_push_pull_ngspice_circuit, "Generate Push-Pull ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_isolated_buck_ngspice_circuit", &generate_isolated_buck_ngspice_circuit, "Generate Isolated Buck ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_isolated_buck_boost_ngspice_circuit", &generate_isolated_buck_boost_ngspice_circuit, "Generate Isolated Buck-Boost ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_llc_ngspice_circuit", &generate_llc_ngspice_circuit, "Generate LLC ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_cllc_ngspice_circuit", &generate_cllc_ngspice_circuit, "Generate CLLC ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_src_ngspice_circuit", &generate_src_ngspice_circuit, "Generate SRC ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_dab_ngspice_circuit", &generate_dab_ngspice_circuit, "Generate DAB ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_psfb_ngspice_circuit", &generate_psfb_ngspice_circuit, "Generate PSFB ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_cuk_ngspice_circuit", &generate_cuk_ngspice_circuit, "Generate Cuk ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_zeta_ngspice_circuit", &generate_zeta_ngspice_circuit, "Generate Zeta ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_four_switch_buck_boost_ngspice_circuit", &generate_four_switch_buck_boost_ngspice_circuit, "Generate Four-Switch Buck-Boost ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_weinberg_ngspice_circuit", &generate_weinberg_ngspice_circuit, "Generate Weinberg ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_clllc_ngspice_circuit", &generate_clllc_ngspice_circuit, "Generate CLLLC ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_vienna_ngspice_circuit", &generate_vienna_ngspice_circuit, "Generate Vienna Rectifier ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_pshb_ngspice_circuit", &generate_pshb_ngspice_circuit, "Generate PSHB ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_ahb_ngspice_circuit", &generate_ahb_ngspice_circuit, "Generate Asymmetric Half-Bridge ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0);
-    m.def("generate_pfc_ngspice_circuit", &generate_pfc_ngspice_circuit, "Generate PFC ngspice netlist.", py::arg("inputs"), py::arg("dc_resistance") = 0.1, py::arg("simulation_time") = 0.02, py::arg("time_step") = 1e-8);
+    m.def("generate_flyback_ngspice_circuit", &generate_flyback_ngspice_circuit, "Generate Flyback ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_buck_ngspice_circuit", &generate_buck_ngspice_circuit, "Generate Buck ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_boost_ngspice_circuit", &generate_boost_ngspice_circuit, "Generate Boost ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_sepic_ngspice_circuit", &generate_sepic_ngspice_circuit, "Generate SEPIC ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_forward_ngspice_circuit", &generate_forward_ngspice_circuit, "Generate Single-Switch Forward ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_two_switch_forward_ngspice_circuit", &generate_two_switch_forward_ngspice_circuit, "Generate Two-Switch Forward ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_active_clamp_forward_ngspice_circuit", &generate_active_clamp_forward_ngspice_circuit, "Generate Active-Clamp Forward ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_push_pull_ngspice_circuit", &generate_push_pull_ngspice_circuit, "Generate Push-Pull ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_isolated_buck_ngspice_circuit", &generate_isolated_buck_ngspice_circuit, "Generate Isolated Buck ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_isolated_buck_boost_ngspice_circuit", &generate_isolated_buck_boost_ngspice_circuit, "Generate Isolated Buck-Boost ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_llc_ngspice_circuit", &generate_llc_ngspice_circuit, "Generate LLC ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_cllc_ngspice_circuit", &generate_cllc_ngspice_circuit, "Generate CLLC ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_src_ngspice_circuit", &generate_src_ngspice_circuit, "Generate SRC ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_dab_ngspice_circuit", &generate_dab_ngspice_circuit, "Generate DAB ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_psfb_ngspice_circuit", &generate_psfb_ngspice_circuit, "Generate PSFB ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_cuk_ngspice_circuit", &generate_cuk_ngspice_circuit, "Generate Cuk ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_zeta_ngspice_circuit", &generate_zeta_ngspice_circuit, "Generate Zeta ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_four_switch_buck_boost_ngspice_circuit", &generate_four_switch_buck_boost_ngspice_circuit, "Generate Four-Switch Buck-Boost ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_weinberg_ngspice_circuit", &generate_weinberg_ngspice_circuit, "Generate Weinberg ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_clllc_ngspice_circuit", &generate_clllc_ngspice_circuit, "Generate CLLLC ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_vienna_ngspice_circuit", &generate_vienna_ngspice_circuit, "Generate Vienna Rectifier ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_pshb_ngspice_circuit", &generate_pshb_ngspice_circuit, "Generate PSHB ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_ahb_ngspice_circuit", &generate_ahb_ngspice_circuit, "Generate Asymmetric Half-Bridge ngspice netlist.", py::arg("inputs"), py::arg("input_voltage_index") = 0, py::arg("operating_point_index") = 0,
+        py::call_guard<py::gil_scoped_release>());
+    m.def("generate_pfc_ngspice_circuit", &generate_pfc_ngspice_circuit, "Generate PFC ngspice netlist.", py::arg("inputs"), py::arg("dc_resistance") = 0.1, py::arg("simulation_time") = 0.02, py::arg("time_step") = 1e-8,
+        py::call_guard<py::gil_scoped_release>());
 }
 
 } // namespace PyMKF
