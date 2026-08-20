@@ -227,12 +227,19 @@ double calculate_effective_skin_depth(std::string materialName, json currentJson
     return effectiveSkinDepth;
 }
 
-json get_available_core_losses_methods(json magneticJson) {
-    OpenMagnetics::Magnetic magnetic(magneticJson);
-    auto core = magnetic.get_core();
-    auto material = core.get_functional_description().get_material();
-    auto methods = OpenMagnetics::CoreLossesModel::get_methods(material);
+// The question "which core-loss models does this material support?" belongs to the MATERIAL, and
+// MKF answers it for one directly. Only the whole-Magnetic form was bound, so a caller comparing
+// materials — which is when you want to know — had to invent a Magnetic around each one first.
+// tests/test_core.py had a case for this marked
+// xfail("get_core_material_available_losses_methods not implemented in PyOpenMagnetics"); it was
+// right, the binding was simply missing.
+namespace {
 
+// Shared by both overloads below. The material itself cannot be round-tripped through json to
+// share code that way — CoreMaterialDataOrNameUnion has no to_json — so what is shared is the
+// formatting of the answer, not the question.
+template <typename Methods>
+json losses_methods_to_json(const Methods& methods) {
     json result = json::array();
     for (auto& method : methods) {
         json aux;
@@ -240,6 +247,18 @@ json get_available_core_losses_methods(json magneticJson) {
         result.push_back(aux);
     }
     return result;
+}
+
+} // namespace
+
+json get_core_material_available_losses_methods(json materialJson) {
+    return losses_methods_to_json(OpenMagnetics::CoreLossesModel::get_methods(materialJson));
+}
+
+json get_available_core_losses_methods(json magneticJson) {
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    auto material = magnetic.get_core().get_functional_description().get_material();
+    return losses_methods_to_json(OpenMagnetics::CoreLossesModel::get_methods(material));
 }
 
 json calculate_filling_factor(json coilJson) {
@@ -622,6 +641,22 @@ void register_losses_bindings(py::module& m) {
             JSON array of available core losses method names.
         )pbdoc",
         py::arg("magnetic_json"),
+        py::call_guard<py::gil_scoped_release>());
+
+    m.def("get_core_material_available_losses_methods", &get_core_material_available_losses_methods,
+        R"pbdoc(
+        Get available core loss calculation methods for a core MATERIAL.
+
+        The same question as get_available_core_losses_methods, asked of the material itself, so
+        a caller choosing between materials does not have to build a Magnetic around each one.
+
+        Args:
+            material_json: JSON CoreMaterial object, or its name as a string.
+
+        Returns:
+            JSON array of available core losses method names.
+        )pbdoc",
+        py::arg("material_json"),
         py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_filling_factor", &calculate_filling_factor,

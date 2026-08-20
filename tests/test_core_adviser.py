@@ -71,7 +71,6 @@ class TestCoreAdviserBasic:
 class TestCoreAdviserWithDifferentInputs:
     """Test core adviser with various input configurations."""
 
-    @pytest.mark.xfail(reason="C++ library issue with high frequency inputs")
     def test_high_frequency_inputs(self, high_frequency_inputs, balanced_weights, reset_settings):
         """Test core adviser with high frequency (~500kHz) inputs."""
         processed_inputs = PyOpenMagnetics.process_inputs(high_frequency_inputs)

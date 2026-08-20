@@ -142,7 +142,6 @@ class TestCoreMaterialProperties:
         with pytest.raises(PyOpenMagnetics.EngineError, match="STEINMETZ"):
             PyOpenMagnetics.get_core_material_steinmetz_coefficients(material, 100000.0)
 
-    @pytest.mark.xfail(reason="get_core_material_available_losses_methods not implemented in PyOpenMagnetics")
     def test_get_available_losses_methods(self):
         """Should retrieve available loss calculation methods."""
         names = PyOpenMagnetics.get_core_material_names()

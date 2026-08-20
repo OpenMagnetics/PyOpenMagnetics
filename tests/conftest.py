@@ -173,7 +173,13 @@ def transformer_inputs():
 
 @pytest.fixture
 def high_frequency_inputs():
-    """High frequency inputs for filter applications (~500kHz)."""
+    """High frequency inputs for filter applications (~500kHz).
+
+    Carries a voltage as well as a current: core sizing works from the flux the voltage
+    produces, and without one the advisers dereferenced an empty optional (ABT #825).
+    The voltage is not invented, it follows from the inductor: V = L*dI/dt_on, and with
+    L = 10 uH, dI = 5 A pk-pk and t_on = 1 us (D = 0.5 at 500 kHz) that is 50 V.
+    """
     return {
         "designRequirements": {
             "magnetizingInductance": {"nominal": 10e-6},
@@ -193,6 +199,14 @@ def high_frequency_inputs():
                                 "offset": 0,
                                 "peakToPeak": 5
                             }
+                        },
+                        "voltage": {
+                            "processed": {
+                                "dutyCycle": 0.5,
+                                "label": "Rectangular",
+                                "offset": 0,
+                                "peakToPeak": 50
+                            }
                         }
                     }
                 ]
@@ -206,28 +220,49 @@ def flyback_inputs():
     """
     Flyback transformer inputs based on simple_flyback.json test data.
     Two windings with 1:1 turns ratio.
+
+    Two windings means two excitations -- the docstring said so all along while the fixture
+    supplied one, which is the same under-specification transformer_inputs had (ABT #825).
+    Each carries a voltage as well as a current, because core sizing needs the flux the
+    voltage implies. The 500 V pk-pk primary follows from the magnetising inductance:
+    V = L*dI/dt_on with L = 100 uH, dI = 20 A pk-pk and t_on = 4 us (D = 0.4 at 100 kHz).
+    At 1:1 the secondary mirrors it.
     """
+    turns_ratio = 1  # 1:1, so the secondary mirrors the primary
+
+    def winding(current_peak_to_peak, current_offset, voltage_peak_to_peak):
+        return {
+            "frequency": 100000,
+            "current": {
+                "processed": {
+                    "dutyCycle": 0.4,
+                    "label": "Flyback primary",
+                    "offset": current_offset,
+                    "peakToPeak": current_peak_to_peak
+                }
+            },
+            "voltage": {
+                "processed": {
+                    "dutyCycle": 0.4,
+                    "label": "Rectangular",
+                    "offset": 0,
+                    "peakToPeak": voltage_peak_to_peak
+                }
+            }
+        }
+
     return {
         "designRequirements": {
             "magnetizingInductance": {"nominal": 100e-6},
-            "turnsRatios": [{"nominal": 1}]
+            "turnsRatios": [{"nominal": turns_ratio}]
         },
         "operatingPoints": [
             {
                 "name": "Flyback Op Point",
                 "conditions": {"ambientTemperature": 100},
                 "excitationsPerWinding": [
-                    {
-                        "frequency": 100000,
-                        "current": {
-                            "processed": {
-                                "dutyCycle": 0.4,
-                                "label": "Flyback primary",
-                                "offset": 10,
-                                "peakToPeak": 20
-                            }
-                        }
-                    }
+                    winding(20, 10, 500),
+                    winding(20 * turns_ratio, 10 * turns_ratio, 500 / turns_ratio)
                 ]
             }
         ]

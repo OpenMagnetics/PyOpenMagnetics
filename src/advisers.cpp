@@ -2,6 +2,24 @@
 
 namespace PyMKF {
 
+namespace {
+
+// A result's reference is only the lookup key for the per-filter scoring breakdown, and BOTH
+// manufacturerInfo and its reference are optional in MAS. Six result loops dereferenced both
+// unconditionally, so a catalogue entry carrying no reference killed the whole call with an
+// anonymous "bad optional access" — at the very end, after every candidate had already been
+// advised and scored. (One of the six did not even use the value it dereferenced; that line is
+// gone.) An absent reference is not an error, it just means there is no per-filter breakdown to
+// attach to that result.
+std::optional<std::string> magnetic_reference(const OpenMagnetics::Magnetic& magnetic) {
+    if (!magnetic.get_manufacturer_info()) {
+        return std::nullopt;
+    }
+    return magnetic.get_manufacturer_info()->get_reference();
+}
+
+} // namespace
+
 json calculate_advised_cores(json inputsJson, json weightsJson, int maximumNumberResults, json coreModeJson) {
     OpenMagnetics::Inputs inputs(inputsJson);
     OpenMagnetics::CoreAdviser::CoreAdviserModes coreMode;
@@ -28,15 +46,15 @@ json calculate_advised_cores(json inputsJson, json weightsJson, int maximumNumbe
     json results = json();
     results["data"] = json::array();
     for (auto& [masMagnetic, scoring] : masMagnetics) {
-        std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+        auto name = magnetic_reference(masMagnetic.get_magnetic());
         json result;
         json masJson;
         to_json(masJson, masMagnetic);
         result["mas"] = masJson;
         result["scoring"] = scoring;
-        if (scoringsPerFilter.count(name)) {
+        if (name && scoringsPerFilter.count(*name)) {
             json filterScorings;
-            for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+            for (auto& [filter, filterScore] : scoringsPerFilter[*name]) {
                 filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
             }
             result["scoringPerFilter"] = filterScorings;
@@ -67,15 +85,15 @@ json calculate_advised_magnetics(json inputsJson, int maximumNumberResults, json
     json results = json();
     results["data"] = json::array();
     for (auto& [masMagnetic, scoring] : masMagnetics) {
-        std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+        auto name = magnetic_reference(masMagnetic.get_magnetic());
         json result;
         json masJson;
         to_json(masJson, masMagnetic);
         result["mas"] = masJson;
         result["scoring"] = scoring;
-        if (scoringsPerFilter.count(name)) {
+        if (name && scoringsPerFilter.count(*name)) {
             json filterScorings;
-            for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+            for (auto& [filter, filterScore] : scoringsPerFilter[*name]) {
                 filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
             }
             result["scoringPerFilter"] = filterScorings;
@@ -115,15 +133,15 @@ json calculate_advised_magnetics_with_filters(json inputsJson, json filterFlowJs
     json results = json();
     results["data"] = json::array();
     for (auto& [masMagnetic, scoring] : masMagnetics) {
-        std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+        auto name = magnetic_reference(masMagnetic.get_magnetic());
         json result;
         json masJson;
         to_json(masJson, masMagnetic);
         result["mas"] = masJson;
         result["scoring"] = scoring;
-        if (scoringsPerFilter.count(name)) {
+        if (name && scoringsPerFilter.count(*name)) {
             json filterScorings;
-            for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+            for (auto& [filter, filterScore] : scoringsPerFilter[*name]) {
                 filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
             }
             result["scoringPerFilter"] = filterScorings;
@@ -150,7 +168,6 @@ json calculate_advised_magnetics_fast(json inputsJson, int maximumNumberResults,
     json results = json();
     results["data"] = json::array();
     for (auto& [masMagnetic, scoring] : masMagnetics) {
-        std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
         json result;
         json masJson;
         to_json(masJson, masMagnetic);
@@ -182,15 +199,15 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
     json results = json();
     results["data"] = json::array();
     for (auto& [masMagnetic, scoring] : masMagnetics) {
-        std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+        auto name = magnetic_reference(masMagnetic.get_magnetic());
         json result;
         json masJson;
         to_json(masJson, masMagnetic);
         result["mas"] = masJson;
         result["scoring"] = scoring;
-        if (scoringsPerFilter.count(name)) {
+        if (name && scoringsPerFilter.count(*name)) {
             json filterScorings;
-            for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+            for (auto& [filter, filterScore] : scoringsPerFilter[*name]) {
                 filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
             }
             result["scoringPerFilter"] = filterScorings;
@@ -227,15 +244,15 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
     json results = json();
     results["data"] = json::array();
     for (auto& [masMagnetic, scoring] : masMagnetics) {
-        std::string name = masMagnetic.get_magnetic().get_manufacturer_info().value().get_reference().value();
+        auto name = magnetic_reference(masMagnetic.get_magnetic());
         json result;
         json masJson;
         to_json(masJson, masMagnetic);
         result["mas"] = masJson;
         result["scoring"] = scoring;
-        if (scoringsPerFilter.count(name)) {
+        if (name && scoringsPerFilter.count(*name)) {
             json filterScorings;
-            for (auto& [filter, filterScore] : scoringsPerFilter[name]) {
+            for (auto& [filter, filterScore] : scoringsPerFilter[*name]) {
                 filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
             }
             result["scoringPerFilter"] = filterScorings;

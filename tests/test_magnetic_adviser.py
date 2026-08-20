@@ -125,7 +125,6 @@ class TestMagneticAdviserInputTypes:
         
         assert isinstance(results, list)
 
-    @pytest.mark.xfail(reason="C++ library may have issues with high frequency inputs")
     def test_with_high_frequency_inputs(self, high_frequency_inputs, reset_settings):
         """
         Test magnetic adviser with high frequency (~500kHz) inputs.
@@ -188,7 +187,6 @@ class TestMagneticAdviserFiltering:
 class TestMagneticAdviserFromCatalog:
     """Test magnetic adviser from component catalog."""
 
-    @pytest.mark.skip(reason="C++ library crashes with empty catalog - access violation")
     def test_from_catalog_with_empty_catalog(self, inductor_inputs, reset_settings):
         """
         Test magnetic adviser from catalog with empty catalog.
@@ -202,7 +200,6 @@ class TestMagneticAdviserFromCatalog:
         # Should return empty or error gracefully
         assert isinstance(result_data, (dict, str, list))
 
-    @pytest.mark.xfail(reason="Requires valid magnetic catalog data")
     def test_from_catalog_with_magnetics(self, inductor_inputs, reset_settings):
         """
         Test magnetic adviser from catalog with actual magnetic components.
@@ -213,7 +210,11 @@ class TestMagneticAdviserFromCatalog:
         # Create a simple magnetic catalog entry
         catalog = [
             {
+                # manufacturerInfo.name is required, and the coil needs a bobbin: without
+                # either, the call dies with a raw '[json.exception.out_of_range.403] key
+                # 'name'/'bobbin' not found' that names no object (ABT #829).
                 "manufacturerInfo": {
+                    "name": "Test Manufacturer",
                     "reference": "TEST_MAGNETIC_001"
                 },
                 "core": {
@@ -228,6 +229,7 @@ class TestMagneticAdviserFromCatalog:
                     }
                 },
                 "coil": {
+                    "bobbin": "Basic",
                     "functionalDescription": [
                         {
                             "name": "Primary",

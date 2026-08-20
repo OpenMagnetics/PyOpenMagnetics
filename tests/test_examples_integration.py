@@ -293,9 +293,20 @@ class TestBuckInductorWorkflow:
         assert "operatingPoints" in inputs
         assert len(inputs["operatingPoints"]) > 0
     
-    @pytest.mark.skip(reason="Core adviser may timeout in CI environments")
-    def test_get_advised_cores(self):
-        """Test core adviser (skipped by default - long running)."""
+    def test_calculate_advised_cores(self):
+        """Test the core adviser end to end.
+
+        This was skipped as "Core adviser may timeout in CI environments", which was not
+        why it could not run: it called PyOpenMagnetics.get_advised_cores, a function that
+        does not exist, so it would have failed instantly with AttributeError rather than
+        timing out. The real entry point is calculate_advised_cores(inputs, weights,
+        maximum_results, mode), it needs inputs that have been through process_inputs, and
+        the excitation needs a voltage as well as a current because core sizing works from
+        the flux the voltage produces (ABT #825).
+
+        It is genuinely slow -- the adviser sweeps the core catalogue -- which is the real
+        version of the concern the old marker was gesturing at. See ABT #828.
+        """
         inputs = {
             "designRequirements": {
                 "magnetizingInductance": {"nominal": 100e-6},
@@ -303,15 +314,24 @@ class TestBuckInductorWorkflow:
             },
             "operatingPoints": [
                 {
+                    "name": "Nominal",
                     "conditions": {"ambientTemperature": 25},
                     "excitationsPerWinding": [
-                        {"frequency": 100000, "current": {"processed": {"peakToPeak": 2, "offset": 5}}}
+                        {
+                            "frequency": 100000,
+                            "current": {"processed": {"dutyCycle": 0.5, "label": "Triangular",
+                                                      "offset": 5, "peakToPeak": 2}},
+                            "voltage": {"processed": {"dutyCycle": 0.5, "label": "Rectangular",
+                                                      "offset": 0, "peakToPeak": 100}}
+                        }
                     ]
                 }
             ]
         }
-        
-        cores = PyOpenMagnetics.get_advised_cores(inputs, maximum_number_results=3)
+
+        processed_inputs = PyOpenMagnetics.process_inputs(inputs)
+        cores = PyOpenMagnetics.calculate_advised_cores(
+            processed_inputs, {"COST": 1, "EFFICIENCY": 1, "DIMENSIONS": 1}, 3, "available cores")
         assert cores is not None
 
 

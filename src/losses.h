@@ -29,6 +29,7 @@ double calculate_effective_skin_depth(std::string materialName, json currentJson
 
 // Additional loss functions
 json get_available_core_losses_methods(json magneticJson);
+json get_core_material_available_losses_methods(json materialJson);
 json calculate_filling_factor(json coilJson);
 json calculate_ac_resistance_coefficients_per_winding(json magneticJson, double temperature, double frequency);
 
