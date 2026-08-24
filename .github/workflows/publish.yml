@@ -206,6 +206,17 @@ jobs:
           CIBW_SKIP: "*-win32 *-manylinux_i686 *musllinux* pp*"
           CIBW_BEFORE_ALL_WINDOWS: git config --global url."https://github.com/".insteadOf "git@github.com:" && npm install -g quicktype@23.2.6
           CIBW_BEFORE_BUILD: pip install --default-timeout=60 --retries 5 scikit-build-core "cmake<4" ninja pybind11
+          # cibuildwheel 3.0 started running `delvewheel repair` on Windows by
+          # default; 2.21.3 did no Windows repair at all. delvewheel resolves an
+          # extension's dependent DLLs via PATH, and kirchhoffapi.dll is built by
+          # the Kirchhoff ExternalProject and shipped INSIDE the package rather
+          # than installed system-wide -- so the repair aborts with "Unable to
+          # find library: kirchhoffapi.dll" and every Windows wheel fails,
+          # cp310 included. Empty = keep the behaviour that shipped every
+          # Windows wheel up to 1.7.5; scikit-build-core already places the DLL
+          # next to the extension. Bundling it via delvewheel --add-path is the
+          # follow-up, not a prerequisite for 3.14 support.
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: ""
           CIBW_TEST_COMMAND: python -c "import PyOpenMagnetics; print(f'PyOpenMagnetics loaded successfully with {len(dir(PyOpenMagnetics))} functions')"
 
       - name: Install twine
