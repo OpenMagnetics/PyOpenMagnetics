@@ -142,7 +142,7 @@ if(NOT LOCAL_MKF_MAS)
     set(MKF_GIT_TAG "main"
         CACHE STRING "MKF git ref for the vendored PyOM build")
     # Force fresh clone by using a unique timestamp - update this when the pin changes
-    set(MKF_FORCE_REFRESH "2026-08-23-v1.7.4-mkf-479170ce")
+    set(MKF_FORCE_REFRESH "2026-08-24-v1.7.5-mkf-25069e00")
     # Tell MKF to disable matplotplusplus and use SVG-based Painter instead
     set(INCLUDE_PYMKF ON CACHE BOOL "Build Python interface" FORCE)
     # GIT_SUBMODULES_RECURSE pulls in CAS/PEAS (added 2026-04 alongside the
@@ -166,7 +166,7 @@ if(NOT LOCAL_MKF_MAS)
     # Skip Git LFS to avoid bandwidth quota issues - data files are optional for build
     set(ENV{GIT_LFS_SKIP_SMUDGE} "1")
     # Force fresh clone by using a unique timestamp - update this when MAS changes
-    set(MAS_FORCE_REFRESH "2026-08-14-v1.7.0-mas-934d1392")
+    set(MAS_FORCE_REFRESH "2026-08-24-v1.7.5-mas-a24e724")
     FetchContent_Declare(
            mas
            GIT_REPOSITORY https://github.com/OpenMagnetics/MAS.git
