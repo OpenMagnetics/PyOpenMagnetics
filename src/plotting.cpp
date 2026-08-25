@@ -320,14 +320,47 @@ json plot_temperature_field(json magneticJson, json operatingPointJson, std::str
         OpenMagnetics::Magnetic magnetic(magneticJson);
         OperatingPoint operatingPoint(operatingPointJson);
 
-        OpenMagnetics::Temperature temperatureModel(magnetic);
+        // For toroidal cores, ensure the coil is wound (turn nodes need positions)
+        if (magnetic.get_core().get_shape_family() == CoreShapeFamily::T) {
+            auto coil = magnetic.get_mutable_coil();
+            if (!coil.get_turns_description() || coil.get_turns_description()->empty()) {
+                coil.wind();
+                magnetic.set_coil(coil);
+            }
+        }
+
+        double ambientTemp = operatingPoint.get_conditions().get_ambient_temperature();
+
+        // Simulate the operating point to get the losses that power the thermal
+        // network — a default-constructed Temperature(magnetic) solves an UNPOWERED
+        // network at the default 25 C ambient and paints everything stone cold
+        // (ABT #906). This mirrors the WASM wrapper in WebLibMKF.
+        OpenMagnetics::MagneticSimulator magneticSimulator;
+        OpenMagnetics::Mas mas;
+        mas.set_magnetic(magnetic);
+        mas.get_mutable_inputs().set_operating_points({operatingPoint});
+        auto simulatedMas = magneticSimulator.simulate(mas);
+
+        OpenMagnetics::TemperatureConfig config;
+        config.ambientTemperature = ambientTemp;
+        config.plotSchematic = false;
+        if (!simulatedMas.get_outputs().empty()) {
+            auto outputs = simulatedMas.get_outputs()[0];
+            if (outputs.get_core_losses().has_value()) {
+                config.coreLosses = outputs.get_core_losses().value().get_core_losses();
+            }
+            if (outputs.get_winding_losses().has_value()) {
+                config.windingLosses = outputs.get_winding_losses().value().get_winding_losses();
+                config.windingLossesOutput = outputs.get_winding_losses().value();
+            }
+        }
+
+        OpenMagnetics::Temperature temperatureModel(magnetic, config);
         auto thermalResult = temperatureModel.calculateTemperatures();
 
         std::filesystem::path filePath = outputPath.empty()
             ? std::filesystem::temp_directory_path() / "pyom_plot_temperature_field.svg"
             : std::filesystem::path(outputPath);
-
-        double ambientTemp = operatingPoint.get_conditions().get_ambient_temperature();
         OpenMagnetics::Painter painter(filePath);
         painter.paint_temperature_field(magnetic, thermalResult.nodeTemperatures, true,
             OpenMagnetics::ColorPalette::BLUE_TO_RED, ambientTemp, textColor, bgColor);
