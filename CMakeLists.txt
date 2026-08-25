@@ -142,7 +142,7 @@ if(NOT LOCAL_MKF_MAS)
     set(MKF_GIT_TAG "main"
         CACHE STRING "MKF git ref for the vendored PyOM build")
     # Force fresh clone by using a unique timestamp - update this when the pin changes
-    set(MKF_FORCE_REFRESH "2026-08-24-v1.7.5-mkf-25069e00")
+    set(MKF_FORCE_REFRESH "2026-08-26-mkf-10abe8d7")
     # Tell MKF to disable matplotplusplus and use SVG-based Painter instead
     set(INCLUDE_PYMKF ON CACHE BOOL "Build Python interface" FORCE)
     # GIT_SUBMODULES_RECURSE pulls in CAS/PEAS (added 2026-04 alongside the

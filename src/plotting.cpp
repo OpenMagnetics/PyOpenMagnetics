@@ -340,20 +340,13 @@ json plot_temperature_field(json magneticJson, json operatingPointJson, std::str
         mas.set_magnetic(magnetic);
         mas.get_mutable_inputs().set_operating_points({operatingPoint});
         auto simulatedMas = magneticSimulator.simulate(mas);
-
-        OpenMagnetics::TemperatureConfig config;
-        config.ambientTemperature = ambientTemp;
-        config.plotSchematic = false;
-        if (!simulatedMas.get_outputs().empty()) {
-            auto outputs = simulatedMas.get_outputs()[0];
-            if (outputs.get_core_losses().has_value()) {
-                config.coreLosses = outputs.get_core_losses().value().get_core_losses();
-            }
-            if (outputs.get_winding_losses().has_value()) {
-                config.windingLosses = outputs.get_winding_losses().value().get_winding_losses();
-                config.windingLossesOutput = outputs.get_winding_losses().value();
-            }
+        if (simulatedMas.get_outputs().empty()) {
+            throw std::runtime_error("plot_temperature_field: simulation produced no outputs");
         }
+
+        // Shared config builder (ABT #906): the same configuration MagneticSimulator uses
+        // for outputs[].temperature, so this plot and the exported MAS can never disagree.
+        auto config = OpenMagnetics::TemperatureConfig::fromSimulatedOutput(operatingPoint, simulatedMas.get_outputs()[0]);
 
         OpenMagnetics::Temperature temperatureModel(magnetic, config);
         auto thermalResult = temperatureModel.calculateTemperatures();
