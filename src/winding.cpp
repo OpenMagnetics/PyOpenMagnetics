@@ -117,7 +117,14 @@ json wind(json coilJson, size_t repetitions, json proportionPerWindingJson, json
     }
 
     if (!coil.get_turns_description()) {
-        throw std::runtime_error("Turns not created");
+        // ABT #930: "Turns not created" on its own cannot be acted on — it reads as a broken
+        // winder even when MKF is correctly refusing an impossible geometry (a 0.36 mm conductor
+        // asked into a 0.10 mm annulus). MKF now records why; pass it on.
+        const auto& reason = coil.get_last_fit_failure();
+        throw std::runtime_error(reason.empty()
+            ? std::string("Turns not created: the winding does not fit its window, and the reason "
+                          "could not be narrowed further.")
+            : "Turns not created. " + reason);
     }
 
     json result;
@@ -136,7 +143,12 @@ json wind_planar(json coilJson, json stackUpJson, double borderToWireDistance, j
     coil.wind_planar(stackUp, borderToWireDistance, wireToWireDistance, insulationThickness, coreToLayerDistance);
 
     if (!coil.get_turns_description()) {
-        throw std::runtime_error("Turns not created");
+        // ABT #930: same as wind() above — say why, not just that.
+        const auto& reason = coil.get_last_fit_failure();
+        throw std::runtime_error(reason.empty()
+            ? std::string("Turns not created: the planar winding does not fit its window, and the "
+                          "reason could not be narrowed further.")
+            : "Turns not created. " + reason);
     }
 
     return coil;
