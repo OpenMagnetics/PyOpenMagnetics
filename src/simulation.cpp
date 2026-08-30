@@ -7,9 +7,7 @@ json simulate(json inputsJson, json magneticJson, json modelsData) {
     OpenMagnetics::Magnetic magnetic(magneticJson);
     
     auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-    if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
-        OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
-    }
+    find_reluctance_model(modelsData, reluctanceModelName);
     auto coreLossesModelName = OpenMagnetics::defaults.coreLossesModelDefault;
     if (!modelsData.is_null() && modelsData.find("coreLosses") != modelsData.end()) {
         OpenMagnetics::from_json(modelsData["coreLosses"], coreLossesModelName);
@@ -145,9 +143,7 @@ json calculate_inductance_matrix(json magneticJson, double frequency, json model
     OpenMagnetics::Magnetic magnetic(magneticJson);
     
     auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-    if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
-        OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
-    }
+    find_reluctance_model(modelsData, reluctanceModelName);
 
     OpenMagnetics::Inductance inductance(reluctanceModelName);
     auto inductanceMatrix = inductance.calculate_inductance_matrix(magnetic, frequency);
@@ -313,9 +309,7 @@ json calculate_coupling_coefficient_matrix(json magneticJson, double frequency, 
     OpenMagnetics::Magnetic magnetic(magneticJson);
 
     auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-    if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
-        OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
-    }
+    find_reluctance_model(modelsData, reluctanceModelName);
 
     OpenMagnetics::Inductance inductance(reluctanceModelName);
 
@@ -352,9 +346,7 @@ json calculate_leakage_inductance_matrix(json magneticJson, double frequency, js
     OpenMagnetics::Magnetic magnetic(magneticJson);
 
     auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-    if (!modelsData.is_null() && modelsData.find("reluctance") != modelsData.end()) {
-        OpenMagnetics::from_json(modelsData["reluctance"], reluctanceModelName);
-    }
+    find_reluctance_model(modelsData, reluctanceModelName);
 
     OpenMagnetics::Inductance inductance(reluctanceModelName);
     auto leakageInductanceMatrix = inductance.calculate_leakage_inductance_matrix(magnetic, frequency);

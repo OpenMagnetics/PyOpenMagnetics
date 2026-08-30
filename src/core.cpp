@@ -290,11 +290,7 @@ double calculate_inductance_from_number_turns_and_gapping(json coreData, json co
     std::map<std::string, std::string> models = modelsData.get<std::map<std::string, std::string>>();
 
     auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-    if (models.find("reluctance") != models.end()) {
-        std::string modelNameJsonUpper = models["reluctance"];
-        std::transform(modelNameJsonUpper.begin(), modelNameJsonUpper.end(), modelNameJsonUpper.begin(), ::toupper);
-        reluctanceModelName = magic_enum::enum_cast<OpenMagnetics::ReluctanceModels>(modelNameJsonUpper).value();
-    }
+    find_reluctance_model(models, reluctanceModelName);
 
     OpenMagnetics::MagnetizingInductance magnetizingInductanceObj(reluctanceModelName);
     double magnetizingInductance = magnetizingInductanceObj.calculate_inductance_from_number_turns_and_gapping(core, coil, &operatingPoint).get_magnetizing_inductance().get_nominal().value();
@@ -310,9 +306,7 @@ double calculate_number_turns_from_gapping_and_inductance(json coreData, json co
     std::map<std::string, std::string> models = modelsData.get<std::map<std::string, std::string>>();
 
     auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-    if (models.find("reluctance") != models.end()) {
-        OpenMagnetics::from_json(models["reluctance"], reluctanceModelName);
-    }
+    find_reluctance_model(models, reluctanceModelName);
 
     OpenMagnetics::MagnetizingInductance magnetizingInductanceObj(reluctanceModelName);
     double numberTurns = magnetizingInductanceObj.calculate_number_turns_from_gapping_and_inductance(core, coil, &inputs);
@@ -331,9 +325,7 @@ double calculate_number_turns_from_gapping_and_inductance_legacy(json coreData, 
     std::map<std::string, std::string> models = modelsData.get<std::map<std::string, std::string>>();
 
     auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-    if (models.find("reluctance") != models.end()) {
-        OpenMagnetics::from_json(models["reluctance"], reluctanceModelName);
-    }
+    find_reluctance_model(models, reluctanceModelName);
 
     OpenMagnetics::MagnetizingInductance magnetizingInductanceObj(reluctanceModelName);
     double numberTurns = magnetizingInductanceObj.calculate_number_turns_from_gapping_and_inductance(core, &inputs);
@@ -351,9 +343,7 @@ json calculate_gapping_from_number_turns_and_inductance(json coreData, json coil
     OpenMagnetics::GappingType gappingType = magic_enum::enum_cast<OpenMagnetics::GappingType>(gappingTypeJson).value();
     
     auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-    if (models.find("reluctance") != models.end()) {
-        OpenMagnetics::from_json(models["reluctance"], reluctanceModelName);
-    }
+    find_reluctance_model(models, reluctanceModelName);
 
     OpenMagnetics::MagnetizingInductance magnetizingInductanceObj(reluctanceModelName);
     std::vector<CoreGap> gapping = magnetizingInductanceObj.calculate_gapping_from_number_turns_and_inductance(core, coil, &inputs, gappingType, decimals);
@@ -1003,7 +993,8 @@ void register_core_bindings(py::module& m) {
             core_data: JSON object with core specification.
             coil_data: JSON object with coil specification (for turns).
             operating_point_data: JSON operating point for DC bias consideration.
-            models_data: JSON dict with "reluctance" model selection.
+            models_data: JSON dict with "reluctance" (or MKF's own spelling,
+                "gapReluctance" -- both accepted) model selection.
         
         Returns:
             Magnetizing inductance in Henries.
@@ -1021,7 +1012,8 @@ void register_core_bindings(py::module& m) {
             core_data: JSON object with core specification.
             coil_data: JSON object with coil/winding specification.
             inputs_data: JSON Inputs with magnetizingInductance requirement.
-            models_data: JSON dict with "reluctance" model selection.
+            models_data: JSON dict with "reluctance" (or MKF's own spelling,
+                "gapReluctance" -- both accepted) model selection.
 
         Returns:
             Required number of turns (may be non-integer).
@@ -1043,7 +1035,8 @@ void register_core_bindings(py::module& m) {
         Args:
             core_data: JSON object with core specification.
             inputs_data: JSON Inputs with magnetizingInductance requirement.
-            models_data: JSON dict with "reluctance" model selection.
+            models_data: JSON dict with "reluctance" (or MKF's own spelling,
+                "gapReluctance" -- both accepted) model selection.
 
         Returns:
             Required number of turns (may be non-integer).
@@ -1063,7 +1056,8 @@ void register_core_bindings(py::module& m) {
             inputs_data: JSON Inputs with magnetizingInductance requirement.
             gapping_type_json: Gap type ("SUBTRACTIVE", "ADDITIVE", "DISTRIBUTED").
             decimals: Precision in decimal places for gap length.
-            models_data: JSON dict with "reluctance" model selection.
+            models_data: JSON dict with "reluctance" (or MKF's own spelling,
+                "gapReluctance" -- both accepted) model selection.
         
         Returns:
             JSON Core object with updated gapping configuration.

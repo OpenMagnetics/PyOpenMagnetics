@@ -18,9 +18,7 @@ json calculate_core_losses(json coreData, json coilData, json inputsData, json m
     std::map<std::string, std::string> models = modelsData.get<std::map<std::string, std::string>>();
 
     auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
-    if (models.find("reluctance") != models.end()) {
-        OpenMagnetics::from_json(models["reluctance"], reluctanceModelName);
-    }
+    find_reluctance_model(models, reluctanceModelName);
     auto coreLossesModelName = OpenMagnetics::defaults.coreLossesModelDefault;
     if (models.find("coreLosses") != models.end()) {
         OpenMagnetics::from_json(models["coreLosses"], coreLossesModelName);
@@ -315,7 +313,7 @@ void register_losses_bindings(py::module& m) {
             inputs_data: JSON object with operating points (frequency, flux density).
             models_data: JSON dict specifying models to use:
                 - "coreLosses": "STEINMETZ", "IGSE", "MSE", "BARG", "ROSHEN", "PROPRIETARY"
-                - "reluctance": "ZHANG", "MUEHLETHALER", "PARTRIDGE", "STENGLEIN"
+                - "reluctance" (alias "gapReluctance"): "ZHANG", "MUEHLETHALER", "PARTRIDGE", "STENGLEIN"
         
         Returns:
             JSON object containing:
