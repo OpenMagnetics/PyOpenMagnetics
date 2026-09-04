@@ -1,4 +1,5 @@
 #include "core.h"
+#include "constructive_models/CorePiece.h"
 #include "physical_models/ComplexPermeability.h"
 #include <filesystem>
 
@@ -119,6 +120,22 @@ json calculate_core_geometrical_description(json coreDataJson) {
         json aux;
         to_json(aux, elem);
         result.push_back(aux);
+    }
+    return result;
+}
+
+// ABT #1002: the IEC shape constants of a moulded body split per region (post, cover, base),
+// so a material fit can attribute each region's reluctance to the powder pressed there.
+json calculate_core_region_shape_constants(json coreDataJson) {
+    OpenMagnetics::Core core(coreDataJson, false, false, false);
+    auto corePiece = OpenMagnetics::CorePiece::factory(core.resolve_shape());
+    auto regions = corePiece->get_region_shape_constants();
+    if (!regions) {
+        throw std::invalid_argument("this shape family does not expose per-region shape constants");
+    }
+    json result = json::array();
+    for (auto& region : *regions) {
+        result.push_back({{"name", region.name}, {"c1", region.c1}, {"c2", region.c2}, {"minimumArea", region.minimumArea}});
     }
     return result;
 }
@@ -775,6 +792,25 @@ void register_core_bindings(py::module& m) {
         py::arg("core_data_json"),
         py::call_guard<py::gil_scoped_release>());
     
+    m.def("calculate_core_region_shape_constants", &calculate_core_region_shape_constants,
+        R"pbdoc(
+        Per-region IEC shape constants of a moulded body (ABT #1002).
+
+        A compression-moulded body can be pressed from up to three powders: the post the coil
+        sits on, the cover over the coil and the base plate under it. This returns the IEC 60205
+        section sums of each region, in the order functionalDescription.material lists the grades
+        ([post, cover, base]), so a material fit can attribute each region's reluctance to the
+        powder pressed there: R_region = c1 / (mu0 * mu_region), Ae_region = c1 / c2.
+
+        Args:
+            core_data_json: JSON object with functionalDescription (shape family 'molded').
+
+        Returns:
+            JSON array of {name, c1, c2, minimumArea}. Raises for families without regions.
+        )pbdoc",
+        py::arg("core_data_json"),
+        py::call_guard<py::gil_scoped_release>());
+
     m.def("calculate_core_geometrical_description", &calculate_core_geometrical_description,
         R"pbdoc(
         Calculate geometrical description for core visualization.

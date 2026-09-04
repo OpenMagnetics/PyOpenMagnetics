@@ -32,6 +32,7 @@ json get_available_cores();
 json calculate_core_data(json coreDataJson, bool includeMaterialData);
 json calculate_core_processed_description(json coreDataJson);
 json calculate_core_geometrical_description(json coreDataJson);
+json calculate_core_region_shape_constants(json coreDataJson);
 json calculate_core_gapping(json coreDataJson);
 json load_core_data(json coresJson);
 json get_core_temperature_dependant_parameters(json coreData, double temperature);
