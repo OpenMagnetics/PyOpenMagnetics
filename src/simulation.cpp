@@ -215,17 +215,17 @@ json calculate_maxwell_capacitance_matrix(json coilJson, json capacitanceAmongWi
     return result;
 }
 
-json sweep_impedance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, std::string mode, std::string title) {
+json sweep_impedance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, std::string mode, std::string title, bool fast_capacitance) {
     OpenMagnetics::Magnetic magnetic(magneticJson);
-    auto result = OpenMagnetics::Sweeper::sweep_impedance_over_frequency(magnetic, start, stop, numberElements, mode, title);
+    auto result = OpenMagnetics::Sweeper::sweep_impedance_over_frequency(magnetic, start, stop, numberElements, mode, title, /*fast=*/true, fast_capacitance);
     json resultJson;
     to_json(resultJson, result);
     return resultJson;
 }
 
-json sweep_common_mode_impedance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, std::string mode, std::string title) {
+json sweep_common_mode_impedance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, std::string mode, std::string title, bool fast_capacitance) {
     OpenMagnetics::Magnetic magnetic(magneticJson);
-    auto result = OpenMagnetics::Sweeper::sweep_common_mode_impedance_over_frequency(magnetic, start, stop, numberElements, mode, title);
+    auto result = OpenMagnetics::Sweeper::sweep_common_mode_impedance_over_frequency(magnetic, start, stop, numberElements, mode, title, fast_capacitance);
     json resultJson;
     to_json(resultJson, result);
     return resultJson;
@@ -632,7 +632,12 @@ void register_simulation_bindings(py::module& m) {
         py::arg("number_elements"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep impedance over a frequency range.",
+        py::arg("fast_capacitance") = false,
+        "Sweep impedance over a frequency range. fast_capacitance selects the one-layer stray\n"
+        "capacitance model instead of the full per-turn energy sum. The full model winds the coil\n"
+        "and raises when the winder places no turns (ABT #850), so a part whose wire does not fit\n"
+        "its bore can only be swept with fast_capacitance=True -- an explicit choice, never a\n"
+        "silent fallback.",
         py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_common_mode_impedance_over_frequency", &sweep_common_mode_impedance_over_frequency,
@@ -642,6 +647,7 @@ void register_simulation_bindings(py::module& m) {
         py::arg("number_elements"),
         py::arg("mode"),
         py::arg("title"),
+        py::arg("fast_capacitance") = false,
         "Sweep common-mode impedance (all windings driven in parallel — the CMC datasheet CM measurement; magnetizing tank only, no leakage resonance) over a frequency range.",
         py::call_guard<py::gil_scoped_release>());
 
