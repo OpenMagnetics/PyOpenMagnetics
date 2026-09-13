@@ -479,6 +479,11 @@ target_link_libraries(PyOpenMagnetics PUBLIC data::data)
 cmrc_add_resource_library(core_losses_data ALIAS data::core_losses_data NAMESPACE coreLossesData ${MKF_DIR}/src/data/core_losses/ciGSE_coefficients.json)
 target_link_libraries(PyOpenMagnetics PUBLIC data::core_losses_data)
 
+# ABT #1177 (MKF WP8): the design-for-manufacturing rule numbers and their sources. MKF opens it
+# as "src/data/dfm_rules.json", hence WHENCE the MKF root (as for the insulation standards).
+cmrc_add_resource_library(dfm_rules ALIAS data::dfm_rules NAMESPACE dfmData WHENCE ${MKF_DIR}/ ${MKF_DIR}/src/data/dfm_rules.json)
+target_link_libraries(PyOpenMagnetics PUBLIC data::dfm_rules)
+
 include_directories("${CMAKE_BINARY_DIR}/_deps/json-src/include/nlohmann/")
 include_directories("${CMAKE_BINARY_DIR}/_deps/pybind11-src/include/")
 include_directories("${CMAKE_BINARY_DIR}/_deps/pybind11_json-src/include/pybind11_json/")

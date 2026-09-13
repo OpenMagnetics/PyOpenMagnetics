@@ -267,6 +267,15 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
     return results;
 }
 
+json calculate_manufacturability_report(json masJson) {
+    OpenMagnetics::Mas mas(masJson);
+    OpenMagnetics::Manufacturability manufacturability;
+    auto report = manufacturability.calculate_report(mas);
+    json result;
+    OpenMagnetics::to_json(result, report);
+    return result;
+}
+
 json calculate_advised_sections(json masJson, json patternJson, int repetitions) {
     OpenMagnetics::Mas mas(masJson);
     std::vector<size_t> pattern;
@@ -512,6 +521,38 @@ void register_adviser_bindings(py::module& m) {
             Raises PyOpenMagnetics.EngineError if the cache is empty.
         )pbdoc",
         py::arg("inputs_json"), py::arg("filter_flow_json"), py::arg("max_results"),
+        py::call_guard<py::gil_scoped_release>());
+
+    m.def("calculate_manufacturability_report", &calculate_manufacturability_report,
+        R"pbdoc(
+        Run the design-for-manufacturing rule pack over a MAS design.
+
+        Encodes as checks the public Wuerth Elektronik DFM guidance (ABT #1177, WP8). The rule
+        numbers and the source that states each of them live in MKF's src/data/dfm_rules.json.
+        Nothing in the design is changed; this is a report.
+
+        Args:
+            mas: A full MAS object (inputs + magnetic).
+
+        Returns:
+            JSON object with:
+            - "findings": one entry per rule R1..R17, each with "ruleId", "title", "status",
+              "message", "source", and where they exist "measuredValue", "thresholdValue",
+              "unit", "scope", "reason".
+            - "numberPass" / "numberWarnings" / "numberFails" / "numberNotEvaluated" /
+              "numberNotApplicable" / "numberInformational".
+
+            "status" is one of PASS, WARNING, FAIL, INFORMATIONAL, NOT_APPLICABLE,
+            NOT_EVALUATED. NOT_EVALUATED always carries a "reason": a rule that cannot be
+            evaluated says so rather than defaulting to a pass. Rules R2, R3, R4, R10, R11,
+            R14 and R16 are owned by other work packages and report NOT_EVALUATED with the
+            owning work package as the reason.
+
+        Example:
+            >>> report = PyMKF.calculate_manufacturability_report(mas)
+            >>> [f["ruleId"] for f in report["findings"] if f["status"] == "WARNING"]
+        )pbdoc",
+        py::arg("mas"),
         py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_advised_sections", &calculate_advised_sections,

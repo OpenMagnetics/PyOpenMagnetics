@@ -10,6 +10,7 @@
 
 #include <MAS.hpp>
 #include "advisers/MagneticAdviser.h"
+#include "advisers/Manufacturability.h"
 #include "constructive_models/Bobbin.h"
 #include "constructive_models/Coil.h"
 #include "constructive_models/Core.h"

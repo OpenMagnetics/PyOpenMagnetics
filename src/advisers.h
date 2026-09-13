@@ -14,6 +14,9 @@ json calculate_advised_magnetics_fast(json inputsJson, int maximumNumberResults,
 json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson, int maximumNumberResults);
 json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson, int maximumNumberResults);
 
+// Design-for-manufacturing rule pack (ABT #1177, WP8)
+json calculate_manufacturability_report(json masJson);
+
 void register_adviser_bindings(py::module& m);
 
 } // namespace PyMKF
