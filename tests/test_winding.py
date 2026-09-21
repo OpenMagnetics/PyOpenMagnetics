@@ -99,3 +99,58 @@ class TestInsulationMaterials:
         if len(names) > 0:
             material = PyOpenMagnetics.find_insulation_material_by_name(names[0])
             assert isinstance(material, dict)
+
+
+class TestGuessRoundWireFromDcResistance:
+    """Round-wire estimation from measured per-winding DC resistance."""
+
+    @staticmethod
+    def _current_transformer_coil(sample_toroidal_core, primary_wire, secondary_wire):
+        core = PyOpenMagnetics.calculate_core_data(sample_toroidal_core, False)
+        bobbin = PyOpenMagnetics.create_basic_bobbin(core, True)
+        return {
+            "bobbin": bobbin,
+            "functionalDescription": [
+                {"name": "primary", "numberTurns": 1, "numberParallels": 1,
+                 "isolationSide": PyOpenMagnetics.get_isolation_side_from_index(0), "wire": primary_wire},
+                {"name": "secondary", "numberTurns": 50, "numberParallels": 1,
+                 "isolationSide": PyOpenMagnetics.get_isolation_side_from_index(1), "wire": secondary_wire},
+            ],
+        }
+
+    def test_round_trip_recovers_dc_resistance(self, sample_toroidal_core):
+        """Wires guessed from a known coil's DC resistances reproduce those resistances."""
+        reference = self._current_transformer_coil(sample_toroidal_core, "Round 0.90 - Grade 1", "Round 0.212 - Grade 1")
+        wound = PyOpenMagnetics.wind(reference, 1, [0.5, 0.5], [0, 1], [])
+        dc_resistances = PyOpenMagnetics.calculate_dc_resistance_per_winding(wound, 25)
+
+        # Start from the thinnest wire, as heimdall's current-transformer translator does.
+        guess = self._current_transformer_coil(sample_toroidal_core, "Round 0.01 - Grade 1", "Round 0.01 - Grade 1")
+        wires = PyOpenMagnetics.guess_round_wire_from_dc_resistance(guess, dc_resistances)
+
+        assert isinstance(wires, list)
+        assert len(wires) == 2
+        for wire in wires:
+            assert wire["type"] == "round"
+
+        # A 1-turn primary needs a far thicker conductor than a 50-turn secondary.
+        assert wires[0]["conductingDiameter"]["nominal"] > wires[1]["conductingDiameter"]["nominal"]
+
+        guess["functionalDescription"][0]["wire"] = wires[0]
+        guess["functionalDescription"][1]["wire"] = wires[1]
+        rewound = PyOpenMagnetics.wind(guess, 1, [0.5, 0.5], [0, 1], [])
+        recovered = PyOpenMagnetics.calculate_dc_resistance_per_winding(rewound, 25)
+        for target, value in zip(dc_resistances, recovered):
+            assert abs(value - target) / target < 0.05
+
+    def test_rejects_resistance_count_mismatch(self, sample_toroidal_core):
+        """One DC resistance per winding is required."""
+        coil = self._current_transformer_coil(sample_toroidal_core, "Round 0.01 - Grade 1", "Round 0.01 - Grade 1")
+        with pytest.raises(PyOpenMagnetics.EngineError):
+            PyOpenMagnetics.guess_round_wire_from_dc_resistance(coil, [0.001])
+
+    def test_rejects_non_positive_resistance(self, sample_toroidal_core):
+        """A zero DC resistance has no wire and must not be silently mapped to one."""
+        coil = self._current_transformer_coil(sample_toroidal_core, "Round 0.01 - Grade 1", "Round 0.01 - Grade 1")
+        with pytest.raises(PyOpenMagnetics.EngineError):
+            PyOpenMagnetics.guess_round_wire_from_dc_resistance(coil, [0.001, 0.0])

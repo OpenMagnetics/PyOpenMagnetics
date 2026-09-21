@@ -39,6 +39,9 @@ json set_interlayer_insulation(json coilJson, double layerThickness);
 json set_intersection_insulation(json coilJson, double layerThickness, int numberInsulationLayers);
 json get_solid_insulation_requirements_for_wires(json inputsJson, json patternJson, int repetitions);
 
+// Wire estimation
+json guess_round_wire_from_dc_resistance(json coilJson, json dcResistancesJson, double maxError);
+
 void register_winding_bindings(py::module& m);
 
 } // namespace PyMKF

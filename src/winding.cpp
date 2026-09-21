@@ -500,6 +500,32 @@ json get_isolation_side_from_index(size_t index) {
     return OpenMagnetics::get_isolation_side_from_index(index);
 }
 
+json guess_round_wire_from_dc_resistance(json coilJson, json dcResistancesJson, double maxError) {
+    if (!dcResistancesJson.is_array()) {
+        throw std::invalid_argument("guess_round_wire_from_dc_resistance: dc_resistances must be a list of DC resistances in Ohm, one per winding");
+    }
+    std::vector<double> dcResistances = dcResistancesJson.get<std::vector<double>>();
+    OpenMagnetics::Coil coil(coilJson);
+    if (dcResistances.size() != coil.get_functional_description().size()) {
+        throw std::invalid_argument("guess_round_wire_from_dc_resistance: got " + std::to_string(dcResistances.size()) +
+                                    " DC resistances for a coil with " + std::to_string(coil.get_functional_description().size()) + " windings");
+    }
+    for (size_t index = 0; index < dcResistances.size(); ++index) {
+        if (!(dcResistances[index] > 0)) {
+            throw std::invalid_argument("guess_round_wire_from_dc_resistance: DC resistance of winding " + std::to_string(index) +
+                                        " must be positive, got " + std::to_string(dcResistances[index]));
+        }
+    }
+
+    json result = json::array();
+    for (auto& wire : coil.guess_round_wire_from_dc_resistance(dcResistances, maxError)) {
+        json aux;
+        to_json(aux, wire);
+        result.push_back(aux);
+    }
+    return result;
+}
+
 json set_interlayer_insulation(json coilJson, double layerThickness) {
     OpenMagnetics::Coil coil(coilJson, false);
     coil.set_interlayer_insulation(layerThickness);
@@ -866,6 +892,32 @@ void register_winding_bindings(py::module& m) {
             JSON IsolationSide string ("Primary", "Secondary", etc.).
         )pbdoc",
         py::arg("index"),
+        py::call_guard<py::gil_scoped_release>());
+
+    m.def("guess_round_wire_from_dc_resistance", &guess_round_wire_from_dc_resistance,
+        R"pbdoc(
+        Guess the round wire of each winding from its measured DC resistance.
+
+        Winds the coil, then iteratively replaces each winding's wire with the
+        round wire whose DC resistance per meter matches the target over the
+        wound wire length, re-winding until every winding is within max_error
+        (or the chosen wires stop changing).
+
+        Args:
+            coil_json: JSON Coil with bobbin and functionalDescription (any
+                initial wire; it is replaced).
+            dc_resistances: DC resistance in Ohm per winding, same order as
+                functionalDescription.
+            max_error: Maximum relative DC-resistance error (default 0.05).
+
+        Returns:
+            JSON array of Wire objects, one per winding.
+
+        Raises:
+            EngineError if dc_resistances is not a list, its length differs from
+            the number of windings, or any value is not positive.
+        )pbdoc",
+        py::arg("coil_json"), py::arg("dc_resistances"), py::arg("max_error") = 0.05,
         py::call_guard<py::gil_scoped_release>());
 
     m.def("set_interlayer_insulation", &set_interlayer_insulation,
