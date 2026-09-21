@@ -464,11 +464,15 @@ cmrc_add_resource_library(insulation_standards ALIAS data::insulation_standards 
 target_link_libraries(PyOpenMagnetics PUBLIC data::insulation_standards)
 
 
-# Only embed essential data files to reduce binary size
-# Skip large optional datasets like cores_stock.ndjson
+# The MAS catalogues MKF reads at runtime. cores_stock.ndjson is NOT optional: it is the SMALL one
+# (1573 cores vs 18943) and it is what load_cores() reads under settings.useOnlyCoresInStock, the
+# default. Without it MKF used to fall back silently to the full cores.ndjson -- ~2.4 GB resident
+# after load_all_databases(), and an available-cores advise that grew past 16 GB (ABT #1328).
+# MKF now refuses that setting when the stock catalogue is missing, so it must be embedded.
 cmrc_add_resource_library(data ALIAS data::data NAMESPACE data WHENCE ${MAS_DIR} PREFIX MAS 
     ${MAS_DIR}/data/core_materials.ndjson 
     ${MAS_DIR}/data/core_shapes.ndjson 
+    ${MAS_DIR}/data/cores_stock.ndjson 
     ${MAS_DIR}/data/cores.ndjson 
     ${MAS_DIR}/data/bobbins.ndjson 
     ${MAS_DIR}/data/insulation_materials.ndjson 
