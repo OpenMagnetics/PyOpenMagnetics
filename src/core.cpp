@@ -403,6 +403,11 @@ double calculate_saturation_current(json magneticJson, double temperature) {
     return magnetic.calculate_saturation_current(temperature);
 }
 
+std::optional<double> calculate_datasheet_inductance(json magneticJson, double dcBiasCurrent, double temperature) {
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+    return magnetic.calculate_datasheet_inductance(dcBiasCurrent, temperature);
+}
+
 double calculate_saturation_current_at_operating_point(
     json magneticJson, json operatingPointJson, double temperature) {
     OpenMagnetics::Magnetic magnetic(magneticJson);
@@ -1196,6 +1201,29 @@ void register_core_bindings(py::module& m) {
         py::arg("magnetic_json"), py::arg("temperature"),
         py::call_guard<py::gil_scoped_release>());
     
+    m.def("calculate_datasheet_inductance", &calculate_datasheet_inductance,
+        R"pbdoc(
+        Inductance a catalogue part's DATASHEET gives at a DC bias and temperature.
+
+        Reads the measured L(I) points of the part's single-winding inductor entry
+        (manufacturerInfo.datasheetInfo.electrical): linear in current along each measured
+        temperature, linear between the two measured temperatures bracketing `temperature`,
+        and the nearest measured temperature outside that range. Without L(I) points, the
+        stated inductance. Works for datasheet-only parts (no core, no coil).
+
+        Args:
+            magnetic_json: JSON Magnetic object carrying a datasheet.
+            dc_bias_current: DC bias current in Amperes.
+            temperature: Temperature in Celsius.
+
+        Returns:
+            Inductance in Henries, or None when the bias lies beyond the measured curve.
+            Raises PyOpenMagnetics.EngineError when the datasheet gives neither an inductance
+            nor L(I) points.
+        )pbdoc",
+        py::arg("magnetic_json"), py::arg("dc_bias_current"), py::arg("temperature"),
+        py::call_guard<py::gil_scoped_release>());
+
     m.def("calculate_temperature_from_core_thermal_resistance", &calculate_temperature_from_core_thermal_resistance,
         R"pbdoc(
         Calculate core temperature from thermal resistance and losses.

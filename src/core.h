@@ -38,6 +38,7 @@ json load_core_data(json coresJson);
 json get_core_temperature_dependant_parameters(json coreData, double temperature);
 double calculate_core_maximum_magnetic_energy(json coreDataJson, json operatingPointJson);
 double calculate_saturation_current(json magneticJson, double temperature);
+std::optional<double> calculate_datasheet_inductance(json magneticJson, double dcBiasCurrent, double temperature);
 double calculate_peak_winding_current(json magneticJson, json operatingPointJson, int windingIndex);
 double calculate_temperature_from_core_thermal_resistance(json coreJson, double totalLosses);
 
