@@ -32,9 +32,13 @@
 #include <KirchhoffApi.hpp>
 #include <PEAS/src/DimensionJson.hpp>
 
+#include <algorithm>
+#include <cctype>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace py = pybind11;
 using json = nlohmann::json;
@@ -62,9 +66,12 @@ json kh_json(const std::string& out, const char* fn) {
 // ABT #596: the legacy PyOM converter spec (flat inputVoltage / desiredInductance /
 // operatingPoints[].outputVoltages[]/outputCurrents[]) predates Kirchhoff's TAS-inputs contract
 // (designRequirements + operatingPoints[].outputs[]). Detect the legacy shape and adapt it; a
-// TAS-shaped spec (has designRequirements) passes through untouched. Legacy keys Kirchhoff derives
-// itself are deliberately dropped: desiredDutyCycle / maximumDutyCycle (duty comes from the topology
-// equations) and diodeVoltageDrop (Kirchhoff uses its DIDEAL rectifier model).
+// TAS-shaped spec (has designRequirements) passes through untouched.
+//
+// EVERY legacy field is either mapped onto what Kirchhoff reads for that topology, or rejected with a
+// specific exception — never silently dropped (a dropped dutyCycle / rectifierType / resonant band used to
+// yield a design for a different converter than the one asked for, e.g. an LLC with a centre-tapped
+// secondary when the spec said fullBridge).
 bool is_legacy_spec(const json& spec) {
     if (!spec.is_object() || spec.contains("designRequirements")) {
         return false;
@@ -93,12 +100,143 @@ json legacy_outputs_of(const json& op, const char* where) {
     return outputs;
 }
 
-json legacy_spec_to_tas_inputs(const json& spec) {
+// The Kirchhoff config keys a topology reads for each legacy design knob. nullptr / false: the topology has
+// no such knob, so an explicit legacy value cannot be honoured and THROWS.
+struct LegacyKnobs {
+    const char* dutyKey;          // config key of the design duty (at Vin_min) / duty limit
+    bool operatingDuty;           // true: dutyKey IS the design duty, so legacy "dutyCycle" maps too;
+                                  // false: dutyKey is only a limit, so only "maximumDutyCycle" maps
+    const char* rippleKey;        // config key of the inductor current-ripple ratio
+    bool rectifierType;           // reads config.rectifierType
+    bool bridgeType;              // reads config.bridgeType
+    bool qualityFactor;           // reads config.qualityFactor
+    enum class Resonance { NONE, BAND, AT_SWITCHING_FREQUENCY } resonance;
+    enum class Mode { NONE, FLYBACK, PFC } mode;
+};
+
+const LegacyKnobs& legacy_knobs(const std::string& topology) {
+    using R = LegacyKnobs::Resonance;
+    using M = LegacyKnobs::Mode;
+    // Keys as read by Kirchhoff's design_<topology> (cfg::get(d.config, ...)).
+    static const std::unordered_map<std::string, LegacyKnobs> kKnobs = {
+        {"flyback",             {"maxDutyCycle",       true,  "inductorRippleRatio", false, false, false, R::NONE, M::FLYBACK}},
+        {"forward",             {"maxDutyCycle",       true,  "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
+        {"two_switch_forward",  {"maxDutyCycle",       true,  "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
+        {"push_pull",           {"maxDutyCycle",       true,  "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
+        {"acf",                 {"operatingDutyCycle", true,  "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
+        {"ahb",                 {"operatingDutyCycle", true,  "inductorRippleRatio", true,  false, false, R::NONE, M::NONE}},
+        {"psfb",                {"commandedDuty",      true,  "inductorRippleRatio", true,  false, false, R::NONE, M::NONE}},
+        {"pshb",                {"commandedDuty",      true,  "inductorRippleRatio", true,  false, false, R::NONE, M::NONE}},
+        {"isolated_buck",       {nullptr,              false, "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
+        {"isolated_buck_boost", {nullptr,              false, "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
+        {"buck",                {"maximumDutyCycle",   false, "rippleRatio",         false, false, false, R::NONE, M::NONE}},
+        {"boost",               {"maximumDutyCycle",   false, "rippleRatio",         false, false, false, R::NONE, M::NONE}},
+        {"sepic",               {"maximumDutyCycle",   false, nullptr,               false, false, false, R::NONE, M::NONE}},
+        {"cuk",                 {"maximumDutyCycle",   false, nullptr,               false, false, false, R::NONE, M::NONE}},
+        {"zeta",                {"maximumDutyCycle",   false, nullptr,               false, false, false, R::NONE, M::NONE}},
+        {"fsbb",                {"maximumDutyCycle",   false, "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
+        {"weinberg",            {"maximumDutyCycle",   false, nullptr,               false, false, false, R::NONE, M::NONE}},
+        {"llc",                 {nullptr,              false, "rippleRatio",         true,  true,  true,  R::BAND, M::NONE}},
+        {"src",                 {nullptr,              false, "rippleRatio",         true,  true,  true,  R::AT_SWITCHING_FREQUENCY, M::NONE}},
+        {"cllc",                {nullptr,              false, nullptr,               false, false, true,  R::AT_SWITCHING_FREQUENCY, M::NONE}},
+        {"clllc",               {nullptr,              false, nullptr,               false, false, true,  R::AT_SWITCHING_FREQUENCY, M::NONE}},
+        {"dab",                 {nullptr,              false, nullptr,               false, false, false, R::NONE, M::NONE}},
+        {"pfc",                 {nullptr,              false, nullptr,               false, false, false, R::NONE, M::PFC}},
+        {"vienna",              {nullptr,              false, nullptr,               false, false, false, R::NONE, M::NONE}},
+    };
+    auto it = kKnobs.find(topology);
+    if (it == kKnobs.end()) {
+        throw std::invalid_argument("legacy converter spec: unknown topology '" + topology +
+                                    "' (no legacy-spec mapping); pass a known topology or a TAS-shaped spec "
+                                    "(designRequirements + operatingPoints[].outputs[])");
+    }
+    return it->second;
+}
+
+[[noreturn]] void legacy_unsupported(const std::string& field, const std::string& topology, const std::string& why) {
+    throw std::invalid_argument("legacy converter spec: '" + field + "' cannot be honoured for topology '" +
+                                topology + "': " + why);
+}
+
+// Put `value` under config[key]; an explicit config entry that says something different is a contradiction.
+void set_config_knob(json& config, const char* key, const json& value, const std::string& field) {
+    if (config.contains(key) && config.at(key) != value) {
+        throw std::invalid_argument("legacy converter spec: '" + field + "' = " + value.dump() +
+                                    " contradicts config." + key + " = " + config.at(key).dump());
+    }
+    config[key] = value;
+}
+
+// Legacy flyback conduction-mode strings ("Continuous Conduction Mode", ...) -> Kirchhoff's ccm/dcm/bcm/qrm.
+std::string flyback_mode(const std::string& raw) {
+    std::string m;
+    for (char c : raw) {
+        if (!std::isspace(static_cast<unsigned char>(c)) && c != '_' && c != '-') {
+            m += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+    }
+    if (m == "ccm" || m == "continuousconductionmode" || m == "continuous") return "ccm";
+    if (m == "dcm" || m == "discontinuousconductionmode" || m == "discontinuous") return "dcm";
+    if (m == "bcm" || m == "boundaryconductionmode" || m == "boundarymode" || m == "criticalconductionmode" ||
+        m == "crm" || m == "transitionmode") return "bcm";
+    if (m == "qrm" || m == "quasiresonantmode" || m == "quasiresonant") return "qrm";
+    throw std::invalid_argument("legacy converter spec: unknown flyback conduction mode '" + raw + "'");
+}
+
+json legacy_spec_to_tas_inputs(const json& spec, const std::string& topology) {
     if (!is_legacy_spec(spec)) {
         return spec;
     }
+    static const std::vector<std::string> kTopLevel = {
+        "inputVoltage", "operatingPoints", "efficiency", "lineFrequency", "isolationVoltage", "config",
+        "desiredInductance", "desiredTurnsRatios", "desiredResonantInductance", "desiredResonantCapacitance",
+        "desiredSeriesInductance", "minSwitchingFrequency", "maxSwitchingFrequency", "resonantFrequency",
+        "qualityFactor", "currentRippleRatio", "dutyCycle", "maximumDutyCycle", "rectifierType", "bridgeType",
+        "diodeVoltageDrop"};
+    static const std::vector<std::string> kPerOperatingPoint = {
+        "outputVoltages", "outputCurrents", "switchingFrequency", "ambientTemperature", "lineFrequency", "mode"};
+    for (const auto& [key, value] : spec.items()) {
+        (void)value;
+        if (std::find(kTopLevel.begin(), kTopLevel.end(), key) == kTopLevel.end()) {
+            throw std::invalid_argument("legacy converter spec: unsupported field '" + key + "' (topology '" +
+                                        topology + "') — Kirchhoff has no counterpart for it; remove it or pass a "
+                                        "TAS-shaped spec");
+        }
+    }
     const json& ops = spec.at("operatingPoints");
+    for (size_t i = 0; i < ops.size(); ++i) {
+        for (const auto& [key, value] : ops.at(i).items()) {
+            (void)value;
+            if (std::find(kPerOperatingPoint.begin(), kPerOperatingPoint.end(), key) == kPerOperatingPoint.end()) {
+                throw std::invalid_argument("legacy converter spec: unsupported field operatingPoints[" +
+                                            std::to_string(i) + "]." + key + " (topology '" + topology + "')");
+            }
+        }
+    }
+    const LegacyKnobs& knobs = legacy_knobs(topology);
     const json& op0 = ops.at(0);
+
+    // Design-level quantities Kirchhoff takes once per design must agree across the operating points.
+    auto same_across_ops = [&](const char* key) {
+        for (size_t i = 1; i < ops.size(); ++i) {
+            const bool a = op0.contains(key), b = ops.at(i).contains(key);
+            if (a != b || (a && op0.at(key) != ops.at(i).at(key))) {
+                throw std::invalid_argument(std::string("legacy converter spec: operatingPoints[") +
+                                            std::to_string(i) + "]." + key + " differs from operatingPoints[0]; " +
+                                            "Kirchhoff designs for ONE " + key + " per spec");
+            }
+        }
+    };
+    same_across_ops("switchingFrequency");
+    same_across_ops("lineFrequency");
+    same_across_ops("mode");
+
+    if (spec.contains("diodeVoltageDrop")) {
+        legacy_unsupported("diodeVoltageDrop", topology,
+                           "Kirchhoff sizes every rectifier with its DIDEAL diode model (current-dependent forward "
+                           "drop, the same model the ngspice deck simulates), so an explicit fixed drop would "
+                           "describe a different diode; remove the field");
+    }
 
     json dr;
     if (spec.contains("inputVoltage")) {
@@ -107,16 +245,13 @@ json legacy_spec_to_tas_inputs(const json& spec) {
     if (op0.contains("switchingFrequency")) {
         dr["switchingFrequency"]["nominal"] = op0.at("switchingFrequency");
     }
-    if (spec.contains("minSwitchingFrequency")) {
-        dr["switchingFrequency"]["minimum"] = spec.at("minSwitchingFrequency");
-    }
-    if (spec.contains("maxSwitchingFrequency")) {
-        dr["switchingFrequency"]["maximum"] = spec.at("maxSwitchingFrequency");
-    }
     if (spec.contains("efficiency")) {
         dr["efficiency"] = spec.at("efficiency");
     }
     if (spec.contains("lineFrequency")) {   // AC-input topologies (PFC, Vienna)
+        if (op0.contains("lineFrequency") && op0.at("lineFrequency") != spec.at("lineFrequency")) {
+            throw std::invalid_argument("legacy converter spec: lineFrequency and operatingPoints[0].lineFrequency differ");
+        }
         dr["lineFrequency"]["nominal"] = spec.at("lineFrequency");
     } else if (op0.contains("lineFrequency")) {
         dr["lineFrequency"]["nominal"] = op0.at("lineFrequency");
@@ -129,6 +264,11 @@ json legacy_spec_to_tas_inputs(const json& spec) {
     }
     if (spec.contains("desiredTurnsRatios")) {
         dr["turnsRatios"] = spec.at("desiredTurnsRatios");
+    }
+    for (const char* k : {"desiredResonantInductance", "desiredResonantCapacitance", "desiredSeriesInductance"}) {
+        if (spec.contains(k)) {
+            dr[k] = spec.at(k);   // read verbatim by Kirchhoff's provided_resonant_* / provided_series_inductance
+        }
     }
 
     json drOutputs = json::array();
@@ -158,11 +298,117 @@ json legacy_spec_to_tas_inputs(const json& spec) {
         tas["operatingPoints"].push_back(std::move(top));
     }
 
-    // Kirchhoff sizing knobs travel in config; map the legacy ripple key onto it.
+    // Kirchhoff sizing knobs travel in config, under the key THIS topology reads.
     json config = spec.value("config", json::object());
-    if (spec.contains("currentRippleRatio") && !config.contains("rippleRatio")) {
-        config["rippleRatio"] = spec.at("currentRippleRatio");
+
+    if (spec.contains("currentRippleRatio")) {
+        if (!knobs.rippleKey) {
+            legacy_unsupported("currentRippleRatio", topology, "the topology has no ripple-ratio design knob");
+        }
+        set_config_knob(config, knobs.rippleKey, spec.at("currentRippleRatio"), "currentRippleRatio");
     }
+
+    // Duty: "maximumDutyCycle" (the duty limit / design duty at Vin_min) and "dutyCycle" (the design duty).
+    if (spec.contains("dutyCycle") && spec.contains("maximumDutyCycle") &&
+        spec.at("dutyCycle") != spec.at("maximumDutyCycle")) {
+        throw std::invalid_argument("legacy converter spec: dutyCycle = " + spec.at("dutyCycle").dump() +
+                                    " and maximumDutyCycle = " + spec.at("maximumDutyCycle").dump() +
+                                    " disagree; Kirchhoff designs " + topology + " around ONE duty");
+    }
+    if (spec.contains("maximumDutyCycle")) {
+        if (!knobs.dutyKey) {
+            legacy_unsupported("maximumDutyCycle", topology, "the topology has no duty design knob");
+        }
+        set_config_knob(config, knobs.dutyKey, spec.at("maximumDutyCycle"), "maximumDutyCycle");
+    }
+    if (spec.contains("dutyCycle")) {
+        if (!knobs.dutyKey || !knobs.operatingDuty) {
+            legacy_unsupported("dutyCycle", topology,
+                               "the duty follows from the conversion ratio (only a maximumDutyCycle limit is a knob)");
+        }
+        set_config_knob(config, knobs.dutyKey, spec.at("dutyCycle"), "dutyCycle");
+    }
+
+    if (spec.contains("rectifierType")) {
+        if (!knobs.rectifierType) {
+            legacy_unsupported("rectifierType", topology, "the topology has a fixed rectifier");
+        }
+        set_config_knob(config, "rectifierType", spec.at("rectifierType"), "rectifierType");
+    }
+    if (spec.contains("bridgeType")) {
+        if (!knobs.bridgeType) {
+            legacy_unsupported("bridgeType", topology, "the topology has a fixed primary bridge");
+        }
+        set_config_knob(config, "bridgeType", spec.at("bridgeType"), "bridgeType");
+    }
+    if (spec.contains("qualityFactor")) {
+        if (!knobs.qualityFactor) {
+            legacy_unsupported("qualityFactor", topology, "the topology has no resonant tank");
+        }
+        set_config_knob(config, "qualityFactor", spec.at("qualityFactor"), "qualityFactor");
+    }
+
+    // Resonant frequency and the switching-frequency band.
+    const bool hasMin = spec.contains("minSwitchingFrequency"), hasMax = spec.contains("maxSwitchingFrequency");
+    const bool hasFr = spec.contains("resonantFrequency");
+    if (knobs.resonance == LegacyKnobs::Resonance::BAND) {
+        // LLC: fr = sqrt(resonantBandMin · resonantBandMax) (Kirchhoff Llc.cpp).
+        if (hasMin != hasMax) {
+            throw std::invalid_argument("legacy converter spec: " + topology + " needs BOTH minSwitchingFrequency and "
+                                        "maxSwitchingFrequency (the resonant band) or neither");
+        }
+        if (hasMin) {
+            const double fmin = spec.at("minSwitchingFrequency").get<double>();
+            const double fmax = spec.at("maxSwitchingFrequency").get<double>();
+            if (!(fmin > 0) || !(fmax >= fmin)) {
+                throw std::invalid_argument("legacy converter spec: need 0 < minSwitchingFrequency <= maxSwitchingFrequency");
+            }
+            if (hasFr) {
+                const double fr = spec.at("resonantFrequency").get<double>();
+                const double bandCentre = std::sqrt(fmin * fmax);
+                if (std::abs(fr - bandCentre) > 1e-6 * bandCentre) {
+                    throw std::invalid_argument("legacy converter spec: resonantFrequency = " + std::to_string(fr) +
+                                                " contradicts the band centre sqrt(min*max) = " +
+                                                std::to_string(bandCentre) + " Kirchhoff designs the " + topology +
+                                                " tank at");
+                }
+            }
+            set_config_knob(config, "resonantBandMin", spec.at("minSwitchingFrequency"), "minSwitchingFrequency");
+            set_config_knob(config, "resonantBandMax", spec.at("maxSwitchingFrequency"), "maxSwitchingFrequency");
+        } else if (hasFr) {
+            set_config_knob(config, "resonantBandMin", spec.at("resonantFrequency"), "resonantFrequency");
+            set_config_knob(config, "resonantBandMax", spec.at("resonantFrequency"), "resonantFrequency");
+        }
+    } else {
+        if (hasMin || hasMax) {
+            legacy_unsupported(hasMin ? "minSwitchingFrequency" : "maxSwitchingFrequency", topology,
+                               "the design runs at the single operating switching frequency");
+        }
+        if (hasFr) {
+            if (knobs.resonance != LegacyKnobs::Resonance::AT_SWITCHING_FREQUENCY) {
+                legacy_unsupported("resonantFrequency", topology, "the topology has no resonant tank");
+            }
+            // SRC / CLLC / CLLLC are designed AT resonance: fr = the operating switching frequency.
+            if (!op0.contains("switchingFrequency") ||
+                std::abs(spec.at("resonantFrequency").get<double>() - op0.at("switchingFrequency").get<double>()) >
+                    1e-6 * op0.at("switchingFrequency").get<double>()) {
+                legacy_unsupported("resonantFrequency", topology,
+                                   "the tank is designed at resonance, fr = operatingPoints[0].switchingFrequency; "
+                                   "a different resonantFrequency describes another design");
+            }
+        }
+    }
+
+    if (op0.contains("mode")) {
+        if (knobs.mode == LegacyKnobs::Mode::FLYBACK) {
+            set_config_knob(config, "mode", flyback_mode(op0.at("mode").get<std::string>()), "mode");
+        } else if (knobs.mode == LegacyKnobs::Mode::PFC) {
+            set_config_knob(config, "mode", op0.at("mode"), "mode");   // Kirchhoff normalizes the PFC mode names
+        } else {
+            legacy_unsupported("operatingPoints[].mode", topology, "the topology has no conduction-mode knob");
+        }
+    }
+
     if (!config.empty()) {
         tas["config"] = std::move(config);
     }
@@ -197,13 +443,13 @@ std::string kh_topology(const std::string& raw) {
 // Design entry: spec -> MAS::Inputs (the legacy process_converter / calculate_<topo>_inputs contract).
 json design_inputs(const std::string& topology, const json& spec, const char* fn) {
     return kh_json(Kirchhoff::api::design_magnetic_inputs(kh_topology(topology),
-                                                          legacy_spec_to_tas_inputs(spec).dump()), fn);
+                                                          legacy_spec_to_tas_inputs(spec, kh_topology(topology)).dump()), fn);
 }
 
 // ngspice deck from a converter SPEC: design a TAS then assemble the deck. Returns {"netlist": "<spice>"}.
 json ngspice_deck_from_spec(const std::string& topology, const json& spec, const char* fn) {
     const std::string tas = Kirchhoff::api::design_tas(kh_topology(topology),
-                                                       legacy_spec_to_tas_inputs(spec).dump());
+                                                       legacy_spec_to_tas_inputs(spec, kh_topology(topology)).dump());
     if (tas.rfind(kExceptionPrefix, 0) == 0) {
         kh_throw(tas, fn);
     }
@@ -217,7 +463,7 @@ json ngspice_deck_from_spec(const std::string& topology, const json& spec, const
 // ngspice sim from a converter SPEC: design a TAS then run it. Returns Kirchhoff's per-vector summary.
 json ngspice_sim_from_spec(const std::string& topology, const json& spec, const char* fn) {
     const std::string tas = Kirchhoff::api::design_tas(kh_topology(topology),
-                                                       legacy_spec_to_tas_inputs(spec).dump());
+                                                       legacy_spec_to_tas_inputs(spec, kh_topology(topology)).dump());
     if (tas.rfind(kExceptionPrefix, 0) == 0) {
         kh_throw(tas, fn);
     }
