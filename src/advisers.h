@@ -12,7 +12,7 @@ json calculate_advised_magnetics(json inputsJson, int maximumNumberResults, json
 json calculate_advised_magnetics_with_filters(json inputsJson, json filterFlowJson, int maximumNumberResults, json coreModeJson);
 json calculate_advised_magnetics_fast(json inputsJson, int maximumNumberResults, json coreModeJson);
 json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson, int maximumNumberResults);
-json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson, int maximumNumberResults, std::optional<std::vector<std::string>> references = std::nullopt);
+json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson, int maximumNumberResults, std::optional<std::vector<std::string>> references = std::nullopt, bool simulateResults = true);
 
 // Design-for-manufacturing rule pack (ABT #1177, WP8)
 json calculate_manufacturability_report(json masJson);

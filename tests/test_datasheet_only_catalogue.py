@@ -110,3 +110,35 @@ def test_datasheet_inductance_at_a_bias():
     part = datasheet_part("P")
     assert PyOpenMagnetics.calculate_datasheet_inductance(part, 1.0, 20) == pytest.approx(9.5e-6)
     assert PyOpenMagnetics.calculate_datasheet_inductance(part, 5.0, 20) is None
+
+
+def modelled_part(reference):
+    """A core and a coil on public MAS data, plus the datasheet the catalogue carries."""
+    part = datasheet_part(reference)
+    part["core"] = {"functionalDescription": {"type": "two-piece set", "material": "N87", "shape": "E 13/7/4", "gapping": [], "numberStacks": 1}}
+    part["coil"] = {"bobbin": "Basic", "functionalDescription": [{"name": "primary", "numberTurns": 10, "numberParallels": 1, "isolationSide": "primary", "wire": "Round 0.4 - Grade 1"}]}
+    return part
+
+
+@pytest.fixture
+def mixed_catalogue(tmp_path):
+    PyOpenMagnetics.clear_magnetic_cache()
+    path = tmp_path / "catalogue.ndjson"
+    parts = [modelled_part("BUILT"), datasheet_part("SHEET")]
+    path.write_text("\n".join(json.dumps(part) for part in parts) + "\n", encoding="utf-8")
+    PyOpenMagnetics.load_magnetics_from_file(str(path), True)
+    yield
+    PyOpenMagnetics.clear_magnetic_cache()
+
+
+def test_results_can_come_back_ranked_but_unsimulated(mixed_catalogue):
+    """simulate_results=False: the same ranking and scores, without a simulation per part."""
+    flow = [dict(operation, strictlyRequired=False) for operation in FLOW]
+    simulated = PyOpenMagnetics.calculate_advised_magnetics_from_cache(buck_inputs(), flow, 10)
+    ranked = PyOpenMagnetics.calculate_advised_magnetics_from_cache(buck_inputs(), flow, 10, None, False)
+
+    assert references_of(ranked) == references_of(simulated)
+    assert [item["scoringPerFilter"] for item in ranked["data"]] == [item["scoringPerFilter"] for item in simulated["data"]]
+    built = references_of(simulated).index("BUILT")
+    assert simulated["data"][built]["mas"].get("outputs"), "the default still simulates a modelled part"
+    assert not ranked["data"][built]["mas"].get("outputs")

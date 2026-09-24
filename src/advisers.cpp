@@ -222,7 +222,7 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
     return results;
 }
 
-json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson, int maximumNumberResults, std::optional<std::vector<std::string>> references) {
+json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson, int maximumNumberResults, std::optional<std::vector<std::string>> references, bool simulateResults) {
     OpenMagnetics::settings.set_coil_delimit_and_compact(true);
     OpenMagnetics::Inputs inputs(inputsJson);
 
@@ -236,7 +236,9 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
         throw std::runtime_error("No magnetics found in cache");
     }
 
-    OpenMagnetics::MagneticAdviser magneticAdviser;
+    // simulateResults=false returns the ranked parts with their scores and no simulated outputs:
+    // a caller that re-ranks many results itself need not pay a full simulation for each.
+    OpenMagnetics::MagneticAdviser magneticAdviser(simulateResults);
     // `references` restricts the search to those cached parts -- one tool's family, or an
     // admin-chosen pool, out of a cache several callers share. A reference the cache does not
     // hold raises rather than silently searching fewer parts.
@@ -517,6 +519,10 @@ void register_adviser_bindings(py::module& m) {
                         PyOpenMagnetics.EngineError naming any reference the cache does not
                         hold. The cache may hold datasheet-only parts (no core, no coil):
                         they are ranked on the filters that apply to them.
+            simulate_results: True (default) returns each modelled part with its simulated
+                        outputs (losses, temperature). False returns the ranking and the
+                        per-filter scores only -- much faster over many results -- and a part
+                        whose simulation would fail is then returned rather than dropped.
         
         Returns:
             JSON object with "data" array containing ranked results.
@@ -530,7 +536,7 @@ void register_adviser_bindings(py::module& m) {
             Cache must be populated before calling this function.
             Raises PyOpenMagnetics.EngineError if the cache is empty.
         )pbdoc",
-        py::arg("inputs_json"), py::arg("filter_flow_json"), py::arg("max_results"), py::arg("references") = py::none(),
+        py::arg("inputs_json"), py::arg("filter_flow_json"), py::arg("max_results"), py::arg("references") = py::none(), py::arg("simulate_results") = true,
         py::call_guard<py::gil_scoped_release>());
 
     m.def("calculate_manufacturability_report", &calculate_manufacturability_report,
