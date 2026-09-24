@@ -11,6 +11,7 @@ def test_process_flyback():
         "desiredTurnsRatios": [6.14],
         "maximumDutyCycle": 0.5,
         "efficiency": 0.9,
+        "diodeVoltageDrop": 0.7,
         "operatingPoints": [{
             "outputVoltages": [20.0],
             "outputCurrents": [1.5],
@@ -32,6 +33,7 @@ def test_process_buck():
     buck = {
         "inputVoltage": {"minimum": 12, "maximum": 12},
         "desiredInductance": 10e-6,
+        "diodeVoltageDrop": 0.7,
         "operatingPoints": [{
             "outputVoltages": [5.0],
             "outputCurrents": [2.0],
@@ -52,6 +54,7 @@ def test_process_boost():
     boost = {
         "inputVoltage": {"minimum": 5, "maximum": 5},
         "desiredInductance": 10e-6,
+        "diodeVoltageDrop": 0.7,
         "operatingPoints": [{
             "outputVoltages": [12.0],
             "outputCurrents": [1.0],
@@ -75,6 +78,7 @@ def test_design_magnetics_from_flyback():
         "desiredTurnsRatios": [6.14],
         "maximumDutyCycle": 0.5,
         "efficiency": 0.9,
+        "diodeVoltageDrop": 0.7,
         "operatingPoints": [{
             "outputVoltages": [20.0],
             "outputCurrents": [1.5],
@@ -98,6 +102,7 @@ def test_per_topology_wrappers():
         "desiredInductance": 1e-3,
         "desiredTurnsRatios": [10.0],
         "maximumDutyCycle": 0.5,
+        "diodeVoltageDrop": 0.7,
         "efficiency": 0.9,
         "operatingPoints": [{
             "outputVoltages": [10.0],
@@ -115,6 +120,7 @@ def test_per_topology_wrappers():
     buck = {
         "inputVoltage": {"minimum": 12, "maximum": 12},
         "desiredInductance": 10e-6,
+        "diodeVoltageDrop": 0.7,
         "currentRippleRatio": 0.3,
         "operatingPoints": [{
             "outputVoltages": [5.0],
@@ -145,6 +151,7 @@ def test_invalid_topology():
     converter = {
         "inputVoltage": {"minimum": 12, "maximum": 12},
         "desiredInductance": 10e-6,
+        "diodeVoltageDrop": 0.7,
         "currentRippleRatio": 0.3,
         "operatingPoints": [{
             "outputVoltages": [5.0],
@@ -173,7 +180,10 @@ def test_spec_is_validated_before_the_topology():
     would quietly stop testing the topology switch, the one thing that test is named for.
     """
     import pytest
-    with pytest.raises(PyMKF.EngineError, match="designRequirements"):
+    # The spec is refused for the spec: 'some' is not a property of the MAS buck schema (2026-09-24: specs are
+    # read against their MAS topology schema, so the refusal names the field instead of Kirchhoff's
+    # "designRequirements missing").
+    with pytest.raises(PyMKF.EngineError, match="'some' is not in the MAS buck schema"):
         PyMKF.process_converter("buck", {"some": "data"})
     print("✓ A spec that describes no converter is refused for the spec")
 
@@ -209,6 +219,7 @@ def test_forward_converters():
         # [demagnetization, output]. The output ratio must keep duty below 0.5:
         # n < Vin/(2*(Vout+Vd)) = 48/(2*12.7) ~ 1.89 for a single-switch forward.
         "desiredTurnsRatios": [1.0, 1.5],
+        "diodeVoltageDrop": 0.7,
         "currentRippleRatio": 0.2,
         "operatingPoints": [{
             "outputVoltages": [12.0],
@@ -228,6 +239,7 @@ def test_forward_converters():
         "inputVoltage": {"minimum": 48, "maximum": 48},
         "desiredInductance": 1e-3,
         "desiredTurnsRatios": [1.5],  # Same as number of outputs; keeps duty < 0.5
+        "diodeVoltageDrop": 0.7,
         "currentRippleRatio": 0.2,
         "operatingPoints": [{
             "outputVoltages": [12.0],
@@ -265,15 +277,34 @@ if __name__ == "__main__":
     print("\n✓ All tests passed!")
 
 
-def test_legacy_spec_fields_are_mapped_or_refused():
-    """Every legacy spec field is either mapped onto what Kirchhoff reads, or refused — never dropped.
+def test_spec_fields_outside_the_mas_schema_are_refused():
+    """A field the MAS topology schema does not define is refused by name (never silently dropped).
 
-    diodeVoltageDrop: Kirchhoff sizes rectifiers with its DIDEAL diode model (the one the ngspice deck
-    simulates), so a fixed drop cannot be honoured. desiredDutyCycle: the duty follows from the pinned
-    magnetic. A field Kirchhoff has no counterpart for is refused by name.
+    desiredDutyCycle is not in the MAS flyback/forward schemas (the duty follows from the design); the
+    diodeVoltageDrop the schemas DO define is honoured as Kirchhoff's fixed-drop rectifier model.
     """
     import pytest
     base = {
+        "inputVoltage": {"minimum": 48, "maximum": 48},
+        "diodeVoltageDrop": 0.7,
+        "currentRippleRatio": 0.2,
+        "operatingPoints": [{
+            "outputVoltages": [12.0],
+            "outputCurrents": [5.0],
+            "switchingFrequency": 100000,
+            "ambientTemperature": 25
+        }]
+    }
+    PyMKF.process_converter("two_switch_forward", base, use_ngspice=False)
+    for field, value in (("desiredDutyCycle", [[0.45]]), ("maximumDrainSourceVoltage", 800.0),
+                         ("rectifierType", "fullBridge")):
+        with pytest.raises(PyMKF.EngineError, match=field):
+            PyMKF.process_converter("two_switch_forward", dict(base, **{field: value}), use_ngspice=False)
+
+
+def test_diode_voltage_drop_is_honoured():
+    """A stated diodeVoltageDrop sizes the design (fixed-drop rectifier), so a larger drop changes it."""
+    spec = {
         "inputVoltage": {"minimum": 48, "maximum": 48},
         "currentRippleRatio": 0.2,
         "operatingPoints": [{
@@ -283,14 +314,9 @@ def test_legacy_spec_fields_are_mapped_or_refused():
             "ambientTemperature": 25
         }]
     }
-    for field, value in (("diodeVoltageDrop", 0.7), ("desiredDutyCycle", [[0.45]]),
-                         ("maximumDrainSourceVoltage", 800.0)):
-        spec = dict(base, **{field: value})
-        with pytest.raises(PyMKF.EngineError, match=field):
-            PyMKF.process_converter("two_switch_forward", spec, use_ngspice=False)
-    # A rectifier choice on a topology with a fixed rectifier is refused too.
-    with pytest.raises(PyMKF.EngineError, match="rectifierType"):
-        PyMKF.process_converter("two_switch_forward", dict(base, rectifierType="fullBridge"), use_ngspice=False)
+    lo = PyMKF.process_converter("two_switch_forward", dict(spec, diodeVoltageDrop=0.3), use_ngspice=False)
+    hi = PyMKF.process_converter("two_switch_forward", dict(spec, diodeVoltageDrop=1.5), use_ngspice=False)
+    assert lo["designRequirements"]["turnsRatios"] != hi["designRequirements"]["turnsRatios"]
 
 
 def test_llc_rectifier_type_is_honoured():
@@ -310,3 +336,20 @@ def test_llc_rectifier_type_is_honoured():
     ct = PyMKF.process_converter("llc", dict(llc, rectifierType="centerTapped"), use_ngspice=False)
     assert len(fb["designRequirements"]["turnsRatios"]) == 1
     assert len(ct["designRequirements"]["turnsRatios"]) == 2
+
+
+def test_every_operating_point_is_designed():
+    """Each operating point of the spec yields an operating point of the SAME magnetic (none dropped)."""
+    spec = {
+        "inputVoltage": {"minimum": 43, "nominal": 48, "maximum": 53},
+        "diodeVoltageDrop": 0.6,
+        "currentRippleRatio": 0.4,
+        "efficiency": 0.9,
+        "operatingPoints": [
+            {"outputVoltages": [12.0], "outputCurrents": [2.0], "switchingFrequency": 100000, "ambientTemperature": 25},
+            {"outputVoltages": [12.0], "outputCurrents": [1.0], "switchingFrequency": 100000, "ambientTemperature": 60},
+        ]
+    }
+    result = PyMKF.process_converter("flyback", spec, use_ngspice=False)
+    assert len(result["operatingPoints"]) == 2
+    assert result["operatingPoints"][1]["conditions"]["ambientTemperature"] == 60

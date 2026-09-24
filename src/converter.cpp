@@ -33,6 +33,10 @@
 #include <PEAS/src/DimensionJson.hpp>
 
 #include <algorithm>
+#include <functional>
+#include <limits>
+#include <map>
+#include <optional>
 #include <cctype>
 #include <cmath>
 #include <stdexcept>
@@ -48,6 +52,10 @@ namespace PyMKF {
 namespace {
 
 constexpr const char* kExceptionPrefix = "Exception: ";
+// The deck fidelity for spec-level decks/simulations: the ideal, requirements-origin parts (Kirchhoff's
+// default). Kirchhoff requires the object — an empty "{}" was rejected ("Fidelity: object with required
+// 'origin' expected"), which broke generate_ngspice_circuit(topology, spec, ...).
+constexpr const char* kRequirementsFidelity = R"({"origin": "REQUIREMENTS"})";
 
 // Kirchhoff returns "Exception: ..." on failure (no throw crosses the boundary). Re-throw it so the
 // caller gets a real Python exception; otherwise parse the JSON payload.
@@ -63,356 +71,552 @@ json kh_json(const std::string& out, const char* fn) {
     return json::parse(out);
 }
 
-// ABT #596: the legacy PyOM converter spec (flat inputVoltage / desiredInductance /
-// operatingPoints[].outputVoltages[]/outputCurrents[]) predates Kirchhoff's TAS-inputs contract
-// (designRequirements + operatingPoints[].outputs[]). Detect the legacy shape and adapt it; a
-// TAS-shaped spec (has designRequirements) passes through untouched.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+// MAS topology-schema spec -> Kirchhoff TAS inputs (ABT #596, rewritten 2026-09-24)
 //
-// EVERY legacy field is either mapped onto what Kirchhoff reads for that topology, or rejected with a
-// specific exception — never silently dropped (a dropped dutyCycle / rectifierType / resonant band used to
-// yield a design for a different converter than the one asked for, e.g. an LLC with a centre-tapped
-// secondary when the spec said fullBridge).
-bool is_legacy_spec(const json& spec) {
-    if (!spec.is_object() || spec.contains("designRequirements")) {
-        return false;
-    }
-    if (!spec.contains("operatingPoints") || !spec.at("operatingPoints").is_array() ||
-        spec.at("operatingPoints").empty()) {
-        return false;
-    }
-    return spec.at("operatingPoints").at(0).contains("outputVoltages");
+// PyOM's converter specs are the MAS topology schemas (MAS/schemas/inputs/topologies/<schema>.json, which $ref
+// PEAS for the shared types). EVERY field a topology schema defines is accepted and routed to what Kirchhoff
+// reads for that topology — a designRequirements entry, a config knob Kirchhoff's design_<topology> honours
+// as the model parameter it names, or a constraint Kirchhoff checks and refuses with a specific message. The
+// only fields refused outright are ones not in the topology's schema (plus the documented PyOM "advanced"
+// extensions below). Nothing is dropped: each handler records where its field went in the field map, and
+// adapt_converter_spec() exposes that map so a test can walk every schema property.
+//
+// Operating points: Kirchhoff designs from operating point 0. Every further operating point is honoured by a
+// second Kirchhoff run on the SAME magnetic — the first design's magnetizing inductance and turns ratios (and
+// the resonant tank / series / output inductances it sized) are pinned — and its operating point is appended
+// to the returned MAS Inputs.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+// PyOM "advanced" extensions (NOT in the MAS topology schemas): pin the magnetic / tank of an already-chosen
+// part (della-Pollock design-around-the-magnetic flow). Kept because existing callers rely on them; `config`
+// passes Kirchhoff knobs verbatim.
+const std::vector<std::string>& advanced_extensions() {
+    static const std::vector<std::string> k = {"desiredInductance", "desiredTurnsRatios", "desiredResonantInductance",
+                                               "desiredResonantCapacitance", "desiredSeriesInductance", "config"};
+    return k;
 }
 
-json legacy_outputs_of(const json& op, const char* where) {
-    const json& vouts = op.at("outputVoltages");
-    const json& iouts = op.at("outputCurrents");
-    if (!vouts.is_array() || !iouts.is_array() || vouts.empty() || vouts.size() != iouts.size()) {
-        throw std::invalid_argument(std::string("legacy converter spec: ") + where +
-                                    " needs matching non-empty outputVoltages/outputCurrents arrays");
-    }
-    json outputs = json::array();
-    for (size_t k = 0; k < vouts.size(); ++k) {
-        json o;
-        o["voltage"] = vouts.at(k);
-        o["power"] = vouts.at(k).get<double>() * iouts.at(k).get<double>();
-        outputs.push_back(o);
-    }
-    return outputs;
-}
-
-// The Kirchhoff config keys a topology reads for each legacy design knob. nullptr / false: the topology has
-// no such knob, so an explicit legacy value cannot be honoured and THROWS.
-struct LegacyKnobs {
-    const char* dutyKey;          // config key of the design duty (at Vin_min) / duty limit
-    bool operatingDuty;           // true: dutyKey IS the design duty, so legacy "dutyCycle" maps too;
-                                  // false: dutyKey is only a limit, so only "maximumDutyCycle" maps
-    const char* rippleKey;        // config key of the inductor current-ripple ratio
-    bool rectifierType;           // reads config.rectifierType
-    bool bridgeType;              // reads config.bridgeType
-    bool qualityFactor;           // reads config.qualityFactor
-    enum class Resonance { NONE, BAND, AT_SWITCHING_FREQUENCY } resonance;
-    enum class Mode { NONE, FLYBACK, PFC } mode;
+struct Adapted {
+    json designRequirements = json::object();
+    json config = json::object();
+    std::vector<json> operatingPoints;          // TAS operating points (inputVoltage, ambientTemperature, outputs)
+    std::vector<json> perOperatingPointConfig;  // op-level knobs (phase shift, duty, power-flow direction, mode)
+    std::vector<double> perOperatingPointFrequency;
+    json fieldMap = json::object();             // schema field -> destination
 };
 
-const LegacyKnobs& legacy_knobs(const std::string& topology) {
-    using R = LegacyKnobs::Resonance;
-    using M = LegacyKnobs::Mode;
-    // Keys as read by Kirchhoff's design_<topology> (cfg::get(d.config, ...)).
-    static const std::unordered_map<std::string, LegacyKnobs> kKnobs = {
-        {"flyback",             {"maxDutyCycle",       true,  "inductorRippleRatio", false, false, false, R::NONE, M::FLYBACK}},
-        {"forward",             {"maxDutyCycle",       true,  "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
-        {"two_switch_forward",  {"maxDutyCycle",       true,  "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
-        {"push_pull",           {"maxDutyCycle",       true,  "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
-        {"acf",                 {"operatingDutyCycle", true,  "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
-        {"ahb",                 {"operatingDutyCycle", true,  "inductorRippleRatio", true,  false, false, R::NONE, M::NONE}},
-        {"psfb",                {"commandedDuty",      true,  "inductorRippleRatio", true,  false, false, R::NONE, M::NONE}},
-        {"pshb",                {"commandedDuty",      true,  "inductorRippleRatio", true,  false, false, R::NONE, M::NONE}},
-        {"isolated_buck",       {nullptr,              false, "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
-        {"isolated_buck_boost", {nullptr,              false, "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
-        {"buck",                {"maximumDutyCycle",   false, "rippleRatio",         false, false, false, R::NONE, M::NONE}},
-        {"boost",               {"maximumDutyCycle",   false, "rippleRatio",         false, false, false, R::NONE, M::NONE}},
-        {"sepic",               {"maximumDutyCycle",   false, nullptr,               false, false, false, R::NONE, M::NONE}},
-        {"cuk",                 {"maximumDutyCycle",   false, nullptr,               false, false, false, R::NONE, M::NONE}},
-        {"zeta",                {"maximumDutyCycle",   false, nullptr,               false, false, false, R::NONE, M::NONE}},
-        {"fsbb",                {"maximumDutyCycle",   false, "inductorRippleRatio", false, false, false, R::NONE, M::NONE}},
-        {"weinberg",            {"maximumDutyCycle",   false, nullptr,               false, false, false, R::NONE, M::NONE}},
-        {"llc",                 {nullptr,              false, "rippleRatio",         true,  true,  true,  R::BAND, M::NONE}},
-        {"src",                 {nullptr,              false, "rippleRatio",         true,  true,  true,  R::AT_SWITCHING_FREQUENCY, M::NONE}},
-        {"cllc",                {nullptr,              false, nullptr,               false, false, true,  R::AT_SWITCHING_FREQUENCY, M::NONE}},
-        {"clllc",               {nullptr,              false, nullptr,               false, false, true,  R::AT_SWITCHING_FREQUENCY, M::NONE}},
-        {"dab",                 {nullptr,              false, nullptr,               false, false, false, R::NONE, M::NONE}},
-        {"pfc",                 {nullptr,              false, nullptr,               false, false, false, R::NONE, M::PFC}},
-        {"vienna",              {nullptr,              false, nullptr,               false, false, false, R::NONE, M::NONE}},
-    };
-    auto it = kKnobs.find(topology);
-    if (it == kKnobs.end()) {
-        throw std::invalid_argument("legacy converter spec: unknown topology '" + topology +
-                                    "' (no legacy-spec mapping); pass a known topology or a TAS-shaped spec "
-                                    "(designRequirements + operatingPoints[].outputs[])");
-    }
+[[noreturn]] void spec_error(const std::string& topology, const std::string& msg) {
+    throw std::invalid_argument("converter spec (" + topology + "): " + msg);
+}
+
+// Put `value` under `dst[key]`; an explicit entry that already says something different is a contradiction.
+void put(json& dst, const std::string& key, const json& value, const std::string& topology, const std::string& field) {
+    if (dst.contains(key) && dst.at(key) != value)
+        spec_error(topology, "'" + field + "' = " + value.dump() + " contradicts " + key + " = " + dst.at(key).dump());
+    dst[key] = value;
+}
+
+std::string normalized(const std::string& raw) {
+    std::string m;
+    for (char c : raw)
+        if (!std::isspace(static_cast<unsigned char>(c)) && c != '_' && c != '-')
+            m += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return m;
+}
+
+// Flyback modes (MAS flybackModes + legacy spellings) -> Kirchhoff ccm/dcm/bcm/qrm.
+std::string flyback_mode(const std::string& raw) {
+    const std::string m = normalized(raw);
+    if (m == "ccm" || m == "continuousconductionmode" || m == "continuous") return "ccm";
+    if (m == "dcm" || m == "discontinuousconductionmode" || m == "discontinuous") return "dcm";
+    if (m == "bcm" || m == "boundarymodeoperation" || m == "boundaryconductionmode" || m == "boundarymode" ||
+        m == "criticalconductionmode" || m == "crm" || m == "transitionmode") return "bcm";
+    if (m == "qrm" || m == "quasiresonantmode" || m == "quasiresonant") return "qrm";
+    throw std::invalid_argument("converter spec (flyback): unknown conduction mode '" + raw + "'");
+}
+
+// A dimensionWithTolerance scaled by `k` (every bound present).
+json scaled_dimension(const json& d, double k) {
+    if (d.is_number()) return d.get<double>() * k;
+    json out = json::object();
+    for (const char* b : {"minimum", "nominal", "maximum"})
+        if (d.contains(b)) out[b] = d.at(b).get<double>() * k;
+    return out;
+}
+
+// The MAS topology schema each Kirchhoff topology is specified by.
+std::string schema_of(const std::string& topology) {
+    static const std::unordered_map<std::string, std::string> k = {
+        {"flyback", "flyback"}, {"buck", "buck"}, {"boost", "boost"}, {"forward", "forward"},
+        {"two_switch_forward", "forward"}, {"acf", "forward"}, {"push_pull", "pushPull"},
+        {"isolated_buck", "isolatedBuck"}, {"isolated_buck_boost", "isolatedBuckBoost"}, {"sepic", "sepic"},
+        {"cuk", "cuk"}, {"zeta", "zeta"}, {"weinberg", "weinberg"}, {"fsbb", "fourSwitchBuckBoost"},
+        {"ahb", "asymmetricHalfBridge"}, {"llc", "llcResonant"}, {"cllc", "cllcResonant"},
+        {"clllc", "clllcResonant"}, {"src", "seriesResonant"}, {"dab", "dualActiveBridge"},
+        {"psfb", "phaseShiftedFullBridge"}, {"pshb", "phaseShiftedHalfBridge"}, {"pfc", "powerFactorCorrection"},
+        {"vienna", "vienna"}, {"cmc", "commonModeChoke"}, {"dmc", "differentialModeChoke"},
+        {"current_transformer", "currentTransformer"}};
+    auto it = k.find(topology);
+    if (it == k.end())
+        throw std::invalid_argument("converter spec: unknown topology '" + topology + "' (no MAS topology schema)");
     return it->second;
 }
 
-[[noreturn]] void legacy_unsupported(const std::string& field, const std::string& topology, const std::string& why) {
-    throw std::invalid_argument("legacy converter spec: '" + field + "' cannot be honoured for topology '" +
-                                topology + "': " + why);
-}
+using TopHandler = std::function<void(const json& v, Adapted& a)>;
+using OpHandler = std::function<void(const json& v, size_t op, Adapted& a)>;
+struct SchemaRules {
+    std::map<std::string, TopHandler> top;
+    std::map<std::string, OpHandler> op;
+};
 
-// Put `value` under config[key]; an explicit config entry that says something different is a contradiction.
-void set_config_knob(json& config, const char* key, const json& value, const std::string& field) {
-    if (config.contains(key) && config.at(key) != value) {
-        throw std::invalid_argument("legacy converter spec: '" + field + "' = " + value.dump() +
-                                    " contradicts config." + key + " = " + config.at(key).dump());
-    }
-    config[key] = value;
-}
-
-// Legacy flyback conduction-mode strings ("Continuous Conduction Mode", ...) -> Kirchhoff's ccm/dcm/bcm/qrm.
-std::string flyback_mode(const std::string& raw) {
-    std::string m;
-    for (char c : raw) {
-        if (!std::isspace(static_cast<unsigned char>(c)) && c != '_' && c != '-') {
-            m += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        }
-    }
-    if (m == "ccm" || m == "continuousconductionmode" || m == "continuous") return "ccm";
-    if (m == "dcm" || m == "discontinuousconductionmode" || m == "discontinuous") return "dcm";
-    if (m == "bcm" || m == "boundaryconductionmode" || m == "boundarymode" || m == "criticalconductionmode" ||
-        m == "crm" || m == "transitionmode") return "bcm";
-    if (m == "qrm" || m == "quasiresonantmode" || m == "quasiresonant") return "qrm";
-    throw std::invalid_argument("legacy converter spec: unknown flyback conduction mode '" + raw + "'");
-}
-
-json legacy_spec_to_tas_inputs(const json& spec, const std::string& topology) {
-    if (!is_legacy_spec(spec)) {
-        return spec;
-    }
-    static const std::vector<std::string> kTopLevel = {
-        "inputVoltage", "operatingPoints", "efficiency", "lineFrequency", "isolationVoltage", "config",
-        "desiredInductance", "desiredTurnsRatios", "desiredResonantInductance", "desiredResonantCapacitance",
-        "desiredSeriesInductance", "minSwitchingFrequency", "maxSwitchingFrequency", "resonantFrequency",
-        "qualityFactor", "currentRippleRatio", "dutyCycle", "maximumDutyCycle", "rectifierType", "bridgeType",
-        "diodeVoltageDrop"};
-    static const std::vector<std::string> kPerOperatingPoint = {
-        "outputVoltages", "outputCurrents", "switchingFrequency", "ambientTemperature", "lineFrequency", "mode"};
-    for (const auto& [key, value] : spec.items()) {
-        (void)value;
-        if (std::find(kTopLevel.begin(), kTopLevel.end(), key) == kTopLevel.end()) {
-            throw std::invalid_argument("legacy converter spec: unsupported field '" + key + "' (topology '" +
-                                        topology + "') — Kirchhoff has no counterpart for it; remove it or pass a "
-                                        "TAS-shaped spec");
-        }
-    }
-    const json& ops = spec.at("operatingPoints");
-    for (size_t i = 0; i < ops.size(); ++i) {
-        for (const auto& [key, value] : ops.at(i).items()) {
-            (void)value;
-            if (std::find(kPerOperatingPoint.begin(), kPerOperatingPoint.end(), key) == kPerOperatingPoint.end()) {
-                throw std::invalid_argument("legacy converter spec: unsupported field operatingPoints[" +
-                                            std::to_string(i) + "]." + key + " (topology '" + topology + "')");
-            }
-        }
-    }
-    const LegacyKnobs& knobs = legacy_knobs(topology);
-    const json& op0 = ops.at(0);
-
-    // Design-level quantities Kirchhoff takes once per design must agree across the operating points.
-    auto same_across_ops = [&](const char* key) {
-        for (size_t i = 1; i < ops.size(); ++i) {
-            const bool a = op0.contains(key), b = ops.at(i).contains(key);
-            if (a != b || (a && op0.at(key) != ops.at(i).at(key))) {
-                throw std::invalid_argument(std::string("legacy converter spec: operatingPoints[") +
-                                            std::to_string(i) + "]." + key + " differs from operatingPoints[0]; " +
-                                            "Kirchhoff designs for ONE " + key + " per spec");
-            }
-        }
+// Handler factories.
+TopHandler to_config(const std::string& topo, const std::string& field, const std::string& key) {
+    return [topo, field, key](const json& v, Adapted& a) {
+        put(a.config, key, v, topo, field);
+        a.fieldMap[field] = "config." + key;
     };
-    same_across_ops("switchingFrequency");
-    same_across_ops("lineFrequency");
-    same_across_ops("mode");
+}
+TopHandler to_dr(const std::string& field, const std::string& key) {
+    return [field, key](const json& v, Adapted& a) {
+        a.designRequirements[key] = v;
+        a.fieldMap[field] = "designRequirements." + key;
+    };
+}
+OpHandler op_to_config(const std::string& topo, const std::string& field, const std::string& key,
+                       std::function<json(const json&)> transform = nullptr) {
+    return [topo, field, key, transform](const json& v, size_t op, Adapted& a) {
+        put(a.perOperatingPointConfig.at(op), key, transform ? transform(v) : v, topo, field);
+        a.fieldMap["operatingPoints[]." + field] = "config." + key + " (per operating point)";
+    };
+}
 
-    if (spec.contains("diodeVoltageDrop")) {
-        legacy_unsupported("diodeVoltageDrop", topology,
-                           "Kirchhoff sizes every rectifier with its DIDEAL diode model (current-dependent forward "
-                           "drop, the same model the ngspice deck simulates), so an explicit fixed drop would "
-                           "describe a different diode; remove the field");
-    }
+SchemaRules rules_for(const std::string& topo) {
+    const std::string schema = schema_of(topo);
+    SchemaRules r;
+    auto cfg = [&](const std::string& field, const std::string& key) { r.top[field] = to_config(topo, field, key); };
+    auto cfgSame = [&](const std::string& field) { cfg(field, field); };
 
-    json dr;
-    if (spec.contains("inputVoltage")) {
-        dr["inputVoltage"] = spec.at("inputVoltage");
+    // Fields shared by the DC-DC topology schemas.
+    r.top["inputVoltage"] = [](const json& v, Adapted& a) {
+        a.designRequirements["inputVoltage"] = v;
+        a.fieldMap["inputVoltage"] = "designRequirements.inputVoltage (+ operatingPoints[].inputVoltage = nominal)";
+    };
+    r.top["efficiency"] = to_dr("efficiency", "efficiency");
+    r.top["diodeVoltageDrop"] = [topo](const json& v, Adapted& a) {
+        put(a.config, "diodeVoltageDrop", v, topo, "diodeVoltageDrop");
+        a.fieldMap["diodeVoltageDrop"] = "config.diodeVoltageDrop (Kirchhoff fixed-drop rectifier model)";
+    };
+    r.top["maximumSwitchCurrent"] = to_config(topo, "maximumSwitchCurrent", "maximumSwitchCurrent");
+    r.top["operatingPoints"] = [](const json&, Adapted& a) { a.fieldMap["operatingPoints"] = "operatingPoints[]"; };
+    r.op["outputVoltages"] = [](const json&, size_t, Adapted& a) { a.fieldMap["operatingPoints[].outputVoltages"] = "designRequirements.outputs[].voltage / operatingPoints[].outputs[]"; };
+    r.op["outputCurrents"] = [](const json&, size_t, Adapted& a) { a.fieldMap["operatingPoints[].outputCurrents"] = "operatingPoints[].outputs[].power = V·I"; };
+    for (const char* t : {"outputVoltagesType", "outputCurrentsType"}) {
+        const std::string field = t;
+        r.op[field] = [topo, field](const json& v, size_t, Adapted& a) {
+            const std::string s = v.get<std::string>();
+            if (s != "dc" && s != "average")
+                spec_error(topo, field + " '" + s + "': Kirchhoff's converter models take DC (= average) output "
+                           "quantities; a '" + s + "' value cannot be converted without the output waveform");
+            a.fieldMap["operatingPoints[]." + field] = "constraint: dc/average accepted";
+        };
     }
-    if (op0.contains("switchingFrequency")) {
-        dr["switchingFrequency"]["nominal"] = op0.at("switchingFrequency");
-    }
-    if (spec.contains("efficiency")) {
-        dr["efficiency"] = spec.at("efficiency");
-    }
-    if (spec.contains("lineFrequency")) {   // AC-input topologies (PFC, Vienna)
-        if (op0.contains("lineFrequency") && op0.at("lineFrequency") != spec.at("lineFrequency")) {
-            throw std::invalid_argument("legacy converter spec: lineFrequency and operatingPoints[0].lineFrequency differ");
-        }
-        dr["lineFrequency"]["nominal"] = spec.at("lineFrequency");
-    } else if (op0.contains("lineFrequency")) {
-        dr["lineFrequency"]["nominal"] = op0.at("lineFrequency");
-    }
-    if (spec.contains("isolationVoltage")) {
-        dr["isolationVoltage"] = spec.at("isolationVoltage");
-    }
-    if (spec.contains("desiredInductance")) {
-        dr["magnetizingInductance"]["nominal"] = spec.at("desiredInductance");
-    }
-    if (spec.contains("desiredTurnsRatios")) {
-        dr["turnsRatios"] = spec.at("desiredTurnsRatios");
-    }
-    for (const char* k : {"desiredResonantInductance", "desiredResonantCapacitance", "desiredSeriesInductance"}) {
-        if (spec.contains(k)) {
-            dr[k] = spec.at(k);   // read verbatim by Kirchhoff's provided_resonant_* / provided_series_inductance
-        }
-    }
+    r.op["switchingFrequency"] = [](const json& v, size_t op, Adapted& a) {
+        a.perOperatingPointFrequency.at(op) = v.get<double>();
+        a.fieldMap["operatingPoints[].switchingFrequency"] = "designRequirements.switchingFrequency (per operating point)";
+    };
+    r.op["ambientTemperature"] = [](const json& v, size_t op, Adapted& a) {
+        a.operatingPoints.at(op)["ambientTemperature"] = v;
+        a.fieldMap["operatingPoints[].ambientTemperature"] = "operatingPoints[].ambientTemperature";
+    };
 
-    json drOutputs = json::array();
-    for (const auto& o : legacy_outputs_of(op0, "operatingPoints[0]")) {
-        json out;
-        out["name"] = "output " + std::to_string(drOutputs.size());
-        out["voltage"]["nominal"] = o.at("voltage");
-        out["power"]["nominal"] = o.at("power");
-        drOutputs.push_back(out);
-    }
-    dr["outputs"] = drOutputs;
+    const std::string ripple = (topo == "buck" || topo == "boost" || topo == "llc" || topo == "src") ? "rippleRatio"
+                             : (topo == "sepic" || topo == "zeta" || topo == "cuk" || topo == "weinberg") ? "l1RippleRatio"
+                             : "inductorRippleRatio";
+    r.top["currentRippleRatio"] = to_config(topo, "currentRippleRatio", ripple);
 
-    json tas;
-    tas["designRequirements"] = std::move(dr);
-    tas["operatingPoints"] = json::array();
-    for (size_t i = 0; i < ops.size(); ++i) {
-        const json& op = ops.at(i);
-        json top;
-        top["name"] = "operating point " + std::to_string(i);
-        if (spec.contains("inputVoltage")) {
-            top["inputVoltage"] = PEAS::resolve_dimensional_values(spec.at("inputVoltage"));
-        }
-        if (op.contains("ambientTemperature")) {
-            top["ambientTemperature"] = op.at("ambientTemperature");
-        }
-        top["outputs"] = legacy_outputs_of(op, "operatingPoints[i]");
-        tas["operatingPoints"].push_back(std::move(top));
-    }
-
-    // Kirchhoff sizing knobs travel in config, under the key THIS topology reads.
-    json config = spec.value("config", json::object());
-
-    if (spec.contains("currentRippleRatio")) {
-        if (!knobs.rippleKey) {
-            legacy_unsupported("currentRippleRatio", topology, "the topology has no ripple-ratio design knob");
-        }
-        set_config_knob(config, knobs.rippleKey, spec.at("currentRippleRatio"), "currentRippleRatio");
-    }
-
-    // Duty: "maximumDutyCycle" (the duty limit / design duty at Vin_min) and "dutyCycle" (the design duty).
-    if (spec.contains("dutyCycle") && spec.contains("maximumDutyCycle") &&
-        spec.at("dutyCycle") != spec.at("maximumDutyCycle")) {
-        throw std::invalid_argument("legacy converter spec: dutyCycle = " + spec.at("dutyCycle").dump() +
-                                    " and maximumDutyCycle = " + spec.at("maximumDutyCycle").dump() +
-                                    " disagree; Kirchhoff designs " + topology + " around ONE duty");
-    }
-    if (spec.contains("maximumDutyCycle")) {
-        if (!knobs.dutyKey) {
-            legacy_unsupported("maximumDutyCycle", topology, "the topology has no duty design knob");
-        }
-        set_config_knob(config, knobs.dutyKey, spec.at("maximumDutyCycle"), "maximumDutyCycle");
-    }
-    if (spec.contains("dutyCycle")) {
-        if (!knobs.dutyKey || !knobs.operatingDuty) {
-            legacy_unsupported("dutyCycle", topology,
-                               "the duty follows from the conversion ratio (only a maximumDutyCycle limit is a knob)");
-        }
-        set_config_knob(config, knobs.dutyKey, spec.at("dutyCycle"), "dutyCycle");
-    }
-
-    if (spec.contains("rectifierType")) {
-        if (!knobs.rectifierType) {
-            legacy_unsupported("rectifierType", topology, "the topology has a fixed rectifier");
-        }
-        set_config_knob(config, "rectifierType", spec.at("rectifierType"), "rectifierType");
-    }
-    if (spec.contains("bridgeType")) {
-        if (!knobs.bridgeType) {
-            legacy_unsupported("bridgeType", topology, "the topology has a fixed primary bridge");
-        }
-        set_config_knob(config, "bridgeType", spec.at("bridgeType"), "bridgeType");
-    }
-    if (spec.contains("qualityFactor")) {
-        if (!knobs.qualityFactor) {
-            legacy_unsupported("qualityFactor", topology, "the topology has no resonant tank");
-        }
-        set_config_knob(config, "qualityFactor", spec.at("qualityFactor"), "qualityFactor");
-    }
-
-    // Resonant frequency and the switching-frequency band.
-    const bool hasMin = spec.contains("minSwitchingFrequency"), hasMax = spec.contains("maxSwitchingFrequency");
-    const bool hasFr = spec.contains("resonantFrequency");
-    if (knobs.resonance == LegacyKnobs::Resonance::BAND) {
-        // LLC: fr = sqrt(resonantBandMin · resonantBandMax) (Kirchhoff Llc.cpp).
-        if (hasMin != hasMax) {
-            throw std::invalid_argument("legacy converter spec: " + topology + " needs BOTH minSwitchingFrequency and "
-                                        "maxSwitchingFrequency (the resonant band) or neither");
-        }
-        if (hasMin) {
-            const double fmin = spec.at("minSwitchingFrequency").get<double>();
-            const double fmax = spec.at("maxSwitchingFrequency").get<double>();
-            if (!(fmin > 0) || !(fmax >= fmin)) {
-                throw std::invalid_argument("legacy converter spec: need 0 < minSwitchingFrequency <= maxSwitchingFrequency");
-            }
-            if (hasFr) {
-                const double fr = spec.at("resonantFrequency").get<double>();
-                const double bandCentre = std::sqrt(fmin * fmax);
-                if (std::abs(fr - bandCentre) > 1e-6 * bandCentre) {
-                    throw std::invalid_argument("legacy converter spec: resonantFrequency = " + std::to_string(fr) +
-                                                " contradicts the band centre sqrt(min*max) = " +
-                                                std::to_string(bandCentre) + " Kirchhoff designs the " + topology +
-                                                " tank at");
-                }
-            }
-            set_config_knob(config, "resonantBandMin", spec.at("minSwitchingFrequency"), "minSwitchingFrequency");
-            set_config_knob(config, "resonantBandMax", spec.at("maxSwitchingFrequency"), "maxSwitchingFrequency");
-        } else if (hasFr) {
-            set_config_knob(config, "resonantBandMin", spec.at("resonantFrequency"), "resonantFrequency");
-            set_config_knob(config, "resonantBandMax", spec.at("resonantFrequency"), "resonantFrequency");
-        }
-    } else {
-        if (hasMin || hasMax) {
-            legacy_unsupported(hasMin ? "minSwitchingFrequency" : "maxSwitchingFrequency", topology,
-                               "the design runs at the single operating switching frequency");
-        }
-        if (hasFr) {
-            if (knobs.resonance != LegacyKnobs::Resonance::AT_SWITCHING_FREQUENCY) {
-                legacy_unsupported("resonantFrequency", topology, "the topology has no resonant tank");
-            }
-            // SRC / CLLC / CLLLC are designed AT resonance: fr = the operating switching frequency.
-            if (!op0.contains("switchingFrequency") ||
-                std::abs(spec.at("resonantFrequency").get<double>() - op0.at("switchingFrequency").get<double>()) >
-                    1e-6 * op0.at("switchingFrequency").get<double>()) {
-                legacy_unsupported("resonantFrequency", topology,
-                                   "the tank is designed at resonance, fr = operatingPoints[0].switchingFrequency; "
-                                   "a different resonantFrequency describes another design");
-            }
-        }
-    }
-
-    if (op0.contains("mode")) {
-        if (knobs.mode == LegacyKnobs::Mode::FLYBACK) {
-            set_config_knob(config, "mode", flyback_mode(op0.at("mode").get<std::string>()), "mode");
-        } else if (knobs.mode == LegacyKnobs::Mode::PFC) {
-            set_config_knob(config, "mode", op0.at("mode"), "mode");   // Kirchhoff normalizes the PFC mode names
+    if (schema == "flyback") {
+        cfgSame("maximumDrainSourceVoltage");
+        cfg("maximumDutyCycle", "maxDutyCycle");
+        r.op["mode"] = op_to_config(topo, "mode", "mode", [](const json& v) { return json(flyback_mode(v.get<std::string>())); });
+    } else if (schema == "forward") {
+        cfg("dutyCycle", topo == "acf" ? "operatingDutyCycle" : "maxDutyCycle");
+    } else if (schema == "pushPull") {
+        cfg("dutyCycle", "maxDutyCycle");
+        cfgSame("maximumDrainSourceVoltage");
+    } else if (schema == "sepic" || schema == "zeta") {
+        r.top["synchronousRectifier"] = [topo](const json& v, Adapted& a) {
+            put(a.config, "rectifier", v.get<bool>() ? "synchronous" : "diode", topo, "synchronousRectifier");
+            a.fieldMap["synchronousRectifier"] = "config.rectifier";
+        };
+        cfgSame("coupledInductor");
+        cfgSame("couplingCoefficient");
+    } else if (schema == "cuk") {
+        r.top["synchronous"] = [topo](const json& v, Adapted& a) {
+            put(a.config, "rectifier", v.get<bool>() ? "synchronous" : "diode", topo, "synchronous");
+            a.fieldMap["synchronous"] = "config.rectifier";
+        };
+        for (const char* f : {"bidirectional", "isolated", "coupledInductor", "turnsRatio", "couplingCoefficient",
+                              "couplingCapacitanceSecondary"}) cfgSame(f);
+        r.op["powerFlow"] = op_to_config(topo, "powerFlow", "powerFlowDirection");
+    } else if (schema == "fourSwitchBuckBoost") {
+        for (const char* f : {"outputVoltageRippleRatio", "controlMode", "transitionMode", "bidirectional", "phaseCount"})
+            cfgSame(f);
+        cfg("transitionHysteresisRatio", "fsbbTransitionBand");
+    } else if (schema == "weinberg") {
+        for (const char* f : {"variant", "synchronousRectifier", "couplingCoefficientInput", "couplingCoefficientMain"})
+            cfgSame(f);
+    } else if (schema == "asymmetricHalfBridge") {
+        for (const char* f : {"rectifierType", "useLeakageInductance", "leakageInductance", "outputInductance",
+                              "dcBlockingCapacitance", "maximumDutyCycle", "inputVoltageStepRange"}) cfgSame(f);
+        r.top["magnetizingInductance"] = [](const json& v, Adapted& a) {
+            a.designRequirements["magnetizingInductance"] = json{{"nominal", v}};
+            a.fieldMap["magnetizingInductance"] = "designRequirements.magnetizingInductance";
+        };
+        r.op["dutyCycle"] = op_to_config(topo, "dutyCycle", "operatingDutyCycle");
+    } else if (schema == "llcResonant") {
+        // Band / resonant frequency: fr = sqrt(resonantBandMin·resonantBandMax) in Kirchhoff's LLC.
+        r.top["minSwitchingFrequency"] = to_config(topo, "minSwitchingFrequency", "resonantBandMin");
+        r.top["maxSwitchingFrequency"] = to_config(topo, "maxSwitchingFrequency", "resonantBandMax");
+        r.top["resonantFrequency"] = [topo](const json& v, Adapted& a) {
+            a.fieldMap["resonantFrequency"] = "config.resonantBandMin/Max (fr = sqrt(min·max))";
+            a.config["__llcResonantFrequency"] = v;   // resolved against the band after every field is read
+        };
+        cfgSame("inductanceRatio"); cfgSame("qualityFactor"); cfgSame("bridgeType"); cfgSame("rectifierType");
+        cfgSame("integratedResonantInductor");
+        r.top["seriesInductance"] = to_dr("seriesInductance", "desiredResonantInductance");
+        r.top["resonantCapacitance"] = to_dr("resonantCapacitance", "desiredResonantCapacitance");
+        // The operating point's switchingFrequency is the frequency the LLC runs at (inside the band), not fr.
+        r.op["switchingFrequency"] = [topo](const json& v, size_t op, Adapted& a) {
+            a.perOperatingPointFrequency.at(op) = v.get<double>();
+            put(a.perOperatingPointConfig.at(op), "driveAtSwitchingFrequency", true, topo, "switchingFrequency");
+            a.fieldMap["operatingPoints[].switchingFrequency"] =
+                "designRequirements.switchingFrequency + config.driveAtSwitchingFrequency (operated there)";
+        };
+    } else if (schema == "cllcResonant") {
+        for (const char* f : {"minSwitchingFrequency", "maxSwitchingFrequency", "qualityFactor", "symmetricDesign",
+                              "bidirectional", "bridgeType", "integratedResonantInductor1", "integratedResonantInductor2",
+                              "resonantInductorRatio", "resonantCapacitorRatio"}) cfgSame(f);
+        r.op["powerFlow"] = op_to_config(topo, "powerFlow", "powerFlowDirection");
+    } else if (schema == "clllcResonant") {
+        r.top["highVoltageBusVoltage"] = [](const json& v, Adapted& a) {
+            a.designRequirements["inputVoltage"] = v;
+            a.fieldMap["highVoltageBusVoltage"] = "designRequirements.inputVoltage (+ operatingPoints[].inputVoltage)";
+        };
+        r.top["lowVoltageBusVoltage"] = [](const json& v, Adapted& a) {
+            a.config["__lowVoltageBus"] = v;   // becomes outputs[0].voltage; checked against outputVoltages[0]
+            a.fieldMap["lowVoltageBusVoltage"] = "designRequirements.outputs[0].voltage";
+        };
+        for (const char* f : {"minSwitchingFrequency", "maxSwitchingFrequency", "primaryResonantFrequency",
+                              "qualityFactor", "tankSymmetryRatio", "bridgeTypePrimary", "bridgeTypeSecondary",
+                              "controlStrategy", "integratedResonantInductors", "primarySeriesInductance",
+                              "primaryResonantCapacitance"}) cfgSame(f);
+        cfg("inductanceRatioK", "inductanceRatio");
+        r.op["powerFlowDirection"] = op_to_config(topo, "powerFlowDirection", "powerFlowDirection");
+        r.op["phaseShiftDegrees"] = op_to_config(topo, "phaseShiftDegrees", "phaseShiftDegrees");
+    } else if (schema == "seriesResonant") {
+        for (const char* f : {"minSwitchingFrequency", "maxSwitchingFrequency", "resonantFrequency", "qualityFactor",
+                              "bridgeType", "isolated", "useSynchronousRectifier"}) cfgSame(f);
+        r.top["rectifierType"] = [topo](const json& v, Adapted& a) {
+            static const std::unordered_map<std::string, std::string> k = {
+                {"fullBridgeDiode", "fullBridge"}, {"centerTappedDiode", "centerTapped"}, {"currentDoubler", "currentDoubler"}};
+            const auto it = k.find(v.get<std::string>());
+            if (it == k.end()) spec_error(topo, "unknown rectifierType '" + v.get<std::string>() + "'");
+            put(a.config, "rectifierType", it->second, topo, "rectifierType");
+            a.fieldMap["rectifierType"] = "config.rectifierType";
+        };
+        r.top["seriesInductance"] = to_dr("seriesInductance", "desiredResonantInductance");
+        r.top["resonantCapacitance"] = to_dr("resonantCapacitance", "desiredResonantCapacitance");
+    } else if (schema == "dualActiveBridge" || schema == "phaseShiftedFullBridge" || schema == "phaseShiftedHalfBridge") {
+        // seriesInductance 0 = "use the transformer leakage": the series inductance is then realised as T1's
+        // leakage (useLeakageInductance), sized by the design; > 0 pins it.
+        r.top["seriesInductance"] = [topo](const json& v, Adapted& a) {
+            const double l = v.get<double>();
+            if (l < 0) spec_error(topo, "seriesInductance must be >= 0");
+            if (l > 0) put(a.config, "seriesInductance", l, topo, "seriesInductance");
+            else put(a.config, "useLeakageInductance", true, topo, "seriesInductance = 0 (use the leakage)");
+            a.fieldMap["seriesInductance"] = l > 0 ? "config.seriesInductance" : "config.useLeakageInductance = true";
+        };
+        cfgSame("useLeakageInductance");
+        if (schema == "dualActiveBridge") {
+            cfgSame("perSecondaryLeakage");
+            r.op["modulationType"] = op_to_config(topo, "modulationType", "dabModulationType");
+            r.op["innerPhaseShift1"] = op_to_config(topo, "innerPhaseShift1", "dabInnerPhaseShift1Deg");
+            r.op["innerPhaseShift2"] = op_to_config(topo, "innerPhaseShift2", "dabInnerPhaseShift2Deg");
+            r.op["innerPhaseShift3"] = op_to_config(topo, "innerPhaseShift3", "dabPhaseShiftDeg");
         } else {
-            legacy_unsupported("operatingPoints[].mode", topology, "the topology has no conduction-mode knob");
+            cfgSame("outputInductance"); cfgSame("rectifierType"); cfgSame("maximumPhaseShift");
+            r.op["phaseShift"] = op_to_config(topo, "phaseShift", "commandedDuty",
+                                              [](const json& v) { return json(v.get<double>() / 180.0); });
+        }
+    } else if (schema == "powerFactorCorrection") {
+        r.top.erase("operatingPoints");
+        r.top["outputVoltage"] = [](const json& v, Adapted& a) {
+            a.config["__pfcOutputVoltage"] = v;
+            a.fieldMap["outputVoltage"] = "designRequirements.outputs[0].voltage";
+        };
+        r.top["outputPower"] = [](const json& v, Adapted& a) {
+            a.config["__pfcOutputPower"] = v;
+            a.fieldMap["outputPower"] = "operatingPoints[0].outputs[0].power";
+        };
+        r.top["lineFrequency"] = [](const json& v, Adapted& a) {
+            a.designRequirements["lineFrequency"] = json{{"nominal", v}};
+            a.fieldMap["lineFrequency"] = "designRequirements.lineFrequency";
+        };
+        r.top["switchingFrequency"] = [](const json& v, Adapted& a) {
+            a.config["__pfcSwitchingFrequency"] = v;
+            a.fieldMap["switchingFrequency"] = "designRequirements.switchingFrequency";
+        };
+        r.top["ambientTemperature"] = [](const json& v, Adapted& a) {
+            a.config["__pfcAmbient"] = v;
+            a.fieldMap["ambientTemperature"] = "operatingPoints[0].ambientTemperature";
+        };
+        cfg("currentRippleRatio", "currentRippleFraction");
+        r.top["mode"] = [topo](const json& v, Adapted& a) {
+            static const std::unordered_map<std::string, std::string> k = {
+                {"continuousConductionMode", "ccm"}, {"discontinuousConductionMode", "dcm"},
+                {"criticalConductionMode", "crm"}, {"transitionMode", "transition"}};
+            const auto it = k.find(v.get<std::string>());
+            put(a.config, "mode", it != k.end() ? json(it->second) : v, topo, "mode");
+            a.fieldMap["mode"] = "config.mode";
+        };
+        cfgSame("topologyVariant"); cfgSame("numberOfPhases"); cfgSame("wideBandgapSwitch");
+        cfg("bulkCapacitance", "outputCapacitance");
+        r.top["maximumCoreTemperatureRise"] = [topo](const json&, Adapted&) {
+            spec_error(topo, "maximumCoreTemperatureRise cannot be honoured: the MAS Inputs this call returns have no "
+                       "temperature-rise requirement (MAS designRequirements has no such field) and no magnetic is "
+                       "designed here to check it against — a MAS schema gap, not a Kirchhoff choice");
+        };
+    } else if (schema == "vienna") {
+        r.top["lineToLineVoltage"] = [](const json& v, Adapted& a) {
+            // Kirchhoff's Vienna takes the PHASE (line-to-neutral) rms: V_LN = V_LL/√3.
+            a.designRequirements["inputVoltage"] = scaled_dimension(v, 1.0 / std::sqrt(3.0));
+            a.fieldMap["lineToLineVoltage"] = "designRequirements.inputVoltage = V_LL/sqrt(3) (phase rms)";
+        };
+        r.top["lineFrequency"] = [](const json& v, Adapted& a) {
+            a.designRequirements["lineFrequency"] = json{{"nominal", v}};
+            a.fieldMap["lineFrequency"] = "designRequirements.lineFrequency";
+        };
+        r.top["outputDcVoltage"] = [](const json& v, Adapted& a) {
+            a.config["__viennaOutputDcVoltage"] = v;
+            a.fieldMap["outputDcVoltage"] = "designRequirements.outputs[0].voltage (checked against outputVoltages)";
+        };
+        r.top["switchingFrequency"] = [](const json& v, Adapted& a) {
+            a.config["__viennaSwitchingFrequency"] = v;
+            a.fieldMap["switchingFrequency"] = "designRequirements.switchingFrequency (checked against the operating points)";
+        };
+        for (const char* f : {"powerFactor", "viennaVariant", "switchType", "synchronousRectifier", "samplingStrategy"})
+            cfgSame(f);
+        cfg("phaseCount", "numberOfChannels");
+    }
+    return r;
+}
+
+bool is_chokes_or_ct(const std::string& topo) { return topo == "cmc" || topo == "dmc" || topo == "current_transformer"; }
+
+// Adapt a MAS topology-schema spec. Returns one Kirchhoff TAS-inputs spec per operating point (index 0 is the
+// design point) plus the field map.
+struct AdaptResult {
+    std::vector<json> specs;
+    json fieldMap;
+};
+
+AdaptResult adapt_spec(const json& spec, const std::string& topo) {
+    AdaptResult out;
+    if (!spec.is_object()) spec_error(topo, "the spec must be a JSON object");
+    if (spec.contains("designRequirements")) {   // already Kirchhoff/TAS-shaped: pass through
+        out.specs.push_back(spec);
+        return out;
+    }
+    const std::string schema = schema_of(topo);
+    if (is_chokes_or_ct(topo)) {
+        // The CMC / DMC / current-transformer designers read their MAS schema fields natively.
+        out.specs.push_back(spec);
+        for (const auto& [k, v] : spec.items()) { (void)v; out.fieldMap[k] = "Kirchhoff design_" + topo + " (native)"; }
+        return out;
+    }
+    SchemaRules rules = rules_for(topo);
+    const auto& ext = advanced_extensions();
+    for (const auto& [k, v] : spec.items()) {
+        (void)v;
+        if (!rules.top.count(k) && std::find(ext.begin(), ext.end(), k) == ext.end())
+            spec_error(topo, "field '" + k + "' is not in the MAS " + schema + " schema");
+    }
+    Adapted a;
+    const bool pfc = (schema == "powerFactorCorrection");
+    const json ops = pfc ? json::array({json::object()}) : spec.at("operatingPoints");
+    if (!ops.is_array() || ops.empty()) spec_error(topo, "operatingPoints must be a non-empty array");
+    a.operatingPoints.assign(ops.size(), json::object());
+    a.perOperatingPointConfig.assign(ops.size(), json::object());
+    a.perOperatingPointFrequency.assign(ops.size(), std::numeric_limits<double>::quiet_NaN());
+    if (spec.contains("config")) a.config = spec.at("config");
+
+    for (const auto& [k, v] : spec.items())
+        if (rules.top.count(k)) rules.top.at(k)(v, a);
+    for (size_t i = 0; i < ops.size(); ++i) {
+        for (const auto& [k, v] : ops.at(i).items()) {
+            if (!rules.op.count(k))
+                spec_error(topo, "operatingPoints[" + std::to_string(i) + "]." + k + " is not in the MAS " + schema +
+                           " schema");
+            rules.op.at(k)(v, i, a);
         }
     }
 
-    if (!config.empty()) {
-        tas["config"] = std::move(config);
+    // Advanced extensions.
+    if (spec.contains("desiredInductance"))
+        a.designRequirements["magnetizingInductance"] = json{{"nominal", spec.at("desiredInductance")}};
+    if (spec.contains("desiredTurnsRatios")) a.designRequirements["turnsRatios"] = spec.at("desiredTurnsRatios");
+    for (const char* k : {"desiredResonantInductance", "desiredResonantCapacitance", "desiredSeriesInductance"})
+        if (spec.contains(k)) a.designRequirements[k] = spec.at(k);
+
+    // Cross-field resolution.
+    if (a.config.contains("__llcResonantFrequency")) {
+        const double fr = a.config.at("__llcResonantFrequency").get<double>();
+        a.config.erase("__llcResonantFrequency");
+        const bool hasMin = a.config.contains("resonantBandMin"), hasMax = a.config.contains("resonantBandMax");
+        if (hasMin && hasMax) {
+            const double centre = std::sqrt(a.config.at("resonantBandMin").get<double>() * a.config.at("resonantBandMax").get<double>());
+            if (std::abs(fr - centre) > 1e-6 * centre)
+                spec_error(topo, "resonantFrequency " + std::to_string(fr) + " Hz contradicts the band centre sqrt(min·max) = " +
+                           std::to_string(centre) + " Hz Kirchhoff designs the LLC tank at");
+        } else if (hasMin || hasMax) {
+            spec_error(topo, "resonantFrequency with only one of min/maxSwitchingFrequency is ambiguous");
+        } else {
+            a.config["resonantBandMin"] = fr;
+            a.config["resonantBandMax"] = fr;
+        }
     }
-    return tas;
+    if (schema == "llcResonant" && (a.config.contains("resonantBandMin") != a.config.contains("resonantBandMax")))
+        spec_error(topo, "needs BOTH minSwitchingFrequency and maxSwitchingFrequency (the resonant band) or neither");
+
+    // Outputs and operating points.
+    json drOutputs = json::array();
+    if (pfc) {
+        for (const char* k : {"__pfcOutputVoltage", "__pfcOutputPower", "__pfcSwitchingFrequency"})
+            if (!a.config.contains(k)) spec_error(topo, std::string("missing ") + (k + 5));
+        drOutputs.push_back(json{{"name", "output 0"}, {"voltage", {{"nominal", a.config.at("__pfcOutputVoltage")}}}});
+        a.operatingPoints[0]["outputs"] = json::array({json{{"power", a.config.at("__pfcOutputPower")}}});
+        a.perOperatingPointFrequency[0] = a.config.at("__pfcSwitchingFrequency").get<double>();
+        if (a.config.contains("__pfcAmbient")) a.operatingPoints[0]["ambientTemperature"] = a.config.at("__pfcAmbient");
+        for (const char* k : {"__pfcOutputVoltage", "__pfcOutputPower", "__pfcSwitchingFrequency", "__pfcAmbient"})
+            a.config.erase(k);
+    } else {
+        for (size_t i = 0; i < ops.size(); ++i) {
+            const json& op = ops.at(i);
+            if (!op.contains("outputVoltages") || !op.contains("outputCurrents"))
+                spec_error(topo, "operatingPoints[" + std::to_string(i) + "] needs outputVoltages and outputCurrents");
+            const json& vs = op.at("outputVoltages");
+            const json& is = op.at("outputCurrents");
+            if (!vs.is_array() || !is.is_array() || vs.empty() || vs.size() != is.size())
+                spec_error(topo, "operatingPoints[" + std::to_string(i) + "] needs matching non-empty outputVoltages/outputCurrents");
+            json outs = json::array();
+            for (size_t k = 0; k < vs.size(); ++k) outs.push_back(json{{"power", vs.at(k).get<double>() * is.at(k).get<double>()}});
+            a.operatingPoints[i]["outputs"] = outs;
+            if (i == 0)
+                for (size_t k = 0; k < vs.size(); ++k)
+                    drOutputs.push_back(json{{"name", "output " + std::to_string(k)}, {"voltage", {{"nominal", vs.at(k)}}}});
+        }
+    }
+    if (a.config.contains("__lowVoltageBus")) {
+        const json lv = a.config.at("__lowVoltageBus");
+        a.config.erase("__lowVoltageBus");
+        const double lvNominal = PEAS::resolve_dimensional_values(lv);
+        if (std::abs(lvNominal - drOutputs.at(0).at("voltage").at("nominal").get<double>()) > 1e-6 * lvNominal)
+            spec_error(topo, "lowVoltageBusVoltage (nominal " + std::to_string(lvNominal) +
+                       " V) disagrees with operatingPoints[0].outputVoltages[0]");
+        drOutputs.at(0)["voltage"] = lv;
+    }
+    if (a.config.contains("__viennaOutputDcVoltage")) {
+        const double vdc = a.config.at("__viennaOutputDcVoltage").get<double>();
+        a.config.erase("__viennaOutputDcVoltage");
+        if (std::abs(vdc - drOutputs.at(0).at("voltage").at("nominal").get<double>()) > 1e-6 * vdc)
+            spec_error(topo, "outputDcVoltage disagrees with operatingPoints[0].outputVoltages[0]");
+    }
+    if (a.config.contains("__viennaSwitchingFrequency")) {
+        const double fs = a.config.at("__viennaSwitchingFrequency").get<double>();
+        a.config.erase("__viennaSwitchingFrequency");
+        for (auto& f : a.perOperatingPointFrequency) {
+            if (!std::isnan(f) && std::abs(f - fs) > 1e-9 * fs)
+                spec_error(topo, "switchingFrequency disagrees with an operating point's switchingFrequency");
+            f = fs;
+        }
+    }
+    a.designRequirements["outputs"] = drOutputs;
+    if (!a.designRequirements.contains("inputVoltage"))
+        spec_error(topo, "needs the input voltage (inputVoltage / highVoltageBusVoltage / lineToLineVoltage)");
+    const double vinNominal = PEAS::resolve_dimensional_values(a.designRequirements.at("inputVoltage"));
+
+    for (size_t i = 0; i < ops.size(); ++i) {
+        if (std::isnan(a.perOperatingPointFrequency[i]))
+            spec_error(topo, "operatingPoints[" + std::to_string(i) + "] has no switchingFrequency" +
+                       (schema == "flyback" ? std::string(" — the schema lets a flyback infer it from the conduction "
+                        "mode, but MAS docs/inputs.md defines no inference rule and Kirchhoff needs the frequency")
+                                            : std::string()));
+        json s;
+        s["designRequirements"] = a.designRequirements;
+        s["designRequirements"]["switchingFrequency"] = json{{"nominal", a.perOperatingPointFrequency[i]}};
+        json op = a.operatingPoints[i];
+        op["name"] = "operating point " + std::to_string(i);
+        op["inputVoltage"] = vinNominal;
+        s["operatingPoints"] = json::array({op});
+        json config = a.config;
+        for (const auto& [k, v] : a.perOperatingPointConfig[i].items()) put(config, k, v, topo, k);
+        if (!config.empty()) s["config"] = config;
+        out.specs.push_back(std::move(s));
+    }
+    out.fieldMap = a.fieldMap;
+    for (const char* k : {"desiredInductance", "desiredTurnsRatios", "desiredResonantInductance",
+                          "desiredResonantCapacitance", "desiredSeriesInductance", "config"})
+        if (spec.contains(k)) out.fieldMap[k] = "PyOM advanced extension (not in the MAS schema)";
+    return out;
+}
+
+// Pin the design of operating point 0 into a later operating point's spec, so every operating point describes
+// the SAME magnetic: the main magnetic's magnetizing inductance and turns ratios, and the tank / series / output
+// inductances the design sized (read back from the op-0 TAS by component name).
+void pin_design(json& spec, const json& tas0, const json& inputs0, const std::string& topo) {
+    json& dr = spec["designRequirements"];
+    const json& dr0 = inputs0.at("designRequirements");
+    const double lm = PEAS::resolve_dimensional_values(dr0.at("magnetizingInductance"));
+    dr["magnetizingInductance"] = json{{"nominal", lm}};
+    json tr = json::array();
+    for (const auto& t : dr0.at("turnsRatios")) tr.push_back(json{{"nominal", PEAS::resolve_dimensional_values(t)}});
+    dr["turnsRatios"] = tr;
+    // Component values from the TAS.
+    auto component_value = [&](const std::string& name) -> std::optional<double> {
+        for (const auto& st : tas0.at("topology").at("stages")) {
+            if (!st.contains("circuit") || !st.at("circuit").contains("components")) continue;
+            for (const auto& c : st.at("circuit").at("components")) {
+                if (c.value("name", std::string()) != name || !c.contains("data")) continue;
+                const json& d = c.at("data");
+                if (d.contains("magnetic") && d.contains("inputs"))
+                    return PEAS::resolve_dimensional_values(d.at("inputs").at("designRequirements").at("magnetizingInductance"));
+                if (d.contains("capacitor"))
+                    return PEAS::resolve_dimensional_values(d.at("inputs").at("designRequirements").at("capacitance"));
+            }
+        }
+        return std::nullopt;
+    };
+    json& config = spec["config"];
+    if (topo == "llc" || topo == "src") {
+        if (auto l = component_value("Lr")) dr["desiredResonantInductance"] = *l;
+        if (auto c = component_value("Cr")) dr["desiredResonantCapacitance"] = *c;
+    } else if (topo == "clllc") {
+        if (auto l = component_value("Lr1")) config["primarySeriesInductance"] = *l;
+        if (auto c = component_value("Cr1")) config["primaryResonantCapacitance"] = *c;
+    } else if (topo == "dab" || topo == "psfb" || topo == "pshb") {
+        if (auto l = component_value("Lr")) {
+            config["seriesInductance"] = *l;
+        } else if (dr0.contains("leakageInductance") && !dr0.at("leakageInductance").empty()) {
+            // Lr folded into T1's leakage (useLeakageInductance): the leakage IS the series inductance.
+            config["seriesInductance"] = PEAS::resolve_dimensional_values(dr0.at("leakageInductance").at(0));
+        } else {
+            throw std::runtime_error("pin_design(" + topo + "): operating point 0's design has neither a series "
+                                     "inductor Lr nor a leakage requirement to pin");
+        }
+    }
+    if (topo == "psfb" || topo == "pshb" || topo == "ahb")
+        if (auto l = component_value("Lout")) config["outputInductance"] = *l;
 }
 
 // Map PyOM's legacy long topology names (and the "advanced_" mode prefix, which Kirchhoff derives from
@@ -435,25 +639,50 @@ std::string kh_topology(const std::string& raw) {
         {"asymmetric_half_bridge", "ahb"},
         {"common_mode_choke", "cmc"},
         {"differential_mode_choke", "dmc"},
+        {"dual_active_bridge", "dab"},
+        {"series_resonant", "src"},
+        {"currentTransformer", "current_transformer"},
     };
     auto it = kMap.find(s);
     return it != kMap.end() ? it->second : s;
 }
 
-// Design entry: spec -> MAS::Inputs (the legacy process_converter / calculate_<topo>_inputs contract).
+// Design entry: spec -> MAS::Inputs (the legacy process_converter / calculate_<topo>_inputs contract). One
+// Kirchhoff design per operating point; the later ones are pinned to operating point 0's magnetic and their
+// operating points appended, so the returned Inputs carry every operating point of the spec.
 json design_inputs(const std::string& topology, const json& spec, const char* fn) {
-    return kh_json(Kirchhoff::api::design_magnetic_inputs(kh_topology(topology),
-                                                          legacy_spec_to_tas_inputs(spec, kh_topology(topology)).dump()), fn);
+    const std::string topo = kh_topology(topology);
+    AdaptResult adapted = adapt_spec(spec, topo);
+    json inputs0 = kh_json(Kirchhoff::api::design_magnetic_inputs(topo, adapted.specs.at(0).dump()), fn);
+    if (adapted.specs.size() == 1) return inputs0;
+    const std::string tas0 = Kirchhoff::api::design_tas(topo, adapted.specs.at(0).dump());
+    if (tas0.rfind(kExceptionPrefix, 0) == 0) kh_throw(tas0, fn);
+    const json tas0json = json::parse(tas0);
+    for (size_t i = 1; i < adapted.specs.size(); ++i) {
+        json s = adapted.specs.at(i);
+        pin_design(s, tas0json, inputs0, topo);
+        const json inputsI = kh_json(Kirchhoff::api::design_magnetic_inputs(topo, s.dump()), fn);
+        for (auto op : inputsI.at("operatingPoints")) {
+            op["name"] = "operating point " + std::to_string(i);
+            inputs0["operatingPoints"].push_back(op);
+        }
+    }
+    return inputs0;
+}
+
+// The adapted Kirchhoff spec of the design operating point (decks and simulations run that one).
+json design_point_spec(const std::string& topology, const json& spec) {
+    return adapt_spec(spec, kh_topology(topology)).specs.at(0);
 }
 
 // ngspice deck from a converter SPEC: design a TAS then assemble the deck. Returns {"netlist": "<spice>"}.
 json ngspice_deck_from_spec(const std::string& topology, const json& spec, const char* fn) {
     const std::string tas = Kirchhoff::api::design_tas(kh_topology(topology),
-                                                       legacy_spec_to_tas_inputs(spec, kh_topology(topology)).dump());
+                                                       design_point_spec(topology, spec).dump());
     if (tas.rfind(kExceptionPrefix, 0) == 0) {
         kh_throw(tas, fn);
     }
-    const std::string deck = Kirchhoff::api::generate_ngspice_circuit(tas, "{}");
+    const std::string deck = Kirchhoff::api::generate_ngspice_circuit(tas, kRequirementsFidelity);
     if (deck.rfind(kExceptionPrefix, 0) == 0) {
         kh_throw(deck, fn);
     }
@@ -463,11 +692,11 @@ json ngspice_deck_from_spec(const std::string& topology, const json& spec, const
 // ngspice sim from a converter SPEC: design a TAS then run it. Returns Kirchhoff's per-vector summary.
 json ngspice_sim_from_spec(const std::string& topology, const json& spec, const char* fn) {
     const std::string tas = Kirchhoff::api::design_tas(kh_topology(topology),
-                                                       legacy_spec_to_tas_inputs(spec, kh_topology(topology)).dump());
+                                                       design_point_spec(topology, spec).dump());
     if (tas.rfind(kExceptionPrefix, 0) == 0) {
         kh_throw(tas, fn);
     }
-    return kh_json(Kirchhoff::api::simulate_ngspice(tas, "{}"), fn);
+    return kh_json(Kirchhoff::api::simulate_ngspice(tas, kRequirementsFidelity), fn);
 }
 
 // A built-MAS-Inputs simulate/deck endpoint whose spec is not recoverable: Kirchhoff needs a spec/TAS, not
@@ -782,6 +1011,18 @@ void register_converter_bindings(py::module& m) {
         "Process a converter topology specification to MAS Inputs (via Kirchhoff design_magnetic_inputs).",
         py::arg("topology_name"), py::arg("converter_json"), py::arg("use_ngspice") = true,
         py::call_guard<py::gil_scoped_release>());
+    m.def("adapt_converter_spec",
+        [](const std::string& topologyName, json spec) {
+            const std::string topo = kh_topology(topologyName);
+            AdaptResult r = adapt_spec(spec, topo);
+            return json{{"schema", schema_of(topo)}, {"kirchhoffTopology", topo},
+                        {"kirchhoffSpecs", r.specs}, {"fieldMap", r.fieldMap}};
+        },
+        "Translate a MAS topology-schema converter spec into the Kirchhoff spec(s) it designs from — one per "
+        "operating point — and report where every spec field went (fieldMap). Raises EngineError for a field "
+        "outside the topology's MAS schema.",
+        py::arg("topology_name"), py::arg("spec"));
+
     m.def("design_magnetics_from_converter", &design_magnetics_from_converter,
         "Design requirements (MAS Inputs) from a converter spec via Kirchhoff; feed the magnetic adviser.",
         py::arg("topology_name"), py::arg("converter_json"),
