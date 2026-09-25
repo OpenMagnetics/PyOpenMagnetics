@@ -190,6 +190,8 @@ json get_settings() {
     // Harmonics
     settingsJson["harmonicAmplitudeThresholdQuickMode"] = OpenMagnetics::settings.get_harmonic_amplitude_threshold_quick_mode();
     settingsJson["harmonicAmplitudeThreshold"] = OpenMagnetics::settings.get_harmonic_amplitude_threshold();
+    // Memory kept for the turn-field sums of recently evaluated meshes (0 keeps nothing).
+    settingsJson["magneticFieldTurnSumsCacheBytes"] = OpenMagnetics::settings.get_magnetic_field_turn_sums_cache_bytes();
 
     // Models
     {
@@ -375,6 +377,7 @@ void set_settings(json settingsJson) {
     // Harmonics
     if (settingsJson.contains("harmonicAmplitudeThresholdQuickMode")) OpenMagnetics::settings.set_harmonic_amplitude_threshold_quick_mode(settingsJson["harmonicAmplitudeThresholdQuickMode"]);
     if (settingsJson.contains("harmonicAmplitudeThreshold")) OpenMagnetics::settings.set_harmonic_amplitude_threshold(settingsJson["harmonicAmplitudeThreshold"]);
+    if (settingsJson.contains("magneticFieldTurnSumsCacheBytes")) OpenMagnetics::settings.set_magnetic_field_turn_sums_cache_bytes(settingsJson["magneticFieldTurnSumsCacheBytes"].get<size_t>());
 
     // Models
     if (settingsJson.contains("magneticFieldStrengthModel")) {
