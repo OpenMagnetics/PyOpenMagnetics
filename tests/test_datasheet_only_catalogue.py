@@ -142,3 +142,18 @@ def test_results_can_come_back_ranked_but_unsimulated(mixed_catalogue):
     built = references_of(simulated).index("BUILT")
     assert simulated["data"][built]["mas"].get("outputs"), "the default still simulates a modelled part"
     assert not ranked["data"][built]["mas"].get("outputs")
+
+
+def test_build_datasheet_states_what_mkf_simulates_for_a_modelled_part():
+    """A modelled part with no datasheet gets one from MKF: the values a catalogue datasheet
+    states, computed at the given conditions, with the part's own manufacturerInfo kept."""
+    part = modelled_part("BUILT")
+    del part["manufacturerInfo"]["datasheetInfo"]
+    info = PyOpenMagnetics.build_datasheet(buck_inputs(), PyOpenMagnetics.magnetic_autocomplete(part, {}), {})
+
+    assert info["reference"] == "BUILT"
+    electrical = info["datasheetInfo"]["electrical"][0]
+    assert electrical["subtype"] == "inductor"
+    for key in ("inductance", "dcResistance", "ratedCurrents", "saturationCurrentPeak", "selfResonantFrequency"):
+        assert electrical.get(key) is not None, key
+    assert electrical["ratedCurrents"][0] > 0 and electrical["saturationCurrentPeak"] > 0

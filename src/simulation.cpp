@@ -23,6 +23,31 @@ json simulate(json inputsJson, json magneticJson, json modelsData) {
     return result;
 }
 
+json build_datasheet(json inputsJson, json magneticJson, json modelsData) {
+    // Simulate the magnetic at the given operating points (the same models as simulate), then let
+    // MagneticSimulator::build_datasheet read the outputs into a manufacturer-style datasheet. Returns
+    // the magnetic's manufacturerInfo with datasheetInfo filled in; its other fields are kept.
+    OpenMagnetics::Inputs inputs(inputsJson);
+    OpenMagnetics::Magnetic magnetic(magneticJson);
+
+    auto reluctanceModelName = OpenMagnetics::defaults.reluctanceModelDefault;
+    find_reluctance_model(modelsData, reluctanceModelName);
+    auto coreLossesModelName = OpenMagnetics::defaults.coreLossesModelDefault;
+    if (!modelsData.is_null() && modelsData.find("coreLosses") != modelsData.end()) {
+        OpenMagnetics::from_json(modelsData["coreLosses"], coreLossesModelName);
+    }
+
+    OpenMagnetics::MagneticSimulator magneticSimulator;
+    magneticSimulator.set_core_losses_model_name(coreLossesModelName);
+    magneticSimulator.set_reluctance_model_name(reluctanceModelName);
+    auto mas = magneticSimulator.simulate(inputs, magnetic);
+    auto manufacturerInfo = magneticSimulator.build_datasheet(mas);
+
+    json result;
+    to_json(result, manufacturerInfo);
+    return result;
+}
+
 std::string export_magnetic_as_subcircuit(json magneticJson) {
     // Returns the raw SPICE subcircuit netlist as a plain string. We must NOT
     // return nlohmann::ordered_json here: pybind11_json registers a caster for
@@ -418,6 +443,27 @@ void register_simulation_bindings(py::module& m) {
         )pbdoc",
         py::call_guard<py::gil_scoped_release>());
     
+    m.def("build_datasheet", &build_datasheet,
+        R"pbdoc(
+        Build a manufacturer-style datasheet for a magnetic from MKF's own simulation.
+
+        Simulates the magnetic at the given operating points, then reads the results into
+        manufacturerInfo.datasheetInfo (MagneticSimulator::build_datasheet): inductance at the
+        first operating point, DC resistance, the heat-limited rated current (40 K rise), the
+        peak saturation current at the hottest operating point, self-resonant frequency and an
+        impedance sweep, thermal and mechanical data.
+
+        Args:
+            inputs_json: MAS Inputs: the conditions the datasheet is stated at.
+            magnetic_json: the magnetic (core and coil).
+            models_json: models to simulate with, as for simulate().
+
+        Returns:
+            The magnetic's manufacturerInfo with datasheetInfo filled in.
+        )pbdoc",
+        py::arg("inputs_json"), py::arg("magnetic_json"), py::arg("models_json"),
+        py::call_guard<py::gil_scoped_release>());
+
     m.def("export_magnetic_as_subcircuit", &export_magnetic_as_subcircuit,
         R"pbdoc(
         Export a magnetic component as a SPICE-compatible subcircuit.
