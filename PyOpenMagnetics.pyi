@@ -512,6 +512,18 @@ def get_core_losses_model_information(material: CoreMaterial) -> JsonDict:
     """Get available loss models and data for material."""
     ...
 
+def validate_material(material: CoreMaterial, extra_loss_points: List[JsonDict] = ...) -> JsonDict:
+    """Magnetic Blade Runner: physics check of one MAS core-material record.
+
+    Returns {reference, valid, materialClass, findings, skipped}; valid is False iff a finding
+    is IMPOSSIBLE.
+    """
+    ...
+
+def validate_all_materials(core_materials_path: str = "", advanced_core_materials_path: str = "") -> JsonDict:
+    """Magnetic Blade Runner over a core-material catalogue (empty path = MKF's embedded one)."""
+    ...
+
 # =============================================================================
 # WINDING ENGINE
 # =============================================================================

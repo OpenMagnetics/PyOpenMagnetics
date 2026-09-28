@@ -1,4 +1,5 @@
 #include "losses.h"
+#include "support/MaterialValidator.h"
 
 namespace PyMKF {
 
@@ -57,6 +58,35 @@ json get_core_losses_model_information(json material) {
     info["external_links"] = OpenMagnetics::CoreLossesModel::get_models_external_links();
     info["available_models"] = OpenMagnetics::CoreLossesModel::get_methods_string(material);
     return info;
+}
+
+json validate_material(json material, json extraLossPoints) {
+    std::vector<OpenMagnetics::MaterialLossPoint> points;
+    for (const auto& p : extraLossPoints) {
+        points.push_back(OpenMagnetics::MaterialLossPoint{p.at("frequency").get<double>(), p.at("magneticFluxDensityPeak").get<double>(),
+                                                          p.at("temperature").get<double>(), p.at("volumetricLosses").get<double>(),
+                                                          p.value("origin", std::string())});
+    }
+    json out = OpenMagnetics::MaterialValidator().validate(material, points);
+    return out;
+}
+
+json validate_all_materials(std::string coreMaterialsPath, std::string advancedCoreMaterialsPath) {
+    OpenMagnetics::MaterialValidator validator;
+    std::vector<OpenMagnetics::MaterialVerdict> verdicts;
+    if (coreMaterialsPath.empty()) {
+        if (!advancedCoreMaterialsPath.empty()) {
+            throw std::invalid_argument("advanced_core_materials_path needs core_materials_path");
+        }
+        verdicts = validator.validate_embedded_catalogue();
+    }
+    else {
+        verdicts = validator.validate_catalogue(coreMaterialsPath, advancedCoreMaterialsPath.empty() ? std::nullopt : std::optional<std::string>(advancedCoreMaterialsPath));
+    }
+    json out = OpenMagnetics::summarize_material_verdicts(verdicts);
+    out["verdicts"] = verdicts;
+    out["classTable"] = OpenMagnetics::MaterialValidator::class_table_json();
+    return out;
 }
 
 json calculate_steinmetz_coefficients(json dataJson, json rangesJson) {
@@ -334,6 +364,42 @@ void register_losses_bindings(py::module& m) {
         py::arg("core_data"), py::arg("coil_data"), py::arg("inputs_data"), py::arg("models_data"),
         py::call_guard<py::gil_scoped_release>());
     
+    m.def("validate_material", &validate_material,
+        R"pbdoc(
+        Magnetic Blade Runner: check one MAS core-material record against physics.
+
+        Evaluates the record with MKF's own loss/permeability/saturation models and judges the
+        results against published class envelopes (each with its datasheet source).
+
+        Args:
+            material: one MAS core-material record (a line of core_materials.ndjson).
+            extra_loss_points: optional measured points kept outside the record, each
+                {frequency, magneticFluxDensityPeak, temperature, volumetricLosses, origin}.
+
+        Returns:
+            {reference, valid, materialClass, findings: [{code, severity (WARNING/SUSPICIOUS/
+            IMPOSSIBLE), component, reference, message, value, threshold}], skipped: ["RULE: reason"]}.
+            valid is False iff a finding is IMPOSSIBLE.
+        )pbdoc",
+        py::arg("material"), py::arg("extra_loss_points") = json::array(),
+        py::call_guard<py::gil_scoped_release>());
+
+    m.def("validate_all_materials", &validate_all_materials,
+        R"pbdoc(
+        Magnetic Blade Runner over a whole core-material catalogue.
+
+        Args:
+            core_materials_path: a core_materials.ndjson; empty = the catalogue built into MKF.
+            advanced_core_materials_path: optional advanced_core_materials.ndjson (real file,
+                not a git-LFS pointer) whose sinusoidal loss points are checked too.
+
+        Returns:
+            Summary {records, invalid, recordsWithSuspicious, unclassified, findingsByCode,
+            skippedByCode, provenance, impossible, suspicious} plus verdicts and classTable.
+        )pbdoc",
+        py::arg("core_materials_path") = "", py::arg("advanced_core_materials_path") = "",
+        py::call_guard<py::gil_scoped_release>());
+
     m.def("get_core_losses_model_information", &get_core_losses_model_information,
         R"pbdoc(
         Get documentation and metadata for available core loss models.
