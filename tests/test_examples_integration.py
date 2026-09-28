@@ -171,6 +171,22 @@ class TestSettingsManagement:
         assert after_reset is not None
         assert isinstance(after_reset, dict)
 
+    def test_thermal_network_strict_geometry_round_trip(self):
+        """thermalNetworkStrictGeometry defaults to strict and round-trips through set_settings."""
+        PyOpenMagnetics.reset_settings()
+        try:
+            assert PyOpenMagnetics.get_settings()["thermalNetworkStrictGeometry"] is True
+
+            settings = PyOpenMagnetics.get_settings()
+            settings["thermalNetworkStrictGeometry"] = False
+            PyOpenMagnetics.set_settings(settings)
+            assert PyOpenMagnetics.get_settings()["thermalNetworkStrictGeometry"] is False
+
+            PyOpenMagnetics.reset_settings()
+            assert PyOpenMagnetics.get_settings()["thermalNetworkStrictGeometry"] is True
+        finally:
+            PyOpenMagnetics.reset_settings()
+
 
 class TestBobbinCreation:
     """Test bobbin creation for cores."""

@@ -193,6 +193,9 @@ json get_settings() {
     // Memory kept for the turn-field sums of recently evaluated meshes (0 keeps nothing).
     settingsJson["magneticFieldTurnSumsCacheBytes"] = OpenMagnetics::settings.get_magnetic_field_turn_sums_cache_bytes();
 
+    // Thermal network: a turn overlapping its enclosure throws (true) or loses that conduction path with an ERROR logged (false).
+    settingsJson["thermalNetworkStrictGeometry"] = OpenMagnetics::settings.get_thermal_network_strict_geometry();
+
     // Models
     {
         json aux;
@@ -378,6 +381,9 @@ void set_settings(json settingsJson) {
     if (settingsJson.contains("harmonicAmplitudeThresholdQuickMode")) OpenMagnetics::settings.set_harmonic_amplitude_threshold_quick_mode(settingsJson["harmonicAmplitudeThresholdQuickMode"]);
     if (settingsJson.contains("harmonicAmplitudeThreshold")) OpenMagnetics::settings.set_harmonic_amplitude_threshold(settingsJson["harmonicAmplitudeThreshold"]);
     if (settingsJson.contains("magneticFieldTurnSumsCacheBytes")) OpenMagnetics::settings.set_magnetic_field_turn_sums_cache_bytes(settingsJson["magneticFieldTurnSumsCacheBytes"].get<size_t>());
+
+    // Thermal network
+    if (settingsJson.contains("thermalNetworkStrictGeometry")) OpenMagnetics::settings.set_thermal_network_strict_geometry(settingsJson["thermalNetworkStrictGeometry"]);
 
     // Models
     if (settingsJson.contains("magneticFieldStrengthModel")) {
