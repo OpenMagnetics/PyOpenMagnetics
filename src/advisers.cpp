@@ -195,6 +195,7 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
     auto masMagnetics = magneticAdviser.get_advised_magnetic(inputs, catalog, maximumNumberResults);
 
     auto scoringsPerFilter = magneticAdviser.get_scorings();
+    const auto& lossesNotEvaluable = magneticAdviser.get_losses_not_evaluable();
 
     json results = json();
     results["data"] = json::array();
@@ -211,6 +212,11 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
                 filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
             }
             result["scoringPerFilter"] = filterScorings;
+        }
+        // A part whose core material has no core-loss model is ranked without the loss filters
+        // and returned without simulated outputs; this field says so, and why.
+        if (name && lossesNotEvaluable.count(*name)) {
+            result["lossesNotEvaluable"] = lossesNotEvaluable.at(*name);
         }
         results["data"].push_back(result);
     }
@@ -247,6 +253,7 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
         : magneticAdviser.get_advised_magnetic(inputs, OpenMagnetics::magneticsCache.get(), filterFlow, maximumNumberResults);
 
     auto scoringsPerFilter = magneticAdviser.get_scorings();
+    const auto& lossesNotEvaluable = magneticAdviser.get_losses_not_evaluable();
 
     json results = json();
     results["data"] = json::array();
@@ -263,6 +270,11 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
                 filterScorings[std::string(magic_enum::enum_name(filter))] = filterScore;
             }
             result["scoringPerFilter"] = filterScorings;
+        }
+        // A part whose core material has no core-loss model is ranked without the loss filters
+        // and returned without simulated outputs; this field says so, and why.
+        if (name && lossesNotEvaluable.count(*name)) {
+            result["lossesNotEvaluable"] = lossesNotEvaluable.at(*name);
         }
         results["data"].push_back(result);
     }
@@ -491,7 +503,10 @@ void register_adviser_bindings(py::module& m) {
             - "mas": Mas object with magnetic data
             - "scoring": Overall float score
             - "scoringPerFilter": Object with individual scores per filter
-        
+            - "lossesNotEvaluable" (only on such parts): why this part's core losses could
+              not be evaluated -- its core material carries no core-loss model. The part is
+              ranked without any loss-based filter and returned without simulated outputs.
+
         Example:
             >>> inputs = PyMKF.process_inputs(raw_inputs)
             >>> catalog = [magnetic1, magnetic2, magnetic3]
@@ -531,6 +546,10 @@ void register_adviser_bindings(py::module& m) {
             - "mas": Mas object with magnetic data
             - "scoring": Overall float score
             - "scoringPerFilter": Object with individual scores per filter
+            - "lossesNotEvaluable" (only on such parts): why this part's core losses could
+              not be evaluated -- its core material carries no core-loss model. The part is
+              ranked on the filters that apply to it, with no loss-based filter scored, and
+              is returned without simulated outputs.
         
         Note:
             Cache must be populated before calling this function.

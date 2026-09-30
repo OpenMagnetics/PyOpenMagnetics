@@ -676,6 +676,9 @@ def calculate_advised_magnetics_from_catalog(
         - "mas": Mas object with magnetic data
         - "scoring": Overall float score
         - "scoringPerFilter": Object with individual scores per filter
+        - "lossesNotEvaluable" (only on such parts): why the part's core losses could not be
+          evaluated (its core material has no core-loss model); it is ranked without any
+          loss-based filter and returned without simulated outputs.
     """
     ...
 
