@@ -223,7 +223,7 @@ INLINE_WIRE_MAGNETIC = {
             },
             "gapping": [],
             "numberStacks": 1,
-            "coating": {"type": "epoxy", "thickness": 0.0006, "material": "epoxy"},
+            "coating": {"type": "epoxy", "thickness": {"nominal": 0.0006}, "material": "epoxy"},
         }
     },
     "coil": {
