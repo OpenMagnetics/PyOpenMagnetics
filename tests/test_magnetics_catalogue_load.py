@@ -140,6 +140,27 @@ class TestStrictLoad:
         assert "manufacturerInfo" in message, message
         assert "anonymous.ndjson:1" in message, message
 
+    def test_two_records_sharing_a_reference_raise_and_name_it(self, tmp_path):
+        # The cache is keyed by manufacturerInfo.reference: the second record used to
+        # replace the first without a word (2 offered, "1" returned). Nine WE Midcom
+        # parts whose OEM P/N cell read "#N/A" collapsed to one that way.
+        first = magnetic("#N/A")
+        second = magnetic("#N/A")
+        second["coil"]["functionalDescription"][0]["numberTurns"] = 40
+        path = write_ndjson(tmp_path / "duplicates.ndjson", [magnetic("K1"), first, second])
+
+        with pytest.raises(PyOpenMagnetics.EngineError) as error:
+            PyOpenMagnetics.load_magnetics_from_file(path, True)
+
+        message = str(error.value)
+        assert "duplicates.ndjson:3" in message, message
+        assert "'#N/A'" in message, message
+        assert "line 2" in message, message
+
+        # All or nothing: none of the file reached the cache.
+        good = write_ndjson(tmp_path / "good.ndjson", [magnetic("K9")])
+        assert PyOpenMagnetics.load_magnetics_from_file(good, True) == "1"
+
 
 class TestReportingLoad:
     """load_magnetics_from_file_report: keep the good records, name the dropped ones."""
@@ -166,6 +187,20 @@ class TestReportingLoad:
         report = PyOpenMagnetics.load_magnetics_from_file_report(path, True)
         assert report["loaded"] == 2
         assert report["rejected"] == []
+
+    def test_records_sharing_a_reference_are_all_rejected(self, tmp_path):
+        path = write_ndjson(
+            tmp_path / "duplicates.ndjson",
+            [magnetic("L1"), magnetic("#N/A"), magnetic("L3"), magnetic("#N/A")],
+        )
+
+        report = PyOpenMagnetics.load_magnetics_from_file_report(path, True)
+
+        assert report["loaded"] == 2
+        assert report["cacheSize"] == 2
+        assert [(r["line"], r["reference"]) for r in report["rejected"]] == [(2, "#N/A"), (4, "#N/A")]
+        assert "line 4" in report["rejected"][0]["reason"]
+        assert "line 2" in report["rejected"][1]["reason"]
 
     def test_missing_file_still_raises(self, tmp_path):
         with pytest.raises(PyOpenMagnetics.EngineError):

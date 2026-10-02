@@ -234,12 +234,20 @@ struct RejectedRecord {
 // Read the whole stream before touching the cache, so a strict load is all-or-nothing
 // and a tolerant one is exact about what it dropped. Every failure is reported as
 // "<source>:<line> (part 'X'): <what actually went wrong>".
+//
+// Two records under one manufacturerInfo.reference are an error too. The cache is keyed
+// by the reference, so the second used to replace the first without a word: a catalogue
+// of 2 came back as 1 (nine WE Midcom parts whose OEM P/N cell read "#N/A" collapsed to
+// one). Nothing here can tell which of the two is that part's real record, so a strict
+// load refuses the file and a tolerant one rejects every record sharing the reference.
 std::vector<std::pair<std::string, OpenMagnetics::Magnetic>> stage_magnetics(std::istream& in,
                                                                              const std::string& source,
                                                                              bool expand,
                                                                              bool skipInvalid,
                                                                              std::vector<RejectedRecord>& rejected) {
     std::vector<std::pair<std::string, OpenMagnetics::Magnetic>> staged;
+    std::vector<size_t> stagedLineNumbers;
+    std::map<std::string, size_t> firstLineOfReference;
     std::string line;
     size_t lineNumber = 0;
     while (getline(in, line)) {
@@ -247,8 +255,9 @@ std::vector<std::pair<std::string, OpenMagnetics::Magnetic>> stage_magnetics(std
         if (line.find_first_not_of(" \t\r\n") == std::string::npos) {
             continue;
         }
+        std::pair<std::string, OpenMagnetics::Magnetic> record;
         try {
-            staged.push_back(read_magnetic_line(line, expand));
+            record = read_magnetic_line(line, expand);
         }
         catch (const std::exception& e) {
             std::string reference;
@@ -262,7 +271,46 @@ std::vector<std::pair<std::string, OpenMagnetics::Magnetic>> stage_magnetics(std
                 throw std::runtime_error(locate(source, lineNumber, reference) + ": " + e.what());
             }
             rejected.push_back({lineNumber, reference, e.what()});
+            continue;
         }
+        auto [first, isNew] = firstLineOfReference.emplace(record.first, lineNumber);
+        if (!isNew && !skipInvalid) {
+            throw std::runtime_error(locate(source, lineNumber, record.first) + ": manufacturerInfo.reference '" +
+                                     record.first + "' is also the reference of line " +
+                                     std::to_string(first->second) + ", and the magnetics cache is keyed by it: "
+                                     "one of the two records would silently replace the other");
+        }
+        staged.push_back(std::move(record));
+        stagedLineNumbers.push_back(lineNumber);
+    }
+
+    if (skipInvalid) {
+        std::map<std::string, std::vector<size_t>> linesOfReference;
+        for (size_t index = 0; index < staged.size(); ++index) {
+            linesOfReference[staged[index].first].push_back(stagedLineNumbers[index]);
+        }
+        std::vector<std::pair<std::string, OpenMagnetics::Magnetic>> unique;
+        for (size_t index = 0; index < staged.size(); ++index) {
+            const auto& lines = linesOfReference[staged[index].first];
+            if (lines.size() == 1) {
+                unique.push_back(std::move(staged[index]));
+                continue;
+            }
+            std::string others;
+            for (auto otherLine : lines) {
+                if (otherLine != stagedLineNumbers[index]) {
+                    others += (others.empty() ? "" : ", ") + std::to_string(otherLine);
+                }
+            }
+            rejected.push_back({stagedLineNumbers[index], staged[index].first,
+                                "manufacturerInfo.reference '" + staged[index].first +
+                                    "' is also the reference of line " + others +
+                                    ", and the magnetics cache is keyed by it: every record under it is rejected,"
+                                    " since nothing tells which one is the part's real record"});
+        }
+        staged = std::move(unique);
+        std::stable_sort(rejected.begin(), rejected.end(),
+                         [](const RejectedRecord& a, const RejectedRecord& b) { return a.lineNumber < b.lineNumber; });
     }
     return staged;
 }
@@ -419,7 +467,9 @@ void register_database_bindings(py::module& m) {
         (ABT #823). The first record that cannot be loaded raises EngineError naming
         the file, the line number, the part reference and the underlying reason.
         Blank lines are skipped. Records are keyed by manufacturerInfo.reference, so
-        a record without one is an error rather than an anonymous optional access.
+        a record without one is an error rather than an anonymous optional access, and
+        two records sharing one raise EngineError naming the reference and both lines
+        instead of the second silently replacing the first.
 
         Use load_magnetics_from_file_report() instead when a partial catalogue is
         acceptable and you want the list of rejected records.
@@ -440,7 +490,9 @@ void register_database_bindings(py::module& m) {
         The tolerant counterpart of load_magnetics_from_file (ABT #823): a bad record
         no longer aborts the batch, and the caller is told exactly which records were
         dropped and why instead of silently running on a truncated catalogue. A file
-        that cannot be opened is still an error.
+        that cannot be opened is still an error. Records sharing a
+        manufacturerInfo.reference are all rejected, each naming the other lines,
+        since nothing tells which of them is the part's real record.
 
         Args:
             path: Path to the NDJSON file.
