@@ -567,6 +567,21 @@ json calculate_complex_permeability(json materialJson, double frequency) {
     return result;
 }
 
+json calculate_complex_permeability_frequency_range(json material) {
+    OpenMagnetics::ComplexPermeability complexPermeabilityObj;
+    std::pair<double, double> range;
+    if (material.is_string()) {
+        range = complexPermeabilityObj.get_frequency_range(material.get<std::string>());
+    }
+    else {
+        range = complexPermeabilityObj.get_frequency_range(CoreMaterial(material));
+    }
+    json result;
+    result["minimum"] = range.first;
+    result["maximum"] = range.second;
+    return result;
+}
+
 void register_core_bindings(py::module& m) {
     // Core materials
     m.def("get_core_materials", &get_core_materials,
@@ -1343,6 +1358,24 @@ void register_core_bindings(py::module& m) {
             JSON object with real and imaginary components.
         )pbdoc",
         py::arg("material_json"), py::arg("frequency"),
+        py::call_guard<py::gil_scoped_release>());
+
+    m.def("calculate_complex_permeability_frequency_range", &calculate_complex_permeability_frequency_range,
+        R"pbdoc(
+        Frequency span in which a core material's complex permeability is defined.
+
+        calculate_complex_permeability (and every impedance sweep that uses it)
+        throws outside this span: it is the span covered by both the material's
+        tabulated mu'(f) and mu''(f), or by the table MKF derives from its
+        frequency-dependent initial permeability.
+
+        Args:
+            material: JSON CoreMaterial object, or the material name.
+
+        Returns:
+            JSON object {"minimum": Hz, "maximum": Hz}.
+        )pbdoc",
+        py::arg("material"),
         py::call_guard<py::gil_scoped_release>());
 }
 

@@ -312,3 +312,23 @@ class TestCoreProcessedDescription:
             if "windingWindows" in processed:
                 assert isinstance(processed["windingWindows"], list)
                 assert len(processed["windingWindows"]) > 0
+
+
+class TestComplexPermeabilityFrequencyRange:
+    """calculate_complex_permeability throws outside the material's tabulated span; the span is exposed so
+    callers (impedance sweeps) can stay inside it instead of catching the throw."""
+
+    def test_a07_span_ends_at_the_top_of_its_tabulated_mu_imaginary(self):
+        span = PyOpenMagnetics.calculate_complex_permeability_frequency_range("A07")
+        assert 0 < span["minimum"] < span["maximum"]
+        # A07's tabulated mu''(f) ends at ~17 MHz (mu' extended to it by Kramers-Kronig in MAS).
+        assert 1e7 < span["maximum"] < 1e8
+
+    def test_inside_the_span_answers_and_outside_it_throws(self):
+        material = PyOpenMagnetics.find_core_material_by_name("A07")
+        span = PyOpenMagnetics.calculate_complex_permeability_frequency_range(material)
+        assert span == PyOpenMagnetics.calculate_complex_permeability_frequency_range("A07")
+        inside = PyOpenMagnetics.calculate_complex_permeability(material, span["maximum"] * 0.99)
+        assert inside["imaginary"] > 0
+        with pytest.raises(Exception):
+            PyOpenMagnetics.calculate_complex_permeability(material, span["maximum"] * 1.01)

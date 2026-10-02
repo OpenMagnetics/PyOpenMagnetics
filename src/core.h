@@ -59,6 +59,7 @@ std::vector<std::string> get_available_core_filters();
 std::vector<double> get_maximum_dimensions(json magneticJson);
 json calculate_core_data_from_shape(json shapeJson);
 json calculate_complex_permeability(json materialJson, double frequency);
+json calculate_complex_permeability_frequency_range(json material);
 
 void register_core_bindings(py::module& m);
 
