@@ -208,6 +208,7 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
     auto scoringsPerFilter = magneticAdviser.get_scorings();
     const auto& lossesNotEvaluable = magneticAdviser.get_losses_not_evaluable();
     const auto& judgedFrequencies = magneticAdviser.get_judged_frequencies();
+    const auto& measuredFrequencies = magneticAdviser.get_measured_frequencies();
 
     json results = json();
     results["data"] = json::array();
@@ -231,7 +232,8 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
             result["lossesNotEvaluable"] = lossesNotEvaluable.at(*name);
         }
         // The requirement frequencies each frequency-wise filter judged this part on. IMPEDANCE
-        // judges a minimumImpedance point only inside the core material's tabulated mu(f) range;
+        // judges a minimumImpedance point inside the core material's tabulated mu(f) range on the
+        // model, and outside it on the part's measured common-mode |Z| when the datasheet has one;
         // a point not listed here was not judged (neither passed nor failed).
         if (name && judgedFrequencies.count(*name)) {
             json judged;
@@ -239,6 +241,17 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
                 judged[std::string(magic_enum::enum_name(filter))] = frequencies;
             }
             result["judgedFrequencies"] = judged;
+        }
+        // The subset of judgedFrequencies judged on the part's own measured data instead of the
+        // model: IMPEDANCE judges a point outside the material's mu(f) range on the datasheet's
+        // measured common-mode |Z| (zero-bias impedancePoints, log-log interpolated, never
+        // extrapolated). An empty list: every judged point used the model.
+        if (name && measuredFrequencies.count(*name)) {
+            json measured;
+            for (auto& [filter, frequencies] : measuredFrequencies.at(*name)) {
+                measured[std::string(magic_enum::enum_name(filter))] = frequencies;
+            }
+            result["measuredFrequencies"] = measured;
         }
         results["data"].push_back(result);
     }
@@ -278,6 +291,7 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
     auto scoringsPerFilter = magneticAdviser.get_scorings();
     const auto& lossesNotEvaluable = magneticAdviser.get_losses_not_evaluable();
     const auto& judgedFrequencies = magneticAdviser.get_judged_frequencies();
+    const auto& measuredFrequencies = magneticAdviser.get_measured_frequencies();
 
     json results = json();
     results["data"] = json::array();
@@ -301,7 +315,8 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
             result["lossesNotEvaluable"] = lossesNotEvaluable.at(*name);
         }
         // The requirement frequencies each frequency-wise filter judged this part on. IMPEDANCE
-        // judges a minimumImpedance point only inside the core material's tabulated mu(f) range;
+        // judges a minimumImpedance point inside the core material's tabulated mu(f) range on the
+        // model, and outside it on the part's measured common-mode |Z| when the datasheet has one;
         // a point not listed here was not judged (neither passed nor failed).
         if (name && judgedFrequencies.count(*name)) {
             json judged;
@@ -309,6 +324,17 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
                 judged[std::string(magic_enum::enum_name(filter))] = frequencies;
             }
             result["judgedFrequencies"] = judged;
+        }
+        // The subset of judgedFrequencies judged on the part's own measured data instead of the
+        // model: IMPEDANCE judges a point outside the material's mu(f) range on the datasheet's
+        // measured common-mode |Z| (zero-bias impedancePoints, log-log interpolated, never
+        // extrapolated). An empty list: every judged point used the model.
+        if (name && measuredFrequencies.count(*name)) {
+            json measured;
+            for (auto& [filter, frequencies] : measuredFrequencies.at(*name)) {
+                measured[std::string(magic_enum::enum_name(filter))] = frequencies;
+            }
+            result["measuredFrequencies"] = measured;
         }
         results["data"].push_back(result);
     }
@@ -543,10 +569,16 @@ void register_adviser_bindings(py::module& m) {
               ranked without any loss-based filter and returned without simulated outputs.
             - "judgedFrequencies" (only with a frequency-wise requirement): the requirement
               frequencies, in Hz, each such filter judged the part on, keyed by filter enum
-              name, e.g. {"IMPEDANCE": [150000.0, 1000000.0]}. IMPEDANCE judges a
-              minimumImpedance point only inside the core material's tabulated mu(f) range;
-              a point not listed was not judged (neither passed nor failed), and the
-              IMPEDANCE score is the mean over the listed points.
+              name, e.g. {"IMPEDANCE": [150000.0, 1000000.0, 30000000.0]}. IMPEDANCE judges a
+              minimumImpedance point inside the core material's tabulated mu(f) range on the
+              model, and outside it on the part's own measured common-mode |Z| (datasheet
+              impedancePoints with no DC bias, log|Z| vs log f interpolated between the
+              bracketing measured points, never extrapolated); a point covered by neither is
+              not listed and was not judged (neither passed nor failed), and the IMPEDANCE
+              score is the mean over the listed points.
+            - "measuredFrequencies" (only with a frequency-wise requirement): the subset of
+              "judgedFrequencies" judged on the measured data, keyed the same way, e.g.
+              {"IMPEDANCE": [30000000.0]}; an empty list means every judged point used the model.
             And a "failedCandidates" array next to "data": one {"reference", "error"} per
             candidate the search excluded: a filter or the final simulation raised (e.g.
             IMPEDANCE when no minimumImpedance point lies inside the material's mu(f) range),
@@ -604,10 +636,16 @@ void register_adviser_bindings(py::module& m) {
               is returned without simulated outputs.
             - "judgedFrequencies" (only with a frequency-wise requirement): the requirement
               frequencies, in Hz, each such filter judged the part on, keyed by filter enum
-              name, e.g. {"IMPEDANCE": [150000.0, 1000000.0]}. IMPEDANCE judges a
-              minimumImpedance point only inside the core material's tabulated mu(f) range;
-              a point not listed was not judged (neither passed nor failed), and the
-              IMPEDANCE score is the mean over the listed points.
+              name, e.g. {"IMPEDANCE": [150000.0, 1000000.0, 30000000.0]}. IMPEDANCE judges a
+              minimumImpedance point inside the core material's tabulated mu(f) range on the
+              model, and outside it on the part's own measured common-mode |Z| (datasheet
+              impedancePoints with no DC bias, log|Z| vs log f interpolated between the
+              bracketing measured points, never extrapolated); a point covered by neither is
+              not listed and was not judged (neither passed nor failed), and the IMPEDANCE
+              score is the mean over the listed points.
+            - "measuredFrequencies" (only with a frequency-wise requirement): the subset of
+              "judgedFrequencies" judged on the measured data, keyed the same way, e.g.
+              {"IMPEDANCE": [30000000.0]}; an empty list means every judged point used the model.
             And a "failedCandidates" array next to "data": one {"reference", "error"} per
             candidate the search excluded: a filter or the final simulation raised (e.g.
             IMPEDANCE when no minimumImpedance point lies inside the material's mu(f) range),

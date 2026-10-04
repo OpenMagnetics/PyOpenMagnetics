@@ -681,8 +681,13 @@ def calculate_advised_magnetics_from_catalog(
           loss-based filter and returned without simulated outputs.
         - "judgedFrequencies" (only with a frequency-wise requirement): requirement frequencies
           in Hz each such filter judged the part on, keyed by filter enum name, e.g.
-          {"IMPEDANCE": [150000.0, 1000000.0]}. IMPEDANCE judges a minimumImpedance point only
-          inside the core material's tabulated mu(f) range; unlisted points were not judged.
+          {"IMPEDANCE": [150000.0, 1000000.0, 30000000.0]}. IMPEDANCE judges a minimumImpedance
+          point inside the core material's tabulated mu(f) range on the model, and outside it on
+          the part's own measured common-mode |Z| (zero-bias datasheet impedancePoints, log-log
+          interpolated, never extrapolated); unlisted points were not judged.
+        - "measuredFrequencies" (only with a frequency-wise requirement): the subset of
+          "judgedFrequencies" judged on measured data, e.g. {"IMPEDANCE": [30000000.0]}; an
+          empty list means every judged point used the model.
         And a "failedCandidates" array next to "data": one {"reference", "error"} per candidate
         the search excluded (a filter or the final simulation raised, or the
         LOSS_MODEL_FREQUENCY_SPAN gate excluded it while losses are computed); it is not ranked.
