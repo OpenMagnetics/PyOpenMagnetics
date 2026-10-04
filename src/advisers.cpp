@@ -179,6 +179,17 @@ json calculate_advised_magnetics_fast(json inputsJson, int maximumNumberResults,
     return results;
 }
 
+// The candidates the adviser excluded because evaluating them raised (a filter or the final
+// simulation threw), each with the error. They are not ranked; this says which and why, instead of
+// the result silently holding fewer parts.
+static json failed_candidates_to_json(const OpenMagnetics::MagneticAdviser& magneticAdviser) {
+    json failedCandidates = json::array();
+    for (const auto& [reference, error] : magneticAdviser.get_failed_candidates()) {
+        failedCandidates.push_back({{"reference", reference}, {"error", error}});
+    }
+    return failedCandidates;
+}
+
 json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson, int maximumNumberResults) {
     OpenMagnetics::settings.set_coil_delimit_and_compact(true);
     OpenMagnetics::Inputs inputs(inputsJson);
@@ -224,6 +235,7 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
     sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
         return b1["scoring"] > b2["scoring"];
     });
+    results["failedCandidates"] = failed_candidates_to_json(magneticAdviser);
 
     return results;
 }
@@ -282,6 +294,7 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
     sort(results["data"].begin(), results["data"].end(), [](json& b1, json& b2) {
         return b1["scoring"] > b2["scoring"];
     });
+    results["failedCandidates"] = failed_candidates_to_json(magneticAdviser);
 
     return results;
 }
@@ -506,6 +519,9 @@ void register_adviser_bindings(py::module& m) {
             - "lossesNotEvaluable" (only on such parts): why this part's core losses could
               not be evaluated -- its core material carries no core-loss model. The part is
               ranked without any loss-based filter and returned without simulated outputs.
+            And a "failedCandidates" array next to "data": one {"reference", "error"} per
+            candidate whose evaluation raised (a filter or the final simulation threw). Such a
+            candidate is not ranked; this names it and the error instead of dropping it silently.
 
         Example:
             >>> inputs = PyMKF.process_inputs(raw_inputs)
@@ -550,6 +566,9 @@ void register_adviser_bindings(py::module& m) {
               not be evaluated -- its core material carries no core-loss model. The part is
               ranked on the filters that apply to it, with no loss-based filter scored, and
               is returned without simulated outputs.
+            And a "failedCandidates" array next to "data": one {"reference", "error"} per
+            candidate whose evaluation raised (a filter or the final simulation threw). Such a
+            candidate is not ranked; this names it and the error instead of dropping it silently.
         
         Note:
             Cache must be populated before calling this function.

@@ -679,6 +679,8 @@ def calculate_advised_magnetics_from_catalog(
         - "lossesNotEvaluable" (only on such parts): why the part's core losses could not be
           evaluated (its core material has no core-loss model); it is ranked without any
           loss-based filter and returned without simulated outputs.
+        And a "failedCandidates" array next to "data": one {"reference", "error"} per candidate
+        whose evaluation raised (a filter or the final simulation threw); it is not ranked.
     """
     ...
 
