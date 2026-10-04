@@ -679,8 +679,13 @@ def calculate_advised_magnetics_from_catalog(
         - "lossesNotEvaluable" (only on such parts): why the part's core losses could not be
           evaluated (its core material has no core-loss model); it is ranked without any
           loss-based filter and returned without simulated outputs.
+        - "judgedFrequencies" (only with a frequency-wise requirement): requirement frequencies
+          in Hz each such filter judged the part on, keyed by filter enum name, e.g.
+          {"IMPEDANCE": [150000.0, 1000000.0]}. IMPEDANCE judges a minimumImpedance point only
+          inside the core material's tabulated mu(f) range; unlisted points were not judged.
         And a "failedCandidates" array next to "data": one {"reference", "error"} per candidate
-        whose evaluation raised (a filter or the final simulation threw); it is not ranked.
+        the search excluded (a filter or the final simulation raised, or the
+        LOSS_MODEL_FREQUENCY_SPAN gate excluded it while losses are computed); it is not ranked.
     """
     ...
 

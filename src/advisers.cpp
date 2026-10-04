@@ -207,6 +207,7 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
 
     auto scoringsPerFilter = magneticAdviser.get_scorings();
     const auto& lossesNotEvaluable = magneticAdviser.get_losses_not_evaluable();
+    const auto& judgedFrequencies = magneticAdviser.get_judged_frequencies();
 
     json results = json();
     results["data"] = json::array();
@@ -228,6 +229,16 @@ json calculate_advised_magnetics_from_catalog(json inputsJson, json catalogJson,
         // and returned without simulated outputs; this field says so, and why.
         if (name && lossesNotEvaluable.count(*name)) {
             result["lossesNotEvaluable"] = lossesNotEvaluable.at(*name);
+        }
+        // The requirement frequencies each frequency-wise filter judged this part on. IMPEDANCE
+        // judges a minimumImpedance point only inside the core material's tabulated mu(f) range;
+        // a point not listed here was not judged (neither passed nor failed).
+        if (name && judgedFrequencies.count(*name)) {
+            json judged;
+            for (auto& [filter, frequencies] : judgedFrequencies.at(*name)) {
+                judged[std::string(magic_enum::enum_name(filter))] = frequencies;
+            }
+            result["judgedFrequencies"] = judged;
         }
         results["data"].push_back(result);
     }
@@ -266,6 +277,7 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
 
     auto scoringsPerFilter = magneticAdviser.get_scorings();
     const auto& lossesNotEvaluable = magneticAdviser.get_losses_not_evaluable();
+    const auto& judgedFrequencies = magneticAdviser.get_judged_frequencies();
 
     json results = json();
     results["data"] = json::array();
@@ -287,6 +299,16 @@ json calculate_advised_magnetics_from_cache(json inputsJson, json filterFlowJson
         // and returned without simulated outputs; this field says so, and why.
         if (name && lossesNotEvaluable.count(*name)) {
             result["lossesNotEvaluable"] = lossesNotEvaluable.at(*name);
+        }
+        // The requirement frequencies each frequency-wise filter judged this part on. IMPEDANCE
+        // judges a minimumImpedance point only inside the core material's tabulated mu(f) range;
+        // a point not listed here was not judged (neither passed nor failed).
+        if (name && judgedFrequencies.count(*name)) {
+            json judged;
+            for (auto& [filter, frequencies] : judgedFrequencies.at(*name)) {
+                judged[std::string(magic_enum::enum_name(filter))] = frequencies;
+            }
+            result["judgedFrequencies"] = judged;
         }
         results["data"].push_back(result);
     }
@@ -519,9 +541,19 @@ void register_adviser_bindings(py::module& m) {
             - "lossesNotEvaluable" (only on such parts): why this part's core losses could
               not be evaluated -- its core material carries no core-loss model. The part is
               ranked without any loss-based filter and returned without simulated outputs.
+            - "judgedFrequencies" (only with a frequency-wise requirement): the requirement
+              frequencies, in Hz, each such filter judged the part on, keyed by filter enum
+              name, e.g. {"IMPEDANCE": [150000.0, 1000000.0]}. IMPEDANCE judges a
+              minimumImpedance point only inside the core material's tabulated mu(f) range;
+              a point not listed was not judged (neither passed nor failed), and the
+              IMPEDANCE score is the mean over the listed points.
             And a "failedCandidates" array next to "data": one {"reference", "error"} per
-            candidate whose evaluation raised (a filter or the final simulation threw). Such a
-            candidate is not ranked; this names it and the error instead of dropping it silently.
+            candidate the search excluded: a filter or the final simulation raised (e.g.
+            IMPEDANCE when no minimumImpedance point lies inside the material's mu(f) range),
+            or the LOSS_MODEL_FREQUENCY_SPAN gate excluded it because an operating frequency
+            lies outside its material's fitted core-loss span while the flow or the final
+            simulation computes core losses. Such a candidate is not ranked; this names it
+            and the reason instead of dropping it silently.
 
         Example:
             >>> inputs = PyMKF.process_inputs(raw_inputs)
@@ -554,6 +586,10 @@ void register_adviser_bindings(py::module& m) {
                         outputs (losses, temperature). False returns the ranking and the
                         per-filter scores only -- much faster over many results -- and a part
                         whose simulation would fail is then returned rather than dropped.
+                        The simulation computes core losses at every operating point, so with
+                        True a part whose material's core-loss fit does not cover an operating
+                        frequency (e.g. a 50 Hz mains point) is excluded and listed in
+                        failedCandidates; with False and no loss-based filter it is kept.
         
         Returns:
             JSON object with "data" array containing ranked results.
@@ -566,9 +602,19 @@ void register_adviser_bindings(py::module& m) {
               not be evaluated -- its core material carries no core-loss model. The part is
               ranked on the filters that apply to it, with no loss-based filter scored, and
               is returned without simulated outputs.
+            - "judgedFrequencies" (only with a frequency-wise requirement): the requirement
+              frequencies, in Hz, each such filter judged the part on, keyed by filter enum
+              name, e.g. {"IMPEDANCE": [150000.0, 1000000.0]}. IMPEDANCE judges a
+              minimumImpedance point only inside the core material's tabulated mu(f) range;
+              a point not listed was not judged (neither passed nor failed), and the
+              IMPEDANCE score is the mean over the listed points.
             And a "failedCandidates" array next to "data": one {"reference", "error"} per
-            candidate whose evaluation raised (a filter or the final simulation threw). Such a
-            candidate is not ranked; this names it and the error instead of dropping it silently.
+            candidate the search excluded: a filter or the final simulation raised (e.g.
+            IMPEDANCE when no minimumImpedance point lies inside the material's mu(f) range),
+            or the LOSS_MODEL_FREQUENCY_SPAN gate excluded it because an operating frequency
+            lies outside its material's fitted core-loss span while the flow or the final
+            simulation computes core losses. Such a candidate is not ranked; this names it
+            and the reason instead of dropping it silently.
         
         Note:
             Cache must be populated before calling this function.
