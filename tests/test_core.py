@@ -245,6 +245,42 @@ class TestPeakWindingCurrent:
             magnetic, op_used, 25.0)
         assert isat > ipeak  # an advised design should not be saturating
 
+    def test_flyback_peak_is_the_primary_current_peak(self):
+        """
+        A CCM flyback, 1:1, 100 kHz, D = 0.5: the primary carries 2 -> 6 A
+        during the on-time, the secondary 6 -> 2 A during the off-time. Each
+        winding alone carries the magnetizing MMF while it conducts, so the
+        magnetizing current peaks at the primary current's peak, 6 A (MKF's
+        shared magnetizing-current decision, DC anchored where the primary
+        conducts alone). The binding used to pass `true` into MKF's dcCurrent
+        argument: a flat 1 A DC under a zero-mean Faraday ripple, ~3 A.
+        """
+        def winding(name, current, voltage):
+            return {
+                "name": name,
+                "frequency": 100000,
+                "current": {"waveform": {"data": current,
+                                         "time": [0, 0.000005, 0.000005, 0.00001]}},
+                "voltage": {"waveform": {"data": voltage,
+                                         "time": [0, 0.000005, 0.000005, 0.00001]}},
+            }
+        op = {
+            "name": "Nominal",
+            "conditions": {"ambientTemperature": 25},
+            "excitationsPerWinding": [
+                winding("Primary", [2, 6, 0, 0], [80, 80, -80, -80]),
+                winding("Secondary", [0, 0, 6, 2], [-80, -80, 80, 80]),
+            ],
+        }
+        inputs = {
+            "designRequirements": {"magnetizingInductance": {"nominal": 100e-6},
+                                   "turnsRatios": [{"nominal": 1.0}]},
+            "operatingPoints": [op],
+        }
+        magnetic, op_used = self._advise_magnetic(inputs)
+        ipeak = PyOpenMagnetics.calculate_peak_winding_current(magnetic, op_used, 0)
+        assert ipeak == pytest.approx(6.0, rel=0.05)
+
     def test_transformer_winding_index_scales_by_turns_ratio(self):
         """
         For a transformer the per-winding magnetizing peak is the primary

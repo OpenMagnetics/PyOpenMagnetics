@@ -445,13 +445,16 @@ double calculate_peak_winding_current(json magneticJson, json operatingPointJson
     }
 
     // The magnetizing (flux-driving) current is referred to the primary
-    // (winding 0): I_mag = (1/L) ∫ v_primary dt, derived from the primary
-    // excitation's voltage. addOffset=true folds the operating DC bias of
-    // the primary current back in, so the returned peak is the saturation-
-    // driving peak (DC + ripple), not just the AC ripple amplitude.
-    auto primaryExcitation = excitations[0];
+    // (winding 0): Faraday on the primary voltage, I_mag = (1/L) ∫ v dt,
+    // plus the DC the winding currents give (a single winding's own current,
+    // or the anchor of windings that do not always conduct together: a
+    // flyback, a forward's reset). This is MKF's one shared decision
+    // (Inputs::calculate_magnetizing_current on the operating point), so the
+    // returned peak is the saturation-driving peak (DC + ripple). The former
+    // call passed `true` into the dcCurrent slot, which C++ converted to a
+    // flat 1 A DC whatever the currents were.
     auto magnetizingCurrent = OpenMagnetics::Inputs::calculate_magnetizing_current(
-        primaryExcitation, magnetizingInductance, true, true);
+        op, 0, magnetizingInductance, magnetic.get_mutable_coil().get_turns_ratios(), true);
     auto processed = magnetizingCurrent.get_processed();
     if (!processed.has_value() || !processed->get_peak().has_value()) {
         throw std::runtime_error(
