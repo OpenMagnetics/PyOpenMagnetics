@@ -44,7 +44,7 @@ json sweep_resistance_over_frequency(json magneticJson, double start, double sto
 json sweep_magnetizing_inductance_over_frequency(json magneticJson, double start, double stop, size_t numberElements, double temperature, std::string mode, std::string title);
 json sweep_magnetizing_inductance_over_temperature(json magneticJson, double start, double stop, size_t numberElements, double frequency, std::string mode, std::string title);
 json sweep_magnetizing_inductance_over_dc_bias(json magneticJson, double start, double stop, size_t numberElements, double temperature, std::string mode, std::string title);
-json sweep_core_losses_over_frequency(json magneticJson, json operatingPointJson, double start, double stop, size_t numberElements, double temperature, std::string mode, std::string title);
+json sweep_core_losses_over_frequency(json magneticJson, json operatingPointJson, json topologyJson, double start, double stop, size_t numberElements, double temperature, std::string mode, std::string title);
 json sweep_winding_losses_over_frequency(json magneticJson, json operatingPointJson, double start, double stop, size_t numberElements, double temperature, std::string mode, std::string title);
 
 // Matrix calculations

@@ -312,10 +312,30 @@ json sweep_magnetizing_inductance_over_dc_bias(json magneticJson, double start, 
     return resultJson;
 }
 
-json sweep_core_losses_over_frequency(json magneticJson, json operatingPointJson, double start, double stop, size_t numberElements, double temperature, std::string mode, std::string title) {
+// The generated from_json leaves a Topology untouched for a name it does not know, so an unknown
+// name would reach the model as an uninitialised value: match it against each topology's own
+// spelling and throw when none matches.
+static std::optional<MAS::Topology> parse_optional_topology(const json& topologyJson) {
+    if (topologyJson.is_null()) {
+        return std::nullopt;
+    }
+    for (auto candidate : magic_enum::enum_values<MAS::Topology>()) {
+        json spelling;
+        to_json(spelling, candidate);
+        if (spelling == topologyJson) {
+            return candidate;
+        }
+    }
+    throw std::invalid_argument("Unknown topology " + topologyJson.dump());
+}
+
+// topologyJson: the design's designRequirements.topology, None when the design has none. The
+// magnetizing current that drives the core depends on it (MKF ABT #1754).
+json sweep_core_losses_over_frequency(json magneticJson, json operatingPointJson, json topologyJson, double start, double stop, size_t numberElements, double temperature, std::string mode, std::string title) {
     OpenMagnetics::Magnetic magnetic(magneticJson);
     OperatingPoint operatingPoint(operatingPointJson);
-    auto result = OpenMagnetics::Sweeper::sweep_core_losses_over_frequency(magnetic, operatingPoint, start, stop, numberElements, temperature, mode, title);
+    auto topology = parse_optional_topology(topologyJson);
+    auto result = OpenMagnetics::Sweeper::sweep_core_losses_over_frequency(magnetic, operatingPoint, topology, start, stop, numberElements, temperature, mode, title);
     json resultJson;
     to_json(resultJson, result);
     return resultJson;
@@ -776,13 +796,14 @@ void register_simulation_bindings(py::module& m) {
     m.def("sweep_core_losses_over_frequency", &sweep_core_losses_over_frequency,
         py::arg("magnetic_json"),
         py::arg("operating_point_json"),
+        py::arg("topology"),
         py::arg("start"),
         py::arg("stop"),
         py::arg("number_elements"),
         py::arg("temperature"),
         py::arg("mode"),
         py::arg("title"),
-        "Sweep core losses over a frequency range.",
+        "Sweep core losses over a frequency range. topology: the design's designRequirements.topology, None when it has none.",
         py::call_guard<py::gil_scoped_release>());
 
     m.def("sweep_winding_losses_over_frequency", &sweep_winding_losses_over_frequency,
