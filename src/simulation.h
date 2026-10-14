@@ -6,6 +6,9 @@ namespace PyMKF {
 
 // Simulation
 json simulate(json inputsJson, json magneticJson, json modelsData);
+// ABT #1855: MKF's findings on a simulated MAS (one output per operating point), each naming its
+// operating point: a JSON array of {operatingPointIndex, operatingPointName?, code, message}.
+json analyze_results(json masJson);
 json build_datasheet(json inputsJson, json magneticJson, json modelsData);
 
 // Export

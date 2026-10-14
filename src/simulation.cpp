@@ -1,4 +1,5 @@
 #include "simulation.h"
+#include "processors/ResultsAnalyzer.h"
 
 namespace PyMKF {
 
@@ -20,6 +21,14 @@ json simulate(json inputsJson, json magneticJson, json modelsData) {
 
     json result;
     to_json(result, mas);
+    return result;
+}
+
+json analyze_results(json masJson) {
+    OpenMagnetics::Mas mas(masJson);
+    auto findings = OpenMagnetics::ResultsAnalyzer::analyze_results(mas);
+    json result;
+    OpenMagnetics::to_json(result, findings);
     return result;
 }
 
@@ -463,6 +472,25 @@ void register_simulation_bindings(py::module& m) {
         )pbdoc",
         py::call_guard<py::gil_scoped_release>());
     
+    m.def("analyze_results", &analyze_results,
+        R"pbdoc(
+        MKF's findings on a simulated MAS (ABT #1855).
+
+        simulate gives its numbers for every operating point and does not judge them; this says
+        whether they describe a part that works: a saturating core, a voltage that is not
+        volt-second balanced (simulated on its balanced part), a core or winding above a
+        temperature limit its part states (or a part that states none), a core driven past the
+        temperatures its material data covers.
+
+        Args:
+            mas_json: a simulated MAS, with one output per operating point.
+
+        Returns:
+            JSON array of {operatingPointIndex, operatingPointName (when the point has one),
+            code, message}. Raises when the MAS lacks an output for an operating point.
+        )pbdoc",
+        py::call_guard<py::gil_scoped_release>());
+
     m.def("build_datasheet", &build_datasheet,
         R"pbdoc(
         Build a manufacturer-style datasheet for a magnetic from MKF's own simulation.
