@@ -32,7 +32,11 @@ json calculate_core_losses(json coreData, json coilData, json inputsData, json m
     OpenMagnetics::MagneticSimulator magneticSimulator;
     magneticSimulator.set_core_losses_model_name(coreLossesModelName);
     magneticSimulator.set_reluctance_model_name(reluctanceModelName);
-    auto coreLossesOutput = magneticSimulator.calculate_core_losses(operatingPoint, magnetic);
+    // ABT #1876 (Alf, 2026-10-14): a point with no thermal operating point gets its core losses at ambient and
+    // NO temperature (temperatureOutput stays empty); its coreLosses.temperature is the ambient they were
+    // evaluated at, not an operating temperature.
+    std::optional<TemperatureOutput> temperatureOutput;
+    auto coreLossesOutput = magneticSimulator.calculate_core_losses(operatingPoint, magnetic, nullptr, &temperatureOutput);
     json result;
     to_json(result, coreLossesOutput);
 
@@ -44,8 +48,12 @@ json calculate_core_losses(json coreData, json coilData, json inputsData, json m
     result["voltageRms"] = operatingPoint.get_mutable_excitations_per_winding()[0].get_voltage().value().get_processed().value().get_rms().value();
     result["currentRms"] = operatingPoint.get_mutable_excitations_per_winding()[0].get_current().value().get_processed().value().get_rms().value();
     result["apparentPower"] = operatingPoint.get_mutable_excitations_per_winding()[0].get_voltage().value().get_processed().value().get_rms().value() * operatingPoint.get_mutable_excitations_per_winding()[0].get_current().value().get_processed().value().get_rms().value();
-    result["maximumCoreTemperature"] = coreLossesOutput.get_temperature();
-    result["maximumCoreTemperatureRise"] = coreLossesOutput.get_temperature() - operatingPoint.get_conditions().get_ambient_temperature();
+    // The core temperature the losses were solved at, only when the point has a thermal operating point:
+    // otherwise both keys are absent.
+    if (temperatureOutput) {
+        result["maximumCoreTemperature"] = coreLossesOutput.get_temperature();
+        result["maximumCoreTemperatureRise"] = coreLossesOutput.get_temperature() - operatingPoint.get_conditions().get_ambient_temperature();
+    }
 
     return result;
 }
@@ -353,8 +361,10 @@ void register_losses_bindings(py::module& m) {
                 - voltageRms: RMS voltage in Volts
                 - currentRms: RMS current in Amperes
                 - apparentPower: Apparent power in VA
-                - maximumCoreTemperature: Estimated max temperature in Celsius
-                - maximumCoreTemperatureRise: Temperature rise in Kelvin
+                - maximumCoreTemperature: Core temperature the losses were solved at, in Celsius.
+                  Absent when the point has no thermal operating point (the losses are then
+                  those at ambient; analyze_results reports NO_THERMAL_OPERATING_POINT).
+                - maximumCoreTemperatureRise: Temperature rise in Kelvin; absent likewise.
         
         Example:
             >>> models = {"coreLosses": "IGSE", "reluctance": "ZHANG"}
