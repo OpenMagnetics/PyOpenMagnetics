@@ -283,6 +283,16 @@ message(STATUS "Compiling MAS")
 file(GLOB_RECURSE MAS_SCHEMA_FILES CONFIGURE_DEPENDS "${MAS_DIR}/schemas/*.json")
 file(GLOB_RECURSE PEAS_SCHEMA_FILES CONFIGURE_DEPENDS "${MKF_DIR}/PEAS/schemas/*.json")
 
+# MKF's own build runs a post-generation step on MAS.hpp (scripts/mas_const_ref_getters.py): it adds a const&
+# accessor, get_<name>_ref(), next to every optional getter and makes the setters move. MKF's sources call those
+# accessors, so the header PyOM generates must get the same step. Run only when the MKF checkout ships the script.
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(MKF_MAS_POSTGEN_COMMAND "")
+set(MKF_MAS_POSTGEN_DEPENDS "")
+if(EXISTS "${MKF_DIR}/scripts/mas_const_ref_getters.py")
+    set(MKF_MAS_POSTGEN_COMMAND COMMAND "${Python3_EXECUTABLE}" "${MKF_DIR}/scripts/mas_const_ref_getters.py" "${MAS_DIRECTORY}/MAS.hpp")
+    set(MKF_MAS_POSTGEN_DEPENDS "${MKF_DIR}/scripts/mas_const_ref_getters.py")
+endif()
 add_custom_command(
   OUTPUT "${MAS_DIRECTORY}/MAS.hpp"
   # Force regeneration by removing output first
@@ -369,7 +379,8 @@ add_custom_command(
   # help: it runs only once CMake has already decided to regenerate.)
   # Globbed rather than repeating the ~80-entry -S list, which would drift out of
   # sync with it; CONFIGURE_DEPENDS also re-globs when a schema file is added.
-  DEPENDS ${MAS_SCHEMA_FILES} ${PEAS_SCHEMA_FILES}
+  ${MKF_MAS_POSTGEN_COMMAND}
+  DEPENDS ${MAS_SCHEMA_FILES} ${PEAS_SCHEMA_FILES} ${MKF_MAS_POSTGEN_DEPENDS}
   USES_TERMINAL)
 
 add_custom_target(PyMASGeneration
@@ -429,6 +440,20 @@ file(GLOB SOURCES src/*.cpp
     ${MKF_DIR}/src/processors/*.cpp
     ${MKF_DIR}/src/support/*.cpp
     )
+
+# MKF parses its MAS databases with simdjson (src/support/FastJsonParse.cpp), compiled from the single-header
+# amalgamation as in MKF's own CMakeLists.txt; only those two files see its header.
+if(EXISTS "${MKF_DIR}/src/support/FastJsonParse.cpp")
+    FetchContent_Declare(simdjson
+        GIT_REPOSITORY https://github.com/simdjson/simdjson.git
+        GIT_TAG  tags/v5.0.5
+        GIT_SHALLOW TRUE
+        SOURCE_SUBDIR singleheader-not-a-cmake-project)
+    FetchContent_MakeAvailable(simdjson)
+    list(APPEND SOURCES "${simdjson_SOURCE_DIR}/singleheader/simdjson.cpp")
+    set_source_files_properties("${simdjson_SOURCE_DIR}/singleheader/simdjson.cpp" "${MKF_DIR}/src/support/FastJsonParse.cpp"
+        PROPERTIES INCLUDE_DIRECTORIES "${simdjson_SOURCE_DIR}/singleheader")
+endif()
 
 # converter.cpp is now a thin shim over the Kirchhoff string API (libKirchhoffApi) — re-enabled.
 
