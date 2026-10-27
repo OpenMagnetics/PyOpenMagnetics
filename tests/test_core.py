@@ -4,6 +4,7 @@ Tests for PyOpenMagnetics Core data retrieval and calculations.
 These tests mirror TestCore.cpp and TestCoreAdviser.cpp from MKF,
 verifying core shape, material, and gapping calculations.
 """
+import math
 import pytest
 import PyOpenMagnetics
 
@@ -360,11 +361,20 @@ class TestComplexPermeabilityFrequencyRange:
         # A07's tabulated mu''(f) ends at ~17 MHz (mu' extended to it by Kramers-Kronig in MAS).
         assert 1e7 < span["maximum"] < 1e8
 
-    def test_inside_the_span_answers_and_outside_it_throws(self):
+    def test_inside_the_span_answers_and_above_it_estimates(self):
+        # MKF ABT #1861: outside the tabulated span the complex permeability of a material the
+        # estimator covers is answered with the approved estimate, no longer thrown
+        # (MATERIAL_FREQUENCY_OUT_OF_SPAN). Inside the span the table answers, as before.
         material = PyOpenMagnetics.find_core_material_by_name("A07")
         span = PyOpenMagnetics.calculate_complex_permeability_frequency_range(material)
         assert span == PyOpenMagnetics.calculate_complex_permeability_frequency_range("A07")
         inside = PyOpenMagnetics.calculate_complex_permeability(material, span["maximum"] * 0.99)
         assert inside["imaginary"] > 0
-        with pytest.raises(Exception):
-            PyOpenMagnetics.calculate_complex_permeability(material, span["maximum"] * 1.01)
+        at_edge = PyOpenMagnetics.calculate_complex_permeability(material, span["maximum"])
+        above = PyOpenMagnetics.calculate_complex_permeability(material, span["maximum"] * 1.01)
+        # A finite estimate that continues the table: same sign of both parts as at the span's
+        # end, and mu'' still falling with frequency there.
+        for part in ("real", "imaginary"):
+            assert math.isfinite(above[part])
+            assert above[part] * at_edge[part] > 0
+        assert 0 < above["imaginary"] <= at_edge["imaginary"]
