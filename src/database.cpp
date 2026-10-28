@@ -1,4 +1,5 @@
 #include "database.h"
+#include "support/FastJsonParse.h"
 #include <sstream>
 
 namespace PyMKF {
@@ -216,7 +217,8 @@ std::string magnetic_cache_key(const OpenMagnetics::Magnetic& magnetic) {
 }
 
 std::pair<std::string, OpenMagnetics::Magnetic> read_magnetic_line(const std::string& line, bool expand) {
-    json recordJson = json::parse(line);
+    // simdjson parses the catalogue line into the same nlohmann::json tree json::parse builds.
+    json recordJson = OpenMagnetics::parse_json_fast(line.data(), line.size());
     OpenMagnetics::Magnetic magnetic(recordJson);
     if (expand) {
         magnetic = OpenMagnetics::magnetic_autocomplete(magnetic);
@@ -262,7 +264,7 @@ std::vector<std::pair<std::string, OpenMagnetics::Magnetic>> stage_magnetics(std
         catch (const std::exception& e) {
             std::string reference;
             try {
-                reference = reference_hint(json::parse(line));
+                reference = reference_hint(OpenMagnetics::parse_json_fast(line.data(), line.size()));
             }
             catch (const std::exception&) {
                 // The line is not even json; the location alone identifies it.
