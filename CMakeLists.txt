@@ -31,14 +31,16 @@ else ()
     # Enable Link Time Optimization to reduce binary size
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION FALSE)  # TEMP: disable LTO (OOM)
 
-    # Wheel/CI build: -O1 keeps compilation fast and low-memory. -g is
+    # Wheel/CI build: -O2 (Alf, 2026-10-28, ABT #2124: at -O1 the thermal network's elimination ran as a
+    # scalar loop and was 43% of a catalogue search). Still the baseline x86-64 target with no -march, so no
+    # FMA contraction: results are not expected to change from -O1. -g is
     # intentionally dropped — full debug info on the large pybind11 + json
     # translation units (converter.cpp is ~6k lines) balloons RAM during
     # compile and OOM-kills CI runners (exit 143). Frame pointers are kept
     # for usable backtraces. We REPLACE (not append) the flags so the -g in
     # the default RelWithDebInfo flags is stripped too. For local debugging
     # with symbols, re-add -g here.
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O1 -DNDEBUG -fno-omit-frame-pointer")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -DNDEBUG -fno-omit-frame-pointer")
 endif()
 
 SET(MAS_DIRECTORY "${CMAKE_BINARY_DIR}/MAS/")
@@ -142,7 +144,7 @@ if(NOT LOCAL_MKF_MAS)
     set(MKF_GIT_TAG "main"
         CACHE STRING "MKF git ref for the vendored PyOM build")
     # Force fresh clone by using a unique timestamp - update this when the pin changes
-    set(MKF_FORCE_REFRESH "2026-10-28-mkf-619fa558")
+    set(MKF_FORCE_REFRESH "2026-10-28-mkf-ff429ce0")
     # Tell MKF to disable matplotplusplus and use SVG-based Painter instead
     set(INCLUDE_PYMKF ON CACHE BOOL "Build Python interface" FORCE)
     # GIT_SUBMODULES_RECURSE pulls in CAS/PEAS (added 2026-04 alongside the
