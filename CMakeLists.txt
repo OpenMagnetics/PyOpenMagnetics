@@ -142,7 +142,7 @@ if(NOT LOCAL_MKF_MAS)
     set(MKF_GIT_TAG "main"
         CACHE STRING "MKF git ref for the vendored PyOM build")
     # Force fresh clone by using a unique timestamp - update this when the pin changes
-    set(MKF_FORCE_REFRESH "2026-10-28-mkf-292dd4c2")
+    set(MKF_FORCE_REFRESH "2026-10-28-mkf-b0672e4b")
     # Tell MKF to disable matplotplusplus and use SVG-based Painter instead
     set(INCLUDE_PYMKF ON CACHE BOOL "Build Python interface" FORCE)
     # GIT_SUBMODULES_RECURSE pulls in CAS/PEAS (added 2026-04 alongside the
@@ -530,6 +530,8 @@ include_directories("src/")
 #   * Default: clone from GitHub at KIRCHHOFF_GIT_TAG (recursive submodules).
 #   * Local dev: -DKIRCHHOFF_SOURCE_DIR=/path/to/Kirchhoff to build a working tree instead.
 include(ExternalProject)
+# macOS: needs Kirchhoff >= 5682825 (Apple ld spelling of the libKirchhoffApi link: -force_load /
+# -exported_symbols_list instead of GNU --whole-archive/--exclude-libs). "main" always includes it.
 set(KIRCHHOFF_GIT_TAG "main" CACHE STRING "Kirchhoff git tag/branch to build (when fetching from GitHub)")
 set(KIRCHHOFF_SOURCE_DIR "" CACHE PATH "Local Kirchhoff working tree (leave empty to fetch from GitHub)")
 set(KIRCHHOFF_BUILD_DIR "${CMAKE_BINARY_DIR}/kirchhoff-build")
