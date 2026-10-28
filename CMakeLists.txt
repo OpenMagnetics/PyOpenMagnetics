@@ -142,7 +142,7 @@ if(NOT LOCAL_MKF_MAS)
     set(MKF_GIT_TAG "main"
         CACHE STRING "MKF git ref for the vendored PyOM build")
     # Force fresh clone by using a unique timestamp - update this when the pin changes
-    set(MKF_FORCE_REFRESH "2026-10-27-mkf-dae218b7")
+    set(MKF_FORCE_REFRESH "2026-10-28-mkf-292dd4c2")
     # Tell MKF to disable matplotplusplus and use SVG-based Painter instead
     set(INCLUDE_PYMKF ON CACHE BOOL "Build Python interface" FORCE)
     # GIT_SUBMODULES_RECURSE pulls in CAS/PEAS (added 2026-04 alongside the
@@ -283,16 +283,6 @@ message(STATUS "Compiling MAS")
 file(GLOB_RECURSE MAS_SCHEMA_FILES CONFIGURE_DEPENDS "${MAS_DIR}/schemas/*.json")
 file(GLOB_RECURSE PEAS_SCHEMA_FILES CONFIGURE_DEPENDS "${MKF_DIR}/PEAS/schemas/*.json")
 
-# MKF's own build runs a post-generation step on MAS.hpp (scripts/mas_const_ref_getters.py): it adds a const&
-# accessor, get_<name>_ref(), next to every optional getter and makes the setters move. MKF's sources call those
-# accessors, so the header PyOM generates must get the same step. Run only when the MKF checkout ships the script.
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
-set(MKF_MAS_POSTGEN_COMMAND "")
-set(MKF_MAS_POSTGEN_DEPENDS "")
-if(EXISTS "${MKF_DIR}/scripts/mas_const_ref_getters.py")
-    set(MKF_MAS_POSTGEN_COMMAND COMMAND "${Python3_EXECUTABLE}" "${MKF_DIR}/scripts/mas_const_ref_getters.py" "${MAS_DIRECTORY}/MAS.hpp")
-    set(MKF_MAS_POSTGEN_DEPENDS "${MKF_DIR}/scripts/mas_const_ref_getters.py")
-endif()
 add_custom_command(
   OUTPUT "${MAS_DIRECTORY}/MAS.hpp"
   # Force regeneration by removing output first
@@ -379,8 +369,7 @@ add_custom_command(
   # help: it runs only once CMake has already decided to regenerate.)
   # Globbed rather than repeating the ~80-entry -S list, which would drift out of
   # sync with it; CONFIGURE_DEPENDS also re-globs when a schema file is added.
-  ${MKF_MAS_POSTGEN_COMMAND}
-  DEPENDS ${MAS_SCHEMA_FILES} ${PEAS_SCHEMA_FILES} ${MKF_MAS_POSTGEN_DEPENDS}
+  DEPENDS ${MAS_SCHEMA_FILES} ${PEAS_SCHEMA_FILES}
   USES_TERMINAL)
 
 add_custom_target(PyMASGeneration
