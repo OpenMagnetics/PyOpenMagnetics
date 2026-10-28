@@ -530,6 +530,8 @@ include_directories("src/")
 #   * Default: clone from GitHub at KIRCHHOFF_GIT_TAG (recursive submodules).
 #   * Local dev: -DKIRCHHOFF_SOURCE_DIR=/path/to/Kirchhoff to build a working tree instead.
 include(ExternalProject)
+# macOS: needs Kirchhoff >= 5682825 (Apple ld spelling of the libKirchhoffApi link: -force_load /
+# -exported_symbols_list instead of GNU --whole-archive/--exclude-libs). "main" always includes it.
 set(KIRCHHOFF_GIT_TAG "main" CACHE STRING "Kirchhoff git tag/branch to build (when fetching from GitHub)")
 set(KIRCHHOFF_SOURCE_DIR "" CACHE PATH "Local Kirchhoff working tree (leave empty to fetch from GitHub)")
 set(KIRCHHOFF_BUILD_DIR "${CMAKE_BINARY_DIR}/kirchhoff-build")
