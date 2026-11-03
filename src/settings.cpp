@@ -99,7 +99,6 @@ json get_settings() {
         to_json(aux, OpenMagnetics::settings.get_effective_parameter_standard());
         settingsJson["effectiveParameterStandard"] = aux;
     }
-    settingsJson["nanocrystallineStackingFactor"] = OpenMagnetics::settings.get_nanocrystalline_stacking_factor();
 
     // Painter
     settingsJson["painterNumberPointsX"] = OpenMagnetics::settings.get_painter_number_points_x();
@@ -300,7 +299,6 @@ void set_settings(json settingsJson) {
         from_json(settingsJson["effectiveParameterStandard"], standard);
         OpenMagnetics::settings.set_effective_parameter_standard(standard);
     }
-    if (settingsJson.contains("nanocrystallineStackingFactor")) OpenMagnetics::settings.set_nanocrystalline_stacking_factor(settingsJson["nanocrystallineStackingFactor"]);
 
     // Painter
     if (settingsJson.contains("painterNumberPointsX")) OpenMagnetics::settings.set_painter_number_points_x(settingsJson["painterNumberPointsX"]);
