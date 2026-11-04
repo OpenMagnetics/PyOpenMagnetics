@@ -55,6 +55,30 @@ json calculate_core_losses(json coreData, json coilData, json inputsData, json m
         result["maximumCoreTemperatureRise"] = coreLossesOutput.get_temperature() - operatingPoint.get_conditions().get_ambient_temperature();
     }
 
+    // ABT #2264: when its own losses drive the core to its material's data limit (its Curie point, or where its
+    // permeability or loss data ends), MKF holds it there (ABT #1855, #2078). Held at Curie it is magnetized as the
+    // paramagnetic core it is, so the published losses are tiny while the temperature is the limit. Without these keys a
+    // held point read like a cool, low-loss one. Always present, so the absence of a hold is stated, not implied.
+    auto lossesBeforeHold = magneticSimulator.get_last_losses_before_hold();
+    result["coreHeldAtDataLimit"] = lossesBeforeHold.has_value();
+    if (lossesBeforeHold) {
+        const auto& held = lossesBeforeHold.value();
+        std::string limit;
+        switch (held.heldAt.source) {
+            case OpenMagnetics::CoreDataCeilingSource::CURIE_TEMPERATURE: limit = "curieTemperature"; break;
+            case OpenMagnetics::CoreDataCeilingSource::PERMEABILITY_TABLE_END: limit = "permeabilityDataEnd"; break;
+            case OpenMagnetics::CoreDataCeilingSource::STEINMETZ_TEMPERATURE_FACTOR_END: limit = "lossDataEnd"; break;
+        }
+        result["coreHeldAt"] = {{"temperature", held.heldAt.temperature}, {"limit", limit}};
+        // The last iterate with the core still the material its data describes: the losses that drove it to the limit.
+        json beforeHold;
+        to_json(beforeHold, held.coreLosses);
+        result["coreLossesBeforeHold"] = beforeHold;
+    }
+    if (temperatureOutput) {
+        result["temperatureMethod"] = temperatureOutput->get_method_used();
+    }
+
     return result;
 }
 

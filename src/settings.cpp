@@ -1,4 +1,8 @@
 #include "settings.h"
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace PyMKF {
 
@@ -261,198 +265,235 @@ json get_settings() {
     settingsJson["preferredCoreMaterialPowderManufacturer"] = OpenMagnetics::settings.get_preferred_core_material_powder_manufacturer();
     settingsJson["coreCrossReferencerAllowDifferentCoreMaterialType"] = OpenMagnetics::settings.get_core_cross_referencer_allow_different_core_material_type();
 
+    // Material data (ABT #2265)
+    settingsJson["allowMaterialDataExtrapolation"] = OpenMagnetics::settings.get_allow_material_data_extrapolation();
+
     return settingsJson;
 }
 
-void set_settings(json settingsJson) {
+// Applies every key of settingsJson that PyOM knows. With checkedKeys set, it also records each key name it looks
+// for, so calling it on an empty object lists the known keys without applying anything (set_settings uses this).
+static void apply_settings(json settingsJson, std::set<std::string>* checkedKeys) {
+    auto has = [&](const char* key) {
+        if (checkedKeys) checkedKeys->insert(key);
+        return settingsJson.contains(key);
+    };
+    // Material data (ABT #2265): whether material data (Steinmetz, permeability, ...) is evaluated outside the range
+    // it was measured on, holding the nearest data with a warning, or throws there.
+    if (has("allowMaterialDataExtrapolation")) OpenMagnetics::settings.set_allow_material_data_extrapolation(settingsJson["allowMaterialDataExtrapolation"]);
+
     // General
-    if (settingsJson.contains("verbose")) OpenMagnetics::settings.set_verbose(settingsJson["verbose"]);
-    if (settingsJson.contains("useToroidalCores")) OpenMagnetics::settings.set_use_toroidal_cores(settingsJson["useToroidalCores"]);
-    if (settingsJson.contains("useConcentricCores")) OpenMagnetics::settings.set_use_concentric_cores(settingsJson["useConcentricCores"]);
-    if (settingsJson.contains("useOnlyCoresInStock")) OpenMagnetics::settings.set_use_only_cores_in_stock(settingsJson["useOnlyCoresInStock"]);
-    if (settingsJson.contains("usePowderCores")) OpenMagnetics::settings.set_use_powder_cores(settingsJson["usePowderCores"]);
+    if (has("verbose")) OpenMagnetics::settings.set_verbose(settingsJson["verbose"]);
+    if (has("useToroidalCores")) OpenMagnetics::settings.set_use_toroidal_cores(settingsJson["useToroidalCores"]);
+    if (has("useConcentricCores")) OpenMagnetics::settings.set_use_concentric_cores(settingsJson["useConcentricCores"]);
+    if (has("useOnlyCoresInStock")) OpenMagnetics::settings.set_use_only_cores_in_stock(settingsJson["useOnlyCoresInStock"]);
+    if (has("usePowderCores")) OpenMagnetics::settings.set_use_powder_cores(settingsJson["usePowderCores"]);
 
     // Inputs
-    if (settingsJson.contains("inputsTrimHarmonics")) OpenMagnetics::settings.set_inputs_trim_harmonics(settingsJson["inputsTrimHarmonics"]);
-    if (settingsJson.contains("inputsNumberPointsSampledWaveforms")) OpenMagnetics::settings.set_inputs_number_points_sampled_waveforms(settingsJson["inputsNumberPointsSampledWaveforms"]);
+    if (has("inputsTrimHarmonics")) OpenMagnetics::settings.set_inputs_trim_harmonics(settingsJson["inputsTrimHarmonics"]);
+    if (has("inputsNumberPointsSampledWaveforms")) OpenMagnetics::settings.set_inputs_number_points_sampled_waveforms(settingsJson["inputsNumberPointsSampledWaveforms"]);
 
     // Magnetizing inductance
-    if (settingsJson.contains("magnetizingInductanceIncludeAirInductance")) OpenMagnetics::settings.set_magnetizing_inductance_include_air_inductance(settingsJson["magnetizingInductanceIncludeAirInductance"]);
+    if (has("magnetizingInductanceIncludeAirInductance")) OpenMagnetics::settings.set_magnetizing_inductance_include_air_inductance(settingsJson["magnetizingInductanceIncludeAirInductance"]);
 
     // Coil
-    if (settingsJson.contains("coilAllowMarginTape")) OpenMagnetics::settings.set_coil_allow_margin_tape(settingsJson["coilAllowMarginTape"]);
-    if (settingsJson.contains("coilAllowInsulatedWire")) OpenMagnetics::settings.set_coil_allow_insulated_wire(settingsJson["coilAllowInsulatedWire"]);
-    if (settingsJson.contains("coilFillSectionsWithMarginTape")) OpenMagnetics::settings.set_coil_fill_sections_with_margin_tape(settingsJson["coilFillSectionsWithMarginTape"]);
-    if (settingsJson.contains("coilWindEvenIfNotFit")) OpenMagnetics::settings.set_coil_wind_even_if_not_fit(settingsJson["coilWindEvenIfNotFit"]);
-    if (settingsJson.contains("coilDelimitAndCompact")) OpenMagnetics::settings.set_coil_delimit_and_compact(settingsJson["coilDelimitAndCompact"]);
-    if (settingsJson.contains("coilTryRewind")) OpenMagnetics::settings.set_coil_try_rewind(settingsJson["coilTryRewind"]);
-    if (settingsJson.contains("coilIncludeAdditionalCoordinates")) OpenMagnetics::settings.set_coil_include_additional_coordinates(settingsJson["coilIncludeAdditionalCoordinates"]);
-    if (settingsJson.contains("coilEqualizeMargins")) OpenMagnetics::settings.set_coil_equalize_margins(settingsJson["coilEqualizeMargins"]);
-    if (settingsJson.contains("coilOnlyOneTurnPerLayerInContiguousRectangular")) OpenMagnetics::settings.set_coil_only_one_turn_per_layer_in_contiguous_rectangular(settingsJson["coilOnlyOneTurnPerLayerInContiguousRectangular"]);
-    if (settingsJson.contains("coilMaximumLayersPlanar")) OpenMagnetics::settings.set_coil_maximum_layers_planar(settingsJson["coilMaximumLayersPlanar"]);
-    if (settingsJson.contains("coilMesherInsideTurnsFactor")) OpenMagnetics::settings.set_coil_mesher_inside_turns_factor(settingsJson["coilMesherInsideTurnsFactor"]);
-    if (settingsJson.contains("coilEnableUserWindingLossesModels")) OpenMagnetics::settings.set_coil_enable_user_winding_losses_models(settingsJson["coilEnableUserWindingLossesModels"]);
+    if (has("coilAllowMarginTape")) OpenMagnetics::settings.set_coil_allow_margin_tape(settingsJson["coilAllowMarginTape"]);
+    if (has("coilAllowInsulatedWire")) OpenMagnetics::settings.set_coil_allow_insulated_wire(settingsJson["coilAllowInsulatedWire"]);
+    if (has("coilFillSectionsWithMarginTape")) OpenMagnetics::settings.set_coil_fill_sections_with_margin_tape(settingsJson["coilFillSectionsWithMarginTape"]);
+    if (has("coilWindEvenIfNotFit")) OpenMagnetics::settings.set_coil_wind_even_if_not_fit(settingsJson["coilWindEvenIfNotFit"]);
+    if (has("coilDelimitAndCompact")) OpenMagnetics::settings.set_coil_delimit_and_compact(settingsJson["coilDelimitAndCompact"]);
+    if (has("coilTryRewind")) OpenMagnetics::settings.set_coil_try_rewind(settingsJson["coilTryRewind"]);
+    if (has("coilIncludeAdditionalCoordinates")) OpenMagnetics::settings.set_coil_include_additional_coordinates(settingsJson["coilIncludeAdditionalCoordinates"]);
+    if (has("coilEqualizeMargins")) OpenMagnetics::settings.set_coil_equalize_margins(settingsJson["coilEqualizeMargins"]);
+    if (has("coilOnlyOneTurnPerLayerInContiguousRectangular")) OpenMagnetics::settings.set_coil_only_one_turn_per_layer_in_contiguous_rectangular(settingsJson["coilOnlyOneTurnPerLayerInContiguousRectangular"]);
+    if (has("coilMaximumLayersPlanar")) OpenMagnetics::settings.set_coil_maximum_layers_planar(settingsJson["coilMaximumLayersPlanar"]);
+    if (has("coilMesherInsideTurnsFactor")) OpenMagnetics::settings.set_coil_mesher_inside_turns_factor(settingsJson["coilMesherInsideTurnsFactor"]);
+    if (has("coilEnableUserWindingLossesModels")) OpenMagnetics::settings.set_coil_enable_user_winding_losses_models(settingsJson["coilEnableUserWindingLossesModels"]);
 
     // Effective parameter standard
-    if (settingsJson.contains("effectiveParameterStandard")) {
+    if (has("effectiveParameterStandard")) {
         EffectiveParameterStandard standard;
         from_json(settingsJson["effectiveParameterStandard"], standard);
         OpenMagnetics::settings.set_effective_parameter_standard(standard);
     }
 
     // Painter
-    if (settingsJson.contains("painterNumberPointsX")) OpenMagnetics::settings.set_painter_number_points_x(settingsJson["painterNumberPointsX"]);
-    if (settingsJson.contains("painterNumberPointsY")) OpenMagnetics::settings.set_painter_number_points_y(settingsJson["painterNumberPointsY"]);
-    if (settingsJson.contains("painterMode")) OpenMagnetics::settings.set_painter_mode(settingsJson["painterMode"]);
-    if (settingsJson.contains("painterLogarithmicScale")) OpenMagnetics::settings.set_painter_logarithmic_scale(settingsJson["painterLogarithmicScale"]);
-    if (settingsJson.contains("painterIncludeFringing")) OpenMagnetics::settings.set_painter_include_fringing(settingsJson["painterIncludeFringing"]);
-    if (settingsJson.contains("painterDrawSpacer")) OpenMagnetics::settings.set_painter_draw_spacer(settingsJson["painterDrawSpacer"]);
-    if (settingsJson.contains("painterSimpleLitz")) OpenMagnetics::settings.set_painter_simple_litz(settingsJson["painterSimpleLitz"]);
-    if (settingsJson.contains("painterAdvancedLitz")) OpenMagnetics::settings.set_painter_advanced_litz(settingsJson["painterAdvancedLitz"]);
-    if (settingsJson.contains("painterMaximumValueColorbar")) OpenMagnetics::settings.set_painter_maximum_value_colorbar(settingsJson["painterMaximumValueColorbar"]);
-    if (settingsJson.contains("painterMinimumValueColorbar")) OpenMagnetics::settings.set_painter_minimum_value_colorbar(settingsJson["painterMinimumValueColorbar"]);
-    if (settingsJson.contains("painterColorFerrite")) OpenMagnetics::settings.set_painter_color_ferrite(settingsJson["painterColorFerrite"]);
-    if (settingsJson.contains("painterColorBobbin")) OpenMagnetics::settings.set_painter_color_bobbin(settingsJson["painterColorBobbin"]);
-    if (settingsJson.contains("painterColorCopper")) OpenMagnetics::settings.set_painter_color_copper(settingsJson["painterColorCopper"]);
-    if (settingsJson.contains("painterColorInsulation")) OpenMagnetics::settings.set_painter_color_insulation(settingsJson["painterColorInsulation"]);
-    if (settingsJson.contains("painterColorFr4")) OpenMagnetics::settings.set_painter_color_fr4(settingsJson["painterColorFr4"]);
-    if (settingsJson.contains("painterColorEnamel")) OpenMagnetics::settings.set_painter_color_enamel(settingsJson["painterColorEnamel"]);
-    if (settingsJson.contains("painterColorFEP")) OpenMagnetics::settings.set_painter_color_fep(settingsJson["painterColorFEP"]);
-    if (settingsJson.contains("painterColorETFE")) OpenMagnetics::settings.set_painter_color_etfe(settingsJson["painterColorETFE"]);
-    if (settingsJson.contains("painterColorTCA")) OpenMagnetics::settings.set_painter_color_tca(settingsJson["painterColorTCA"]);
-    if (settingsJson.contains("painterColorPFA")) OpenMagnetics::settings.set_painter_color_pfa(settingsJson["painterColorPFA"]);
-    if (settingsJson.contains("painterColorSilk")) OpenMagnetics::settings.set_painter_color_silk(settingsJson["painterColorSilk"]);
-    if (settingsJson.contains("painterColorMargin")) OpenMagnetics::settings.set_painter_color_margin(settingsJson["painterColorMargin"]);
-    if (settingsJson.contains("painterColorSpacer")) OpenMagnetics::settings.set_painter_color_spacer(settingsJson["painterColorSpacer"]);
-    if (settingsJson.contains("painterColorLines")) OpenMagnetics::settings.set_painter_color_lines(settingsJson["painterColorLines"]);
-    if (settingsJson.contains("painterColorText")) OpenMagnetics::settings.set_painter_color_text(settingsJson["painterColorText"]);
-    if (settingsJson.contains("painterColorCurrentDensity")) OpenMagnetics::settings.set_painter_color_current_density(settingsJson["painterColorCurrentDensity"]);
-    if (settingsJson.contains("painterColorMagneticFieldMinimum")) OpenMagnetics::settings.set_painter_color_magnetic_field_minimum(settingsJson["painterColorMagneticFieldMinimum"]);
-    if (settingsJson.contains("painterColorMagneticFieldMaximum")) OpenMagnetics::settings.set_painter_color_magnetic_field_maximum(settingsJson["painterColorMagneticFieldMaximum"]);
+    if (has("painterNumberPointsX")) OpenMagnetics::settings.set_painter_number_points_x(settingsJson["painterNumberPointsX"]);
+    if (has("painterNumberPointsY")) OpenMagnetics::settings.set_painter_number_points_y(settingsJson["painterNumberPointsY"]);
+    if (has("painterMode")) OpenMagnetics::settings.set_painter_mode(settingsJson["painterMode"]);
+    if (has("painterLogarithmicScale")) OpenMagnetics::settings.set_painter_logarithmic_scale(settingsJson["painterLogarithmicScale"]);
+    if (has("painterIncludeFringing")) OpenMagnetics::settings.set_painter_include_fringing(settingsJson["painterIncludeFringing"]);
+    if (has("painterDrawSpacer")) OpenMagnetics::settings.set_painter_draw_spacer(settingsJson["painterDrawSpacer"]);
+    if (has("painterSimpleLitz")) OpenMagnetics::settings.set_painter_simple_litz(settingsJson["painterSimpleLitz"]);
+    if (has("painterAdvancedLitz")) OpenMagnetics::settings.set_painter_advanced_litz(settingsJson["painterAdvancedLitz"]);
+    if (has("painterMaximumValueColorbar")) OpenMagnetics::settings.set_painter_maximum_value_colorbar(settingsJson["painterMaximumValueColorbar"]);
+    if (has("painterMinimumValueColorbar")) OpenMagnetics::settings.set_painter_minimum_value_colorbar(settingsJson["painterMinimumValueColorbar"]);
+    if (has("painterColorFerrite")) OpenMagnetics::settings.set_painter_color_ferrite(settingsJson["painterColorFerrite"]);
+    if (has("painterColorBobbin")) OpenMagnetics::settings.set_painter_color_bobbin(settingsJson["painterColorBobbin"]);
+    if (has("painterColorCopper")) OpenMagnetics::settings.set_painter_color_copper(settingsJson["painterColorCopper"]);
+    if (has("painterColorInsulation")) OpenMagnetics::settings.set_painter_color_insulation(settingsJson["painterColorInsulation"]);
+    if (has("painterColorFr4")) OpenMagnetics::settings.set_painter_color_fr4(settingsJson["painterColorFr4"]);
+    if (has("painterColorEnamel")) OpenMagnetics::settings.set_painter_color_enamel(settingsJson["painterColorEnamel"]);
+    if (has("painterColorFEP")) OpenMagnetics::settings.set_painter_color_fep(settingsJson["painterColorFEP"]);
+    if (has("painterColorETFE")) OpenMagnetics::settings.set_painter_color_etfe(settingsJson["painterColorETFE"]);
+    if (has("painterColorTCA")) OpenMagnetics::settings.set_painter_color_tca(settingsJson["painterColorTCA"]);
+    if (has("painterColorPFA")) OpenMagnetics::settings.set_painter_color_pfa(settingsJson["painterColorPFA"]);
+    if (has("painterColorSilk")) OpenMagnetics::settings.set_painter_color_silk(settingsJson["painterColorSilk"]);
+    if (has("painterColorMargin")) OpenMagnetics::settings.set_painter_color_margin(settingsJson["painterColorMargin"]);
+    if (has("painterColorSpacer")) OpenMagnetics::settings.set_painter_color_spacer(settingsJson["painterColorSpacer"]);
+    if (has("painterColorLines")) OpenMagnetics::settings.set_painter_color_lines(settingsJson["painterColorLines"]);
+    if (has("painterColorText")) OpenMagnetics::settings.set_painter_color_text(settingsJson["painterColorText"]);
+    if (has("painterColorCurrentDensity")) OpenMagnetics::settings.set_painter_color_current_density(settingsJson["painterColorCurrentDensity"]);
+    if (has("painterColorMagneticFieldMinimum")) OpenMagnetics::settings.set_painter_color_magnetic_field_minimum(settingsJson["painterColorMagneticFieldMinimum"]);
+    if (has("painterColorMagneticFieldMaximum")) OpenMagnetics::settings.set_painter_color_magnetic_field_maximum(settingsJson["painterColorMagneticFieldMaximum"]);
     // null means "not set" (see get_settings above), so set_settings(get_settings()) round-trips
     // instead of trying to assign a null to a std::string.
-    if (settingsJson.contains("painterCciCoordinatesPath") && !settingsJson["painterCciCoordinatesPath"].is_null())
+    if (has("painterCciCoordinatesPath") && !settingsJson["painterCciCoordinatesPath"].is_null())
         OpenMagnetics::settings.set_painter_cci_coordinates_path(settingsJson["painterCciCoordinatesPath"]);
-    if (settingsJson.contains("painterMirroringDimension")) OpenMagnetics::settings.set_painter_mirroring_dimension(settingsJson["painterMirroringDimension"]);
-    if (settingsJson.contains("painterMagneticFieldStrengthModel")) {
+    if (has("painterMirroringDimension")) OpenMagnetics::settings.set_painter_mirroring_dimension(settingsJson["painterMirroringDimension"]);
+    if (has("painterMagneticFieldStrengthModel")) {
         OpenMagnetics::MagneticFieldStrengthModels model;
         from_json(settingsJson["painterMagneticFieldStrengthModel"], model);
         OpenMagnetics::settings.set_painter_magnetic_field_strength_model(model);
     }
 
     // Magnetic field
-    if (settingsJson.contains("magneticFieldNumberPointsX")) OpenMagnetics::settings.set_magnetic_field_number_points_x(settingsJson["magneticFieldNumberPointsX"]);
-    if (settingsJson.contains("magneticFieldNumberPointsY")) OpenMagnetics::settings.set_magnetic_field_number_points_y(settingsJson["magneticFieldNumberPointsY"]);
-    if (settingsJson.contains("magneticFieldIncludeFringing")) OpenMagnetics::settings.set_magnetic_field_include_fringing(settingsJson["magneticFieldIncludeFringing"]);
-    if (settingsJson.contains("magneticFieldMirroringDimension")) OpenMagnetics::settings.set_magnetic_field_mirroring_dimension(settingsJson["magneticFieldMirroringDimension"]);
+    if (has("magneticFieldNumberPointsX")) OpenMagnetics::settings.set_magnetic_field_number_points_x(settingsJson["magneticFieldNumberPointsX"]);
+    if (has("magneticFieldNumberPointsY")) OpenMagnetics::settings.set_magnetic_field_number_points_y(settingsJson["magneticFieldNumberPointsY"]);
+    if (has("magneticFieldIncludeFringing")) OpenMagnetics::settings.set_magnetic_field_include_fringing(settingsJson["magneticFieldIncludeFringing"]);
+    if (has("magneticFieldMirroringDimension")) OpenMagnetics::settings.set_magnetic_field_mirroring_dimension(settingsJson["magneticFieldMirroringDimension"]);
 
     // Leakage inductance
-    if (settingsJson.contains("leakageInductanceGridAutoScaling")) OpenMagnetics::settings.set_leakage_inductance_grid_auto_scaling(settingsJson["leakageInductanceGridAutoScaling"]);
-    if (settingsJson.contains("leakageInductanceGridPrecisionLevelPlanar")) OpenMagnetics::settings.set_leakage_inductance_grid_precision_level_planar(settingsJson["leakageInductanceGridPrecisionLevelPlanar"]);
-    if (settingsJson.contains("leakageInductanceGridPrecisionLevelWound")) OpenMagnetics::settings.set_leakage_inductance_grid_precision_level_wound(settingsJson["leakageInductanceGridPrecisionLevelWound"]);
+    if (has("leakageInductanceGridAutoScaling")) OpenMagnetics::settings.set_leakage_inductance_grid_auto_scaling(settingsJson["leakageInductanceGridAutoScaling"]);
+    if (has("leakageInductanceGridPrecisionLevelPlanar")) OpenMagnetics::settings.set_leakage_inductance_grid_precision_level_planar(settingsJson["leakageInductanceGridPrecisionLevelPlanar"]);
+    if (has("leakageInductanceGridPrecisionLevelWound")) OpenMagnetics::settings.set_leakage_inductance_grid_precision_level_wound(settingsJson["leakageInductanceGridPrecisionLevelWound"]);
 
     // Adviser
-    if (settingsJson.contains("coilAdviserMaximumNumberWires")) OpenMagnetics::settings.set_coil_adviser_maximum_number_wires(settingsJson["coilAdviserMaximumNumberWires"]);
-    if (settingsJson.contains("coreAdviserIncludeStacks")) OpenMagnetics::settings.set_core_adviser_include_stacks(settingsJson["coreAdviserIncludeStacks"]);
-    if (settingsJson.contains("coreAdviserIncludeDistributedGaps")) OpenMagnetics::settings.set_core_adviser_include_distributed_gaps(settingsJson["coreAdviserIncludeDistributedGaps"]);
-    if (settingsJson.contains("coreAdviserIncludeMargin")) OpenMagnetics::settings.set_core_adviser_include_margin(settingsJson["coreAdviserIncludeMargin"]);
-    if (settingsJson.contains("coreAdviserEnableIntermediatePruning")) OpenMagnetics::settings.set_core_adviser_enable_intermediate_pruning(settingsJson["coreAdviserEnableIntermediatePruning"]);
-    if (settingsJson.contains("coreAdviserMaximumMagneticsAfterFiltering")) OpenMagnetics::settings.set_core_adviser_maximum_magnetics_after_filtering(settingsJson["coreAdviserMaximumMagneticsAfterFiltering"]);
-    if (settingsJson.contains("coreAdviserEnableTemperatureFilter")) OpenMagnetics::settings.set_core_adviser_enable_temperature_filter(settingsJson["coreAdviserEnableTemperatureFilter"]);
-    if (settingsJson.contains("coreAdviserMaximumTemperature")) OpenMagnetics::settings.set_core_adviser_maximum_temperature(settingsJson["coreAdviserMaximumTemperature"]);
-    if (settingsJson.contains("coreAdviserSaturationMargin")) OpenMagnetics::settings.set_core_adviser_saturation_margin(settingsJson["coreAdviserSaturationMargin"]);
-    if (settingsJson.contains("gappingStrategy")) {
+    if (has("coilAdviserMaximumNumberWires")) OpenMagnetics::settings.set_coil_adviser_maximum_number_wires(settingsJson["coilAdviserMaximumNumberWires"]);
+    if (has("coreAdviserIncludeStacks")) OpenMagnetics::settings.set_core_adviser_include_stacks(settingsJson["coreAdviserIncludeStacks"]);
+    if (has("coreAdviserIncludeDistributedGaps")) OpenMagnetics::settings.set_core_adviser_include_distributed_gaps(settingsJson["coreAdviserIncludeDistributedGaps"]);
+    if (has("coreAdviserIncludeMargin")) OpenMagnetics::settings.set_core_adviser_include_margin(settingsJson["coreAdviserIncludeMargin"]);
+    if (has("coreAdviserEnableIntermediatePruning")) OpenMagnetics::settings.set_core_adviser_enable_intermediate_pruning(settingsJson["coreAdviserEnableIntermediatePruning"]);
+    if (has("coreAdviserMaximumMagneticsAfterFiltering")) OpenMagnetics::settings.set_core_adviser_maximum_magnetics_after_filtering(settingsJson["coreAdviserMaximumMagneticsAfterFiltering"]);
+    if (has("coreAdviserEnableTemperatureFilter")) OpenMagnetics::settings.set_core_adviser_enable_temperature_filter(settingsJson["coreAdviserEnableTemperatureFilter"]);
+    if (has("coreAdviserMaximumTemperature")) OpenMagnetics::settings.set_core_adviser_maximum_temperature(settingsJson["coreAdviserMaximumTemperature"]);
+    if (has("coreAdviserSaturationMargin")) OpenMagnetics::settings.set_core_adviser_saturation_margin(settingsJson["coreAdviserSaturationMargin"]);
+    if (has("gappingStrategy")) {
         GappingOptimizationStrategy strategy;
         from_json(settingsJson["gappingStrategy"], strategy);
         OpenMagnetics::settings.set_gapping_strategy(strategy);
     }
 
     // Wire adviser
-    if (settingsJson.contains("wireAdviserIncludePlanar")) OpenMagnetics::settings.set_wire_adviser_include_planar(settingsJson["wireAdviserIncludePlanar"]);
-    if (settingsJson.contains("wireAdviserIncludeFoil")) OpenMagnetics::settings.set_wire_adviser_include_foil(settingsJson["wireAdviserIncludeFoil"]);
-    if (settingsJson.contains("wireAdviserIncludeRectangular")) OpenMagnetics::settings.set_wire_adviser_include_rectangular(settingsJson["wireAdviserIncludeRectangular"]);
-    if (settingsJson.contains("wireAdviserIncludeLitz")) OpenMagnetics::settings.set_wire_adviser_include_litz(settingsJson["wireAdviserIncludeLitz"]);
-    if (settingsJson.contains("wireAdviserIncludeRound")) OpenMagnetics::settings.set_wire_adviser_include_round(settingsJson["wireAdviserIncludeRound"]);
-    if (settingsJson.contains("wireAdviserAllowRectangularInToroidalCores")) OpenMagnetics::settings.set_wire_adviser_allow_rectangular_in_toroidal_cores(settingsJson["wireAdviserAllowRectangularInToroidalCores"]);
+    if (has("wireAdviserIncludePlanar")) OpenMagnetics::settings.set_wire_adviser_include_planar(settingsJson["wireAdviserIncludePlanar"]);
+    if (has("wireAdviserIncludeFoil")) OpenMagnetics::settings.set_wire_adviser_include_foil(settingsJson["wireAdviserIncludeFoil"]);
+    if (has("wireAdviserIncludeRectangular")) OpenMagnetics::settings.set_wire_adviser_include_rectangular(settingsJson["wireAdviserIncludeRectangular"]);
+    if (has("wireAdviserIncludeLitz")) OpenMagnetics::settings.set_wire_adviser_include_litz(settingsJson["wireAdviserIncludeLitz"]);
+    if (has("wireAdviserIncludeRound")) OpenMagnetics::settings.set_wire_adviser_include_round(settingsJson["wireAdviserIncludeRound"]);
+    if (has("wireAdviserAllowRectangularInToroidalCores")) OpenMagnetics::settings.set_wire_adviser_allow_rectangular_in_toroidal_cores(settingsJson["wireAdviserAllowRectangularInToroidalCores"]);
 
     // Harmonics
-    if (settingsJson.contains("harmonicAmplitudeThresholdQuickMode")) OpenMagnetics::settings.set_harmonic_amplitude_threshold_quick_mode(settingsJson["harmonicAmplitudeThresholdQuickMode"]);
-    if (settingsJson.contains("harmonicAmplitudeThreshold")) OpenMagnetics::settings.set_harmonic_amplitude_threshold(settingsJson["harmonicAmplitudeThreshold"]);
-    if (settingsJson.contains("magneticFieldTurnSumsCacheBytes")) OpenMagnetics::settings.set_magnetic_field_turn_sums_cache_bytes(settingsJson["magneticFieldTurnSumsCacheBytes"].get<size_t>());
+    if (has("harmonicAmplitudeThresholdQuickMode")) OpenMagnetics::settings.set_harmonic_amplitude_threshold_quick_mode(settingsJson["harmonicAmplitudeThresholdQuickMode"]);
+    if (has("harmonicAmplitudeThreshold")) OpenMagnetics::settings.set_harmonic_amplitude_threshold(settingsJson["harmonicAmplitudeThreshold"]);
+    if (has("magneticFieldTurnSumsCacheBytes")) OpenMagnetics::settings.set_magnetic_field_turn_sums_cache_bytes(settingsJson["magneticFieldTurnSumsCacheBytes"].get<size_t>());
 
     // Thermal network
-    if (settingsJson.contains("thermalNetworkStrictGeometry")) OpenMagnetics::settings.set_thermal_network_strict_geometry(settingsJson["thermalNetworkStrictGeometry"]);
+    if (has("thermalNetworkStrictGeometry")) OpenMagnetics::settings.set_thermal_network_strict_geometry(settingsJson["thermalNetworkStrictGeometry"]);
 
     // Models
-    if (settingsJson.contains("magneticFieldStrengthModel")) {
+    if (has("magneticFieldStrengthModel")) {
         OpenMagnetics::MagneticFieldStrengthModels model;
         from_json(settingsJson["magneticFieldStrengthModel"], model);
         OpenMagnetics::settings.set_magnetic_field_strength_model(model);
     }
-    if (settingsJson.contains("magneticFieldStrengthFringingEffectModel")) {
+    if (has("magneticFieldStrengthFringingEffectModel")) {
         OpenMagnetics::MagneticFieldStrengthFringingEffectModels model;
         from_json(settingsJson["magneticFieldStrengthFringingEffectModel"], model);
         OpenMagnetics::settings.set_magnetic_field_strength_fringing_effect_model(model);
     }
-    if (settingsJson.contains("leakageInductanceMagneticFieldStrengthModel")) {
+    if (has("leakageInductanceMagneticFieldStrengthModel")) {
         OpenMagnetics::MagneticFieldStrengthModels model;
         from_json(settingsJson["leakageInductanceMagneticFieldStrengthModel"], model);
         OpenMagnetics::settings.set_leakage_inductance_magnetic_field_strength_model(model);
     }
-    if (settingsJson.contains("reluctanceModel")) {
+    if (has("reluctanceModel")) {
         OpenMagnetics::ReluctanceModels model;
         from_json(settingsJson["reluctanceModel"], model);
         OpenMagnetics::settings.set_reluctance_model(model);
     }
-    if (settingsJson.contains("coreTemperatureModel")) {
+    if (has("coreTemperatureModel")) {
         OpenMagnetics::CoreTemperatureModels model;
         from_json(settingsJson["coreTemperatureModel"], model);
         OpenMagnetics::settings.set_core_temperature_model(model);
     }
-    if (settingsJson.contains("coreThermalResistanceModel")) {
+    if (has("coreThermalResistanceModel")) {
         OpenMagnetics::CoreThermalResistanceModels model;
         from_json(settingsJson["coreThermalResistanceModel"], model);
         OpenMagnetics::settings.set_core_thermal_resistance_model(model);
     }
-    if (settingsJson.contains("windingSkinEffectLossesModel")) {
+    if (has("windingSkinEffectLossesModel")) {
         OpenMagnetics::WindingSkinEffectLossesModels model;
         from_json(settingsJson["windingSkinEffectLossesModel"], model);
         OpenMagnetics::settings.set_winding_skin_effect_losses_model(model);
     }
-    if (settingsJson.contains("windingProximityEffectLossesModel")) {
+    if (has("windingProximityEffectLossesModel")) {
         OpenMagnetics::WindingProximityEffectLossesModels model;
         from_json(settingsJson["windingProximityEffectLossesModel"], model);
         OpenMagnetics::settings.set_winding_proximity_effect_losses_model(model);
     }
-    if (settingsJson.contains("strayCapacitanceModel")) {
+    if (has("strayCapacitanceModel")) {
         OpenMagnetics::StrayCapacitanceModels model;
         from_json(settingsJson["strayCapacitanceModel"], model);
         OpenMagnetics::settings.set_stray_capacitance_model(model);
     }
-    if (settingsJson.contains("electricFieldOutputUnit")) {
+    if (has("electricFieldOutputUnit")) {
         OpenMagnetics::ElectricFieldOutputUnit unit;
         from_json(settingsJson["electricFieldOutputUnit"], unit);
         OpenMagnetics::settings.set_electric_field_output_unit(unit);
     }
 
     // Core losses model
-    if (settingsJson.contains("coreLossesPreferredModelName")) {
+    if (has("coreLossesPreferredModelName")) {
         OpenMagnetics::CoreLossesModels model;
         from_json(settingsJson["coreLossesPreferredModelName"], model);
         OpenMagnetics::settings.set_core_losses_preferred_model_name(model);
     }
 
     // Circuit simulator
-    if (settingsJson.contains("circuitSimulatorCurveFittingMode")) OpenMagnetics::settings.set_circuit_simulator_curve_fitting_mode(settingsJson["circuitSimulatorCurveFittingMode"]);
-    if (settingsJson.contains("circuitSimulatorFracpoleOptions")) OpenMagnetics::settings.set_circuit_simulator_fracpole_options(settingsJson["circuitSimulatorFracpoleOptions"].get<std::map<std::string, double>>());
-    if (settingsJson.contains("circuitSimulatorIncludeSaturation")) OpenMagnetics::settings.set_circuit_simulator_include_saturation(settingsJson["circuitSimulatorIncludeSaturation"]);
-    if (settingsJson.contains("circuitSimulatorIncludeMutualResistance")) OpenMagnetics::settings.set_circuit_simulator_include_mutual_resistance(settingsJson["circuitSimulatorIncludeMutualResistance"]);
-    if (settingsJson.contains("circuitSimulatorCoreLossTopology")) OpenMagnetics::settings.set_circuit_simulator_core_loss_topology(settingsJson["circuitSimulatorCoreLossTopology"]);
+    if (has("circuitSimulatorCurveFittingMode")) OpenMagnetics::settings.set_circuit_simulator_curve_fitting_mode(settingsJson["circuitSimulatorCurveFittingMode"]);
+    if (has("circuitSimulatorFracpoleOptions")) OpenMagnetics::settings.set_circuit_simulator_fracpole_options(settingsJson["circuitSimulatorFracpoleOptions"].get<std::map<std::string, double>>());
+    if (has("circuitSimulatorIncludeSaturation")) OpenMagnetics::settings.set_circuit_simulator_include_saturation(settingsJson["circuitSimulatorIncludeSaturation"]);
+    if (has("circuitSimulatorIncludeMutualResistance")) OpenMagnetics::settings.set_circuit_simulator_include_mutual_resistance(settingsJson["circuitSimulatorIncludeMutualResistance"]);
+    if (has("circuitSimulatorCoreLossTopology")) OpenMagnetics::settings.set_circuit_simulator_core_loss_topology(settingsJson["circuitSimulatorCoreLossTopology"]);
 
     // Preferred manufacturers
-    if (settingsJson.contains("preferredCoreMaterialFerriteManufacturer")) OpenMagnetics::settings.set_preferred_core_material_ferrite_manufacturer(settingsJson["preferredCoreMaterialFerriteManufacturer"]);
-    if (settingsJson.contains("preferredCoreMaterialPowderManufacturer")) OpenMagnetics::settings.set_preferred_core_material_powder_manufacturer(settingsJson["preferredCoreMaterialPowderManufacturer"]);
-    if (settingsJson.contains("coreCrossReferencerAllowDifferentCoreMaterialType")) OpenMagnetics::settings.set_core_cross_referencer_allow_different_core_material_type(settingsJson["coreCrossReferencerAllowDifferentCoreMaterialType"]);
+    if (has("preferredCoreMaterialFerriteManufacturer")) OpenMagnetics::settings.set_preferred_core_material_ferrite_manufacturer(settingsJson["preferredCoreMaterialFerriteManufacturer"]);
+    if (has("preferredCoreMaterialPowderManufacturer")) OpenMagnetics::settings.set_preferred_core_material_powder_manufacturer(settingsJson["preferredCoreMaterialPowderManufacturer"]);
+    if (has("coreCrossReferencerAllowDifferentCoreMaterialType")) OpenMagnetics::settings.set_core_cross_referencer_allow_different_core_material_type(settingsJson["coreCrossReferencerAllowDifferentCoreMaterialType"]);
+}
+
+void set_settings(json settingsJson) {
+    // ABT #2265: an unknown key used to be dropped silently, so a misspelt or not-yet-exposed setting
+    // (e.g. allowMaterialDataExtrapolation before it was added here) looked set and did nothing. The known keys come
+    // from apply_settings itself, so this list cannot drift from what is applied.
+    static const std::set<std::string> knownKeys = [] {
+        std::set<std::string> keys;
+        apply_settings(json::object(), &keys);
+        return keys;
+    }();
+    if (!settingsJson.is_object()) {
+        throw std::invalid_argument("set_settings expects a JSON object of settings, got: " + settingsJson.dump());
+    }
+    std::vector<std::string> unknown;
+    for (const auto& item : settingsJson.items()) {
+        if (!knownKeys.count(item.key())) unknown.push_back(item.key());
+    }
+    if (!unknown.empty()) {
+        std::string list;
+        for (const auto& key : unknown) list += (list.empty() ? "" : ", ") + key;
+        throw std::invalid_argument("set_settings: unknown setting(s): " + list + ". Nothing was applied; get_settings() lists the known keys.");
+    }
+    apply_settings(settingsJson, nullptr);
 }
 
 void reset_settings() {
